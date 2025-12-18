@@ -57,7 +57,7 @@ export const feeds: OracleFeedPlugin[] = [
         "BTC/USD",
         () => fetchCryptoPrice("bitcoin"),
         60,
-        0
+        1.0 // Cost: 1.0 USDC (Testing Payment)
     ),
 
     // Add more feeds as needed:

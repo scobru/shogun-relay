@@ -44,7 +44,7 @@ function createAlphaSignalFeed(): OracleFeedPlugin {
 }
 
 export const feeds: OracleFeedPlugin[] = [
-    // Premium feeds temporarily disabled
-    // createPremiumInsightFeed(),
-    // createAlphaSignalFeed()
+    // Premium feeds enabled
+    createPremiumInsightFeed(),
+    createAlphaSignalFeed()
 ];
