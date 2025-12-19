@@ -191,12 +191,42 @@ router.post("/transfer", strictLimiter, express.json(), async (req, res) => {
 
     const { from, to, amount, message, seaSignature, ethSignature, gunPubKey } = req.body;
 
+    // DEBUG: Log received parameters to trace 400 errors
+    log.debug(
+      {
+        hasFrom: !!from,
+        hasTo: !!to,
+        hasAmount: !!amount,
+        hasMessage: !!message,
+        hasSeaSignature: !!seaSignature,
+        hasEthSignature: !!ethSignature,
+        hasGunPubKey: !!gunPubKey,
+        fromType: typeof from,
+        toType: typeof to,
+        amountType: typeof amount,
+      },
+      "Transfer request received - param check"
+    );
+
     if (!from || !to || !amount || !message || !seaSignature || !ethSignature || !gunPubKey) {
+      log.warn(
+        {
+          from: from || "MISSING",
+          to: to || "MISSING",
+          amount: amount || "MISSING",
+          messageLength: message?.length || 0,
+          seaSignatureLength: seaSignature?.length || 0,
+          ethSignatureLength: ethSignature?.length || 0,
+          gunPubKey: gunPubKey || "MISSING",
+        },
+        "Transfer failed - missing required parameters"
+      );
       return res.status(400).json({
         success: false,
         error: "from, to, amount, message, seaSignature, ethSignature, and gunPubKey required",
       });
     }
+
 
     // Validate addresses
     let fromAddress: string;
