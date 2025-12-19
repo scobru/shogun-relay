@@ -234,7 +234,11 @@ router.post("/transfer", strictLimiter, express.json(), async (req, res) => {
     try {
       fromAddress = ethers.getAddress(from);
       toAddress = ethers.getAddress(to);
-    } catch {
+    } catch (addrError) {
+      log.warn(
+        { from, to, error: String(addrError) },
+        "Transfer failed - invalid address format"
+      );
       return res.status(400).json({
         success: false,
         error: "Invalid address format",
@@ -242,6 +246,10 @@ router.post("/transfer", strictLimiter, express.json(), async (req, res) => {
     }
 
     if (fromAddress.toLowerCase() === toAddress.toLowerCase()) {
+      log.warn(
+        { from: fromAddress, to: toAddress },
+        "Transfer failed - cannot transfer to self"
+      );
       return res.status(400).json({
         success: false,
         error: "Cannot transfer to self",
@@ -251,11 +259,16 @@ router.post("/transfer", strictLimiter, express.json(), async (req, res) => {
     const amountBigInt = BigInt(amount);
 
     if (amountBigInt <= 0n) {
+      log.warn(
+        { amount: amount, amountBigInt: amountBigInt.toString() },
+        "Transfer failed - amount must be positive"
+      );
       return res.status(400).json({
         success: false,
         error: "Amount must be positive",
       });
     }
+
 
     // Get relay keypair for signing
     const relayKeyPair = req.app.get("relayKeyPair") || null;
@@ -2511,6 +2524,8 @@ router.get("/transaction/:txHash", async (req, res) => {
           timestamp: number;
         } | null = null;
 
+        log.debug({ txHash: txHash.trim() }, "Searching for L2 transfer");
+
         try {
           const FrozenData = await import("../utils/frozen-data");
           const entry = await FrozenData.readFrozenEntry(
@@ -2518,6 +2533,16 @@ router.get("/transaction/:txHash", async (req, res) => {
             "bridge-transfers",
             txHash.trim(),
             relayKeyPair?.pub || ""
+          );
+
+          log.debug(
+            {
+              txHash: txHash.trim(),
+              hasEntry: !!entry,
+              verified: entry?.verified,
+              hasData: !!entry?.data
+            },
+            "Direct frozen entry lookup result"
           );
 
           if (entry && entry.verified && entry.data) {
@@ -2556,6 +2581,16 @@ router.get("/transaction/:txHash", async (req, res) => {
         // This handles cases where the hash is the index key (transferHash)
         if (!transfer) {
           const transfers = await listL2Transfers(gun, relayKeyPair?.pub || "");
+
+          log.debug(
+            {
+              txHash: txHash.trim(),
+              transferCount: transfers.length,
+              transferHashes: transfers.slice(0, 5).map(t => t.transferHash.substring(0, 20) + '...')
+            },
+            "L2 transfers list lookup"
+          );
+
 
           // Try exact match first (case-sensitive for base64)
           transfer = transfers.find((t) => t.transferHash === txHash.trim()) || null;
