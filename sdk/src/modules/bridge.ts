@@ -467,6 +467,7 @@ export class BridgeModule {
     source?: "deposit" | "withdrawal" | "transfer";
     error?: string;
   }> {
-    return this.client.get(`/api/v1/bridge/transaction/${txHash}`);
+    // URL-encode the txHash to handle special characters (e.g., / and + in base64 hashes)
+    return this.client.get(`/api/v1/bridge/transaction/${encodeURIComponent(txHash)}`);
   }
 }

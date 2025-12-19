@@ -1,6 +1,6 @@
 {
   "name": "shogun-relay-sdk",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "SDK for interacting with Shogun Relay API - HTTP client for IPFS, deals, registry, and network operations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
