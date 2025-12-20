@@ -193,7 +193,13 @@ router.use(
 // Access Kubo WebUI directly at http://localhost:5001/webui if needed
 
 // Compatibility endpoint for shogun-ipfs: /api/v0/cat
-router.post("/api/v0/cat", async (req: CustomRequest, res: Response) => {
+// This endpoint doesn't need JSON body parsing - it only uses query params
+// We skip body parsing by using a middleware that doesn't parse JSON
+router.post("/api/v0/cat", (req, res, next) => {
+  // Skip JSON body parsing for this endpoint - it only uses query params
+  req.body = undefined;
+  next();
+}, async (req: CustomRequest, res: Response) => {
   try {
     const { arg } = req.query; // IPFS API uses ?arg=CID or ?arg=CID/path/to/file
     const cid = Array.isArray(arg) ? arg[0] : arg;

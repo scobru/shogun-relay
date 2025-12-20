@@ -97,12 +97,16 @@ export class IpfsModule {
       ? `${encodeURIComponent(directoryCid)}/${filePath.split('/').map(p => encodeURIComponent(p)).join('/')}`
       : encodeURIComponent(fullPath);
     
+    // Use GET instead of POST, or send empty string instead of null to avoid JSON parser error
+    // IPFS API v0 cat accepts POST with empty body, but Express JSON parser fails on null
     return this.client.post(
       `/api/v1/ipfs/api/v0/cat?arg=${encodedPath}`,
-      null,
+      "", // Empty string instead of null to avoid JSON parser error
       {
         responseType: "arraybuffer",
-        // Don't set Content-Length header - browser will block it
+        headers: {
+          "Content-Type": "application/octet-stream", // Set content type to avoid JSON parsing
+        },
       }
     );
   }
