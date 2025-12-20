@@ -249,6 +249,45 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
             path: { type: "string" },
           },
         },
+        IPFSDirectoryUploadResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            cid: { type: "string", description: "Directory CID" },
+            directoryCid: { type: "string", description: "Directory CID (same as cid)" },
+            fileCount: { type: "number", description: "Number of files uploaded" },
+            totalSize: { type: "number", description: "Total size in bytes" },
+            totalSizeMB: { type: "number", description: "Total size in MB" },
+            files: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  path: { type: "string", description: "Relative path within directory" },
+                  size: { type: "number" },
+                  mimetype: { type: "string" },
+                },
+              },
+            },
+            authType: { type: "string", enum: ["admin", "user"] },
+            mbUsage: {
+              type: "object",
+              properties: {
+                actualSizeMB: { type: "number" },
+                sizeMB: { type: "number" },
+                verified: { type: "boolean" },
+              },
+            },
+            subscription: {
+              type: "object",
+              properties: {
+                storageUsedMB: { type: "number" },
+                storageRemainingMB: { type: "number" },
+              },
+            },
+          },
+        },
         IPFSPinList: {
           type: "object",
           properties: {
@@ -988,7 +1027,7 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
         post: {
           tags: ["IPFS"],
           summary: "Upload file to IPFS",
-          description: "Upload a file to IPFS",
+          description: "Upload a single file to IPFS",
           operationId: "uploadToIPFS",
           security: [{ bearerAuth: [] }, { tokenHeader: [] }],
           requestBody: {
@@ -1020,6 +1059,86 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
             },
             "401": {
               description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "402": {
+              description: "Payment required (x402 subscription)",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/ipfs/upload-directory": {
+        post: {
+          tags: ["IPFS"],
+          summary: "Upload directory to IPFS",
+          description: "Upload multiple files as a directory to IPFS. Maintains directory structure using relative paths. Files are uploaded with wrap-with-directory=true to preserve structure.",
+          operationId: "uploadDirectoryToIPFS",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    files: {
+                      type: "array",
+                      items: {
+                        type: "string",
+                        format: "binary",
+                      },
+                      description: "Multiple files with relative paths (e.g., index.html, css/style.css, js/app.js)",
+                    },
+                  },
+                  required: ["files"],
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Directory uploaded successfully",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/IPFSDirectoryUploadResponse" },
+                },
+              },
+            },
+            "400": {
+              description: "Bad request - no files provided",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "402": {
+              description: "Payment required (x402 subscription) or storage limit exceeded",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/Error" },

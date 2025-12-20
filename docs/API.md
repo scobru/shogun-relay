@@ -91,11 +91,12 @@ Detailed metrics for monitoring (requires authentication).
 ### IPFS Operations
 
 #### POST `/api/v1/ipfs/upload`
-Upload a file to IPFS.
+Upload a single file to IPFS.
 
 **Headers:**
 - `Content-Type: multipart/form-data`
-- `Authorization: Bearer <token>`
+- `Authorization: Bearer <token>` (admin) OR `X-User-Address: <address>` (user with subscription)
+- `X-Deal-Upload: true` (optional, for storage deals)
 
 **Body:**
 - `file`: File to upload
@@ -104,11 +105,72 @@ Upload a file to IPFS.
 ```json
 {
   "success": true,
-  "cid": "Qm...",
-  "size": 1024,
-  "path": "/ipfs/Qm..."
+  "file": {
+    "hash": "Qm...",
+    "name": "file.txt",
+    "size": 1024,
+    "mimetype": "text/plain"
+  },
+  "cid": "Qm..."
 }
 ```
+
+#### POST `/api/v1/ipfs/upload-directory`
+Upload multiple files as a directory to IPFS. Maintains directory structure using relative paths.
+
+**Headers:**
+- `Content-Type: multipart/form-data`
+- `Authorization: Bearer <token>` (admin) OR `X-User-Address: <address>` (user with subscription)
+- `X-Deal-Upload: true` (optional, for storage deals)
+
+**Body:**
+- `files`: Multiple files with relative paths (e.g., `index.html`, `css/style.css`, `js/app.js`)
+
+**Example:**
+```bash
+curl -X POST http://localhost:8765/api/v1/ipfs/upload-directory \
+  -H "Authorization: Bearer <token>" \
+  -F "files=@index.html" \
+  -F "files=@css/style.css" \
+  -F "files=@js/app.js"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "cid": "QmDirectoryHash...",
+  "directoryCid": "QmDirectoryHash...",
+  "fileCount": 3,
+  "totalSize": 15360,
+  "totalSizeMB": 0.015,
+  "files": [
+    {
+      "name": "index.html",
+      "path": "index.html",
+      "size": 5120,
+      "mimetype": "text/html"
+    },
+    {
+      "name": "style.css",
+      "path": "css/style.css",
+      "size": 2048,
+      "mimetype": "text/css"
+    },
+    {
+      "name": "app.js",
+      "path": "js/app.js",
+      "size": 8192,
+      "mimetype": "application/javascript"
+    }
+  ]
+}
+```
+
+**Notes:**
+- Files are uploaded to IPFS with `wrap-with-directory=true` to maintain directory structure
+- The returned `directoryCid` can be used to access files via `/ipfs/{directoryCid}/path/to/file`
+- For user uploads with x402 subscriptions, storage limits are checked against total size
 
 #### GET `/api/v1/ipfs/cat/:cid`
 Retrieve file content from IPFS by CID.

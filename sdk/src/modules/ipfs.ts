@@ -34,6 +34,47 @@ export class IpfsModule {
     });
   }
 
+  /**
+   * Upload multiple files as a directory to IPFS
+   * Maintains directory structure using relative paths
+   * 
+   * @param files Array of file objects with buffer, filename, path, and contentType
+   * @param userAddress Optional user address for authentication
+   * @returns Promise with directory CID and file information
+   */
+  public async uploadDirectory(
+    files: Array<{
+      buffer: Buffer;
+      filename: string;
+      path: string; // Relative path within directory (e.g., "css/style.css" or "index.html")
+      contentType?: string;
+    }>,
+    userAddress?: string
+  ): Promise<any> {
+    if (!files || files.length === 0) {
+      throw new Error("At least one file is required for directory upload");
+    }
+
+    const form = new FormData();
+    
+    // Add all files to FormData maintaining directory structure
+    files.forEach((file) => {
+      form.append("files", file.buffer, {
+        filename: file.path, // Use path to maintain directory structure
+        contentType: file.contentType || "application/octet-stream",
+      });
+    });
+
+    const headers: any = form.getHeaders();
+    if (userAddress) {
+      headers["x-user-address"] = userAddress;
+    }
+
+    return this.client.post("/api/v1/ipfs/upload-directory", form, {
+      headers: headers,
+    });
+  }
+
   public async cat(cid: string): Promise<Buffer> {
     return this.client.get(`/api/v1/ipfs/cat/${cid}`, {
       responseType: "arraybuffer",

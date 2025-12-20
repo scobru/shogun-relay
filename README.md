@@ -105,7 +105,8 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 
 | Endpoint | Description |
 |----------|-------------|
-| `POST /api/v1/ipfs/upload` | Upload files |
+| `POST /api/v1/ipfs/upload` | Upload single file |
+| `POST /api/v1/ipfs/upload-directory` | Upload multiple files as directory (maintains structure) |
 | `GET /api/v1/ipfs/cat/:cid` | Stream content |
 | `POST /api/v1/ipfs/pin/add` | Pin content |
 | `GET /api/v1/ipfs/pin/ls` | List pins |

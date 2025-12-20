@@ -169,7 +169,7 @@
       </div>
       <div>
         <h1 class="md-headline-medium">IPFS File Uploader</h1>
-        <p class="md-body-medium md-text-secondary">Direct file upload with optional encryption</p>
+        <p class="md-body-medium md-text-secondary">Direct file or directory upload with optional encryption</p>
       </div>
     </div>
   </header>
@@ -184,7 +184,16 @@
             clip-rule="evenodd" />
         </svg>
         <p class="drag-drop-text">Drag & drop files here or click to select</p>
-        <input type="file" id="fileInput" style="display: none;">
+        <input type="file" id="fileInput" style="display: none;" multiple>
+        <input type="file" id="directoryInput" style="display: none;" webkitdirectory>
+      </div>
+
+      <!-- Upload Mode Selection -->
+      <div class="checkbox-row" style="margin-bottom: 16px;">
+        <input type="radio" id="uploadModeSingle" name="uploadMode" value="single" checked>
+        <label class="checkbox-label" for="uploadModeSingle">Single File</label>
+        <input type="radio" id="uploadModeDirectory" name="uploadMode" value="directory" style="margin-left: 24px;">
+        <label class="checkbox-label" for="uploadModeDirectory">Directory (Multiple Files)</label>
       </div>
 
       <!-- File Name Override -->
@@ -230,6 +239,7 @@
   <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
   <script>
     const fileInput = document.getElementById("fileInput");
+    const directoryInput = document.getElementById("directoryInput");
     const uploadBtn = document.getElementById("uploadBtn");
     const messageEl = document.getElementById("message");
     const encryptCheck = document.getElementById("encryptCheck");
@@ -265,14 +275,51 @@
     }
 
     dropArea.addEventListener("drop", handleDrop, false);
-    dropArea.addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", () => updateFileNameInput(fileInput.files[0]));
+    dropArea.addEventListener("click", () => {
+      const uploadMode = document.querySelector('input[name="uploadMode"]:checked').value;
+      if (uploadMode === 'directory') {
+        directoryInput.click();
+      } else {
+        fileInput.click();
+      }
+    });
+    
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files.length > 0) {
+        updateFileNameInput(fileInput.files[0]);
+      }
+    });
+    
+    directoryInput.addEventListener("change", () => {
+      if (directoryInput.files.length > 0) {
+        updateFileNameInput(directoryInput.files[0]);
+      }
+    });
 
     function handleDrop(e) {
       const dt = e.dataTransfer;
       const files = dt.files;
-      fileInput.files = files;
-      updateFileNameInput(files[0]);
+      const uploadMode = document.querySelector('input[name="uploadMode"]:checked').value;
+      
+      if (uploadMode === 'directory') {
+        // Check if dropped items are from a directory
+        const items = Array.from(dt.items);
+        const hasDirectory = items.some(item => item.webkitGetAsEntry && item.webkitGetAsEntry().isDirectory);
+        
+        if (hasDirectory || files.length > 1) {
+          // Create a DataTransfer object to set files
+          const dataTransfer = new DataTransfer();
+          Array.from(files).forEach(file => dataTransfer.items.add(file));
+          directoryInput.files = dataTransfer.files;
+          updateFileNameInput(files[0]);
+        } else {
+          fileInput.files = files;
+          updateFileNameInput(files[0]);
+        }
+      } else {
+        fileInput.files = files;
+        updateFileNameInput(files[0]);
+      }
     }
 
     function updateFileNameInput(file) {
@@ -302,16 +349,31 @@
     });
 
     uploadBtn.addEventListener("click", async () => {
-      const file = fileInput.files[0];
       const token = ShogunAdmin.getPassword();
+      const uploadMode = document.querySelector('input[name="uploadMode"]:checked').value;
+      
+      let filesToUpload = [];
+      let isDirectory = false;
 
       if (!token) {
         showMessage("Admin Token is required. Please set it in the Admin Panel.");
         return;
       }
 
-      if (!file) {
-        showMessage("Please select a file to upload.");
+      if (uploadMode === 'directory') {
+        filesToUpload = Array.from(directoryInput.files);
+        isDirectory = filesToUpload.length > 0 && filesToUpload.some(f => f.webkitRelativePath);
+      } else {
+        const file = fileInput.files[0];
+        if (!file) {
+          showMessage("Please select a file to upload.");
+          return;
+        }
+        filesToUpload = [file];
+      }
+
+      if (filesToUpload.length === 0) {
+        showMessage("Please select file(s) to upload.");
         return;
       }
 
@@ -322,12 +384,22 @@
       progressBar.style.width = "0%";
       progressBar.textContent = "0%";
 
-      let fileToUpload = file;
       const userProvidedName = fileNameInput.value.trim();
-      const baseFileName = userProvidedName || file.name;
-      let uploadFileName = baseFileName;
+      const mainFile = filesToUpload[0];
+      const baseFileName = userProvidedName || mainFile.name;
+      
+      // For directory uploads, encryption is not supported yet
+      if (isDirectory && encryptCheck.checked) {
+        showMessage("Encryption is not yet supported for directory uploads.");
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = "Upload File";
+        uploadProgress.style.display = "none";
+        return;
+      }
 
-      if (encryptCheck.checked) {
+      let processedFiles = filesToUpload;
+      
+      if (encryptCheck.checked && !isDirectory) {
         try {
           progressBar.style.width = "25%";
           progressBar.textContent = "Encrypting...";
@@ -336,7 +408,7 @@
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target.result);
             reader.onerror = (err) => reject(err);
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(mainFile);
           });
 
           const encryptedData = await SEA.encrypt(base64data, token);
@@ -344,10 +416,9 @@
           const encryptionFileName = baseFileName.endsWith(".enc")
             ? baseFileName
             : `${baseFileName}.enc`;
-          fileToUpload = new File([encryptedDataJson], encryptionFileName, {
+          processedFiles = [new File([encryptedDataJson], encryptionFileName, {
             type: "text/plain",
-          });
-          uploadFileName = encryptionFileName;
+          })];
 
           progressBar.style.width = "50%";
           progressBar.textContent = "Encrypted! Uploading...";
@@ -361,11 +432,25 @@
       }
 
       const formData = new FormData();
-      uploadFileName = fileToUpload.name || uploadFileName || baseFileName;
-      formData.append("file", fileToUpload, uploadFileName);
+      const uploadEndpoint = isDirectory ? "/api/v1/ipfs/upload-directory" : "/api/v1/ipfs/upload";
+      
+      if (isDirectory) {
+        // Upload as directory
+        processedFiles.forEach((file) => {
+          const path = file.webkitRelativePath || file.name;
+          formData.append("files", file, path);
+        });
+        progressBar.style.width = "60%";
+        progressBar.textContent = `Uploading ${processedFiles.length} files...`;
+      } else {
+        // Single file upload
+        const uploadFileName = processedFiles[0].name || baseFileName;
+        formData.append("file", processedFiles[0], uploadFileName);
+      }
 
       try {
-        const response = await fetch("/api/v1/ipfs/upload", {
+        progressBar.style.width = isDirectory ? "60%" : "60%";
+        const response = await fetch(uploadEndpoint, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -380,33 +465,37 @@
 
         const result = await response.json();
 
-        if (result.success && result.file) {
+        if (result.success) {
           progressBar.style.width = "100%";
           progressBar.textContent = "Upload Complete!";
 
-          const { hash } = result.file;
-          const isEncrypted = encryptCheck.checked;
+          // Handle both single file and directory responses
+          const hash = result.directoryCid || result.cid || (result.file && result.file.hash);
+          const isEncrypted = encryptCheck.checked && !isDirectory;
+          const fileCount = result.fileCount || 1;
 
           const baseUrl = window.location.origin;
           const finalIpfsUrl = isEncrypted
             ? `${baseUrl}/api/v1/ipfs/cat/${hash}/decrypt?token=${encodeURIComponent(token)}`
             : `${baseUrl}/api/v1/ipfs/cat/${hash}`;
 
-          // Add file to system hashes
+          // Add to system hashes
           try {
             const systemHashData = {
               hash: hash,
               userAddress: 'admin-upload',
               timestamp: Date.now(),
-              fileName: uploadFileName,
-              displayName: uploadFileName,
-              originalName: file.name,
-              fileSize: fileToUpload.size ?? file.size,
+              fileName: isDirectory ? `Directory (${fileCount} files)` : baseFileName,
+              displayName: isDirectory ? `Directory (${fileCount} files)` : baseFileName,
+              originalName: isDirectory ? `Directory (${fileCount} files)` : mainFile.name,
+              fileSize: result.totalSize || processedFiles[0].size,
               isEncrypted: isEncrypted,
-              contentType: fileToUpload.type || file.type || 'application/octet-stream',
+              contentType: isDirectory ? 'application/directory' : (processedFiles[0].type || 'application/octet-stream'),
               relayUrl: finalIpfsUrl,
               gatewayUrl: `${baseUrl}/ipfs/${hash}`,
-              uploadedAt: Date.now()
+              uploadedAt: Date.now(),
+              isDirectory: isDirectory,
+              fileCount: fileCount
             };
 
             await fetch('/api/v1/user-uploads/save-system-hash', {
@@ -418,16 +507,25 @@
               body: JSON.stringify(systemHashData)
             });
           } catch (error) {
-            console.error('Error adding file to system hashes:', error);
+            console.error('Error adding to system hashes:', error);
           }
 
-          const successMessage = `
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <div style="font-weight: 600;">✅ File uploaded successfully!</div>
-                            <div style="font-family: monospace; font-size: 0.875rem;">Hash: ${hash}</div>
-                            <a href="${finalIpfsUrl}" target="_blank">🔗 View File ${isEncrypted ? "(decrypted)" : ""}</a>
-                        </div>
-                    `;
+          const successMessage = isDirectory
+            ? `
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="font-weight: 600;">✅ Directory uploaded successfully!</div>
+                <div style="font-family: monospace; font-size: 0.875rem;">Directory CID: ${hash}</div>
+                <div style="font-size: 0.875rem;">Files: ${fileCount} | Size: ${(result.totalSizeMB || 0).toFixed(2)} MB</div>
+                <a href="${finalIpfsUrl}" target="_blank">🔗 View Directory</a>
+              </div>
+            `
+            : `
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="font-weight: 600;">✅ File uploaded successfully!</div>
+                <div style="font-family: monospace; font-size: 0.875rem;">Hash: ${hash}</div>
+                <a href="${finalIpfsUrl}" target="_blank">🔗 View File ${isEncrypted ? "(decrypted)" : ""}</a>
+              </div>
+            `;
           showMessage(successMessage, "success");
         } else {
           throw new Error(result.error || "Upload failed for an unknown reason.");
