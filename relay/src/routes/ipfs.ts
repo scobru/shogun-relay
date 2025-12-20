@@ -1,8 +1,7 @@
 import express, { Request, Response, Router } from "express";
 import http from "http";
 import FormData from "form-data";
-import multer from "multer";
-import type Express from "express";
+import multer, { Multer } from "multer";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import type { Request as ExpressRequest, Response as ExpressResponse } from "express";
 import type { ClientRequest, IncomingMessage as HttpIncomingMessage } from "http";
@@ -228,7 +227,7 @@ router.post("/api/v0/cat", (req, res, next) => {
       port: 5001,
       // For paths with slashes, encode only the CID part, keep slashes for navigation
       // Split by first slash, encode CID, then append path
-      path: cid.includes('/') 
+      path: cid.includes('/')
         ? `/api/v0/cat?arg=${encodeURIComponent(cid.split('/')[0])}/${cid.split('/').slice(1).join('/')}`
         : `/api/v0/cat?arg=${encodeURIComponent(cid)}`,
       method: "POST",
@@ -801,16 +800,16 @@ router.post(
               mbUsage:
                 customReq.authType === "user"
                   ? {
-                      actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                      sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
-                      verified: true,
-                    }
+                    actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                    sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
+                    verified: true,
+                  }
                   : undefined,
               subscription: subscriptionResult
                 ? {
-                    storageUsedMB: subscriptionResult.storageUsedMB,
-                    storageRemainingMB: subscriptionResult.storageRemainingMB,
-                  }
+                  storageUsedMB: subscriptionResult.storageUsedMB,
+                  storageRemainingMB: subscriptionResult.storageRemainingMB,
+                }
                 : undefined,
             });
           })
@@ -824,11 +823,11 @@ router.post(
               mbUsage:
                 customReq.authType === "user" && req.file
                   ? {
-                      actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
-                      sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
-                      verified: false,
-                      error: error instanceof Error ? error.message : String(error),
-                    }
+                    actualSizeMB: +(req.file.size / 1024 / 1024).toFixed(2),
+                    sizeMB: Math.ceil(req.file.size / (1024 * 1024)),
+                    verified: false,
+                    error: error instanceof Error ? error.message : String(error),
+                  }
                   : undefined,
             });
           });
@@ -948,7 +947,7 @@ router.post(
     try {
       const customReq = req as CustomRequest;
       const files = (req.files || []) as Express.Multer.File[];
-      
+
       if (!files || files.length === 0) {
         return res.status(400).json({
           success: false,
@@ -980,7 +979,7 @@ router.post(
           { userAddress: customReq.userAddress },
           `Verifying real IPFS storage before directory upload`
         );
-        
+
         const canUploadResult = await X402Merchant.canUploadVerified(
           gun,
           customReq.userAddress!,
@@ -1029,16 +1028,16 @@ router.post(
 
       // Create FormData with all files maintaining directory structure
       const formData = new FormData();
-      
+
       // Get file paths from request (can be in fieldname or originalname)
       // For directory uploads, the path might be in the fieldname or we use originalname
       files.forEach((file) => {
         // Try to get relative path from fieldname (if sent as "files" with path)
         // Otherwise use originalname
-        const filePath = file.fieldname && file.fieldname !== "files" 
-          ? file.fieldname 
+        const filePath = file.fieldname && file.fieldname !== "files"
+          ? file.fieldname
           : file.originalname;
-        
+
         formData.append("file", file.buffer, {
           filename: filePath,
           contentType: file.mimetype || "application/octet-stream",
@@ -1184,9 +1183,9 @@ router.post(
               },
               subscription: subscriptionResult
                 ? {
-                    storageUsedMB: subscriptionResult.storageUsedMB,
-                    storageRemainingMB: subscriptionResult.storageRemainingMB,
-                  }
+                  storageUsedMB: subscriptionResult.storageUsedMB,
+                  storageRemainingMB: subscriptionResult.storageRemainingMB,
+                }
                 : undefined,
             });
           })
@@ -3540,11 +3539,11 @@ router.get("/user-uploads/:userAddress", async (req, res) => {
       count: uploads.length,
       subscription: subscription.active
         ? {
-            tier: subscription.tier,
-            storageMB: subscription.storageMB,
-            storageUsedMB: subscription.storageUsedMB,
-            storageRemainingMB: subscription.storageRemainingMB,
-          }
+          tier: subscription.tier,
+          storageMB: subscription.storageMB,
+          storageUsedMB: subscription.storageUsedMB,
+          storageRemainingMB: subscription.storageRemainingMB,
+        }
         : null,
     });
   } catch (error: unknown) {
@@ -3920,9 +3919,9 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
       unpin: unpinResult,
       subscription: updatedSubscription.active
         ? {
-            storageUsedMB: updatedSubscription.storageUsedMB,
-            storageRemainingMB: updatedSubscription.storageRemainingMB,
-          }
+          storageUsedMB: updatedSubscription.storageUsedMB,
+          storageRemainingMB: updatedSubscription.storageRemainingMB,
+        }
         : null,
     });
   } catch (error: unknown) {
