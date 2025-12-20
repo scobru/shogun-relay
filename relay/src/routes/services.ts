@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from "express";
 import { authConfig } from "../config";
 import { loggers } from "../utils/logger";
+import { secureCompare, hashToken } from "../utils/security";
 
 const router: Router = express.Router();
 
@@ -16,11 +17,16 @@ router.post("/:service/restart", async (req: Request, res: Response) => {
     const customToken: string | string[] | undefined = req.headers["token"];
     const token: string | string[] | undefined = bearerToken || customToken;
 
-    if (token && token !== authConfig.adminPassword) {
-      return res.status(401).json({
-        success: false,
-        error: "Unauthorized",
-      });
+    // SECURITY: Use timing-safe comparison to prevent timing attacks
+    if (token) {
+      const tokenHash = hashToken(String(token));
+      const adminHash = authConfig.adminPassword ? hashToken(authConfig.adminPassword) : "";
+      if (!adminHash || !secureCompare(tokenHash, adminHash)) {
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized",
+        });
+      }
     }
 
     // Lista dei servizi supportati

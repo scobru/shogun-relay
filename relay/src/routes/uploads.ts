@@ -2,6 +2,7 @@ import express, { Request, Response, Router, NextFunction } from "express";
 import http from "http";
 import { loggers } from "../utils/logger";
 import { authConfig } from "../config";
+import { secureCompare, hashToken } from "../utils/security";
 
 // Extended Request interface with custom properties
 interface CustomRequest extends Request {
@@ -283,13 +284,16 @@ router.post(
     const customToken = req.headers["token"];
 
     const adminToken = bearerToken || customToken;
-    const isAdmin = adminToken === authConfig.adminPassword;
+    // SECURITY: Use timing-safe comparison to prevent timing attacks
+    const tokenHash = adminToken ? hashToken(String(adminToken)) : "";
+    const adminHash = authConfig.adminPassword ? hashToken(authConfig.adminPassword) : "";
+    const isAdmin = tokenHash && adminHash && secureCompare(tokenHash, adminHash);
 
     if (isAdmin) {
       (req as CustomRequest).authType = "admin";
       next();
     } else {
-      loggers.uploads.warn({ adminToken }, "Auth failed - Admin token");
+      loggers.uploads.warn({}, "Auth failed - Admin token");
       res.status(401).json({ success: false, error: "Unauthorized - Admin token required" });
     }
   },
@@ -406,7 +410,10 @@ router.delete(
     const customToken = req.headers["token"];
 
     const adminToken = bearerToken || customToken;
-    const isAdmin = adminToken === authConfig.adminPassword;
+    // SECURITY: Use timing-safe comparison to prevent timing attacks
+    const tokenHash = adminToken ? hashToken(String(adminToken)) : "";
+    const adminHash = authConfig.adminPassword ? hashToken(authConfig.adminPassword) : "";
+    const isAdmin = tokenHash && adminHash && secureCompare(tokenHash, adminHash);
 
     if (isAdmin) {
       (req as CustomRequest).authType = "admin";
