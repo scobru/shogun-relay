@@ -81,6 +81,32 @@ export class IpfsModule {
     });
   }
 
+  /**
+   * Cat a file from an IPFS directory using a relative path
+   * @param directoryCid The CID of the directory
+   * @param filePath The relative path to the file within the directory (e.g., "index.html" or "css/style.css")
+   * @returns Promise with file content as Buffer
+   */
+  public async catFromDirectory(directoryCid: string, filePath: string): Promise<Buffer> {
+    // IPFS API supports paths like CID/path/to/file
+    // We need to encode the CID but keep slashes for path navigation
+    // Format: /api/v0/cat?arg=QmDirectory/index.html
+    const fullPath = `${directoryCid}/${filePath}`;
+    // Encode only the CID part, keep slashes for navigation
+    const encodedPath = fullPath.includes('/')
+      ? `${encodeURIComponent(directoryCid)}/${filePath.split('/').map(p => encodeURIComponent(p)).join('/')}`
+      : encodeURIComponent(fullPath);
+    
+    return this.client.post(
+      `/api/v1/ipfs/api/v0/cat?arg=${encodedPath}`,
+      null,
+      {
+        responseType: "arraybuffer",
+        // Don't set Content-Length header - browser will block it
+      }
+    );
+  }
+
   public async pinAdd(cid: string): Promise<any> {
     return this.client.post("/api/v1/ipfs/pin/add", { cid });
   }

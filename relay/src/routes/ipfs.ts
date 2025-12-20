@@ -195,7 +195,7 @@ router.use(
 // Compatibility endpoint for shogun-ipfs: /api/v0/cat
 router.post("/api/v0/cat", async (req: CustomRequest, res: Response) => {
   try {
-    const { arg } = req.query; // IPFS API uses ?arg=CID
+    const { arg } = req.query; // IPFS API uses ?arg=CID or ?arg=CID/path/to/file
     const cid = Array.isArray(arg) ? arg[0] : arg;
 
     if (!cid || typeof cid !== "string") {
@@ -207,6 +207,10 @@ router.post("/api/v0/cat", async (req: CustomRequest, res: Response) => {
 
     loggers.server.debug({ cid }, `📄 IPFS API v0 cat (compatibility endpoint) request`);
 
+    // IPFS API supports paths like CID/path/to/file for directory navigation
+    // We need to encode the CID part but keep slashes for path navigation
+    // Format: /api/v0/cat?arg=QmDirectory/index.html
+    // The slash should NOT be encoded, only special characters in the path components
     const requestOptions: {
       hostname: string;
       port: number;
@@ -216,7 +220,11 @@ router.post("/api/v0/cat", async (req: CustomRequest, res: Response) => {
     } = {
       hostname: "127.0.0.1",
       port: 5001,
-      path: `/api/v0/cat?arg=${encodeURIComponent(cid)}`,
+      // For paths with slashes, encode only the CID part, keep slashes for navigation
+      // Split by first slash, encode CID, then append path
+      path: cid.includes('/') 
+        ? `/api/v0/cat?arg=${encodeURIComponent(cid.split('/')[0])}/${cid.split('/').slice(1).join('/')}`
+        : `/api/v0/cat?arg=${encodeURIComponent(cid)}`,
       method: "POST",
       headers: {
         "Content-Length": "0",
