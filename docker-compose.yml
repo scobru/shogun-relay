@@ -41,16 +41,32 @@ services:
       # Relay GunDB User (owns subscription data) - REQUIRED: RELAY_SEA_KEYPAIR or RELAY_SEA_KEYPAIR_PATH
       # Example: RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
       # Or: RELAY_SEA_KEYPAIR_PATH=/app/keys/relay-keypair.json
-      # x402 Payment Configuration
+      # ============================================================================
+      # X402 PAYMENT CONFIGURATION (Multi-Chain)
+      # ============================================================================
       - X402_PAY_TO_ADDRESS=0xYourWalletAddressHere
-      - X402_NETWORK=base-sepolia
+      - X402_NETWORKS=base-sepolia,base
+      - X402_DEFAULT_NETWORK=base-sepolia
       - X402_SETTLEMENT_MODE=direct
-      # Required for direct settlement (private key of wallet that will execute transferWithAuthorization)
-      # This wallet needs ETH for gas fees
+      # Required for direct settlement
       - X402_PRIVATE_KEY=your_private_key_here
-      # Optional: Custom RPC URL
-      # - X402_RPC_URL=https://your-rpc-url
+      # Optional: Network-specific RPC overrides
+      # - X402_BASE_SEPOLIA_RPC=https://your-rpc-url
+      # - X402_BASE_RPC=https://your-rpc-url
+      # ============================================================================
+      # BRIDGE CONFIGURATION (Multi-Chain)
+      # ============================================================================
+      - BRIDGE_ENABLED=true
+      - BRIDGE_NETWORKS=base-sepolia,base
+      - BRIDGE_DEFAULT_NETWORK=base-sepolia
+      # ============================================================================
+      # DEALS CONFIGURATION (Multi-Chain)
+      # ============================================================================
+      - DEALS_NETWORKS=base-sepolia,base
+      - DEALS_DEFAULT_NETWORK=base-sepolia
+      # ============================================================================
       # On-Chain Registry Configuration
+      # ============================================================================
       # Private key for on-chain operations (registration, staking, deals)
       - RELAY_PRIVATE_KEY=0x_your_private_key_here
       # Chain ID: 84532 = Base Sepolia (testnet), 8453 = Base Mainnet

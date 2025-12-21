@@ -1356,8 +1356,8 @@ See docs/RELAY_KEYS.md for more information.
       const { RPC_URLS } = await import("./utils/registry-client");
 
       const REGISTRY_CHAIN_ID = blockchainConfig.registryChainId;
-      const X402_NETWORK = x402Config.network;
-      const X402_RPC_URL = x402Config.rpcUrl;
+      const X402_NETWORK = x402Config.defaultNetwork;
+      const X402_RPC_URL = x402Config.getRpcUrl();
 
       const rpcStatuses = [];
 
@@ -1887,8 +1887,8 @@ See docs/RELAY_KEYS.md for more information.
   // ============================================================================
 
   const BRIDGE_ENABLED = bridgeConfig.enabled;
-  const BRIDGE_RPC_URL = bridgeConfig.rpcUrl;
-  const BRIDGE_CHAIN_ID = bridgeConfig.chainId;
+  const BRIDGE_RPC_URL = bridgeConfig.getRpcUrl();
+  const BRIDGE_CHAIN_ID = bridgeConfig.getChainId();
   const BRIDGE_AUTO_BATCH_ENABLED = bridgeConfig.autoBatchEnabled;
   const BRIDGE_AUTO_BATCH_INTERVAL_MS = bridgeConfig.autoBatchIntervalMs;
   const BRIDGE_AUTO_BATCH_MIN_WITHDRAWALS = bridgeConfig.autoBatchMinWithdrawals;

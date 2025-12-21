@@ -14,6 +14,7 @@ import {
 } from "./bridge-state";
 import { buildMerkleTreeFromWithdrawals, type WithdrawalLeaf } from "./merkle-tree";
 import type { IGunInstance } from "gun";
+import { bridgeConfig } from "../config/env-config";
 
 const log = loggers.bridge || console;
 
@@ -25,12 +26,12 @@ function getBridgeClient(): BridgeClient {
     return bridgeClient;
   }
 
-  const rpcUrl = process.env.BRIDGE_RPC_URL || process.env.REGISTRY_RPC_URL;
-  const chainId = parseInt(process.env.BRIDGE_CHAIN_ID || process.env.REGISTRY_CHAIN_ID || "84532");
-  const privateKey = process.env.BRIDGE_SEQUENCER_PRIVATE_KEY || process.env.RELAY_PRIVATE_KEY;
+  const rpcUrl = bridgeConfig.getRpcUrl();
+  const chainId = bridgeConfig.getChainId();
+  const privateKey = bridgeConfig.sequencerPrivateKey;
 
   if (!rpcUrl) {
-    throw new Error("Bridge not configured: BRIDGE_RPC_URL or REGISTRY_RPC_URL required");
+    throw new Error("Bridge not configured: BRIDGE_RPC_URL or configure BRIDGE_NETWORKS with valid RPC");
   }
 
   bridgeClient = createBridgeClient({

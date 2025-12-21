@@ -61,7 +61,7 @@ import {
 } from "../utils/security";
 import * as Reputation from "../utils/relay-reputation";
 import { getRelayKeyPair } from "../utils/relay-user";
-import { relayConfig } from "../config/env-config";
+import { relayConfig, bridgeConfig } from "../config/env-config";
 
 const router = express.Router();
 const log = loggers.server || console;
@@ -111,12 +111,12 @@ function getBridgeClient(): BridgeClient {
     return bridgeClient;
   }
 
-  const rpcUrl = process.env.BRIDGE_RPC_URL || process.env.REGISTRY_RPC_URL;
-  const chainId = parseInt(process.env.BRIDGE_CHAIN_ID || process.env.REGISTRY_CHAIN_ID || "84532");
-  const privateKey = process.env.BRIDGE_SEQUENCER_PRIVATE_KEY || process.env.RELAY_PRIVATE_KEY;
+  const rpcUrl = bridgeConfig.getRpcUrl();
+  const chainId = bridgeConfig.getChainId();
+  const privateKey = bridgeConfig.sequencerPrivateKey;
 
   if (!rpcUrl) {
-    throw new Error("Bridge not configured: BRIDGE_RPC_URL or REGISTRY_RPC_URL required");
+    throw new Error("Bridge not configured: BRIDGE_RPC_URL or configure BRIDGE_NETWORKS with valid RPC");
   }
 
   bridgeClient = createBridgeClient({
@@ -127,6 +127,7 @@ function getBridgeClient(): BridgeClient {
 
   return bridgeClient;
 }
+
 
 /**
  * POST /api/v1/bridge/deposit
