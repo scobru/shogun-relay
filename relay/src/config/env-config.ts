@@ -132,12 +132,41 @@ export const config = {
   },
 
   // ============================================================================
-  // BLOCKCHAIN / RPC CONFIGURATION
+  // REGISTRY CONFIGURATION (Multi-Chain)
   // ============================================================================
 
-  blockchain: {
-    registryChainId: parseInt(process.env.REGISTRY_CHAIN_ID || "84532"),
-    relayPrivateKey: process.env.RELAY_PRIVATE_KEY,
+  registry: {
+    // Multi-chain configuration
+    networks: parseNetworkList(process.env.REGISTRY_NETWORKS, ['base-sepolia']),
+    defaultNetwork: (process.env.REGISTRY_DEFAULT_NETWORK || 'base-sepolia') as NetworkId,
+    
+    // Get RPC URL for specific network (or default)
+    getRpcUrl: (network?: NetworkId): string => {
+      const targetNetwork = network || (process.env.REGISTRY_DEFAULT_NETWORK || 'base-sepolia') as NetworkId;
+      return getRpcForNetwork(targetNetwork, undefined); // No service-specific override for registry
+    },
+    
+    // Get chain ID for specific network (or default)
+    getChainId: (network?: NetworkId): number => {
+      const targetNetwork = network || (process.env.REGISTRY_DEFAULT_NETWORK || 'base-sepolia') as NetworkId;
+      return getChainIdForNetwork(targetNetwork);
+    },
+    
+    // RPC URLs map for all configured networks
+    rpcUrls: (() => {
+      const networks = parseNetworkList(process.env.REGISTRY_NETWORKS, ['base-sepolia']);
+      const urls: Record<string, string> = {};
+      for (const network of networks) {
+        urls[network] = getRpcForNetwork(network);
+      }
+      return urls;
+    })(),
+    
+    // Default chain ID (for backward compatibility)
+    chainId: getChainIdForNetwork((process.env.REGISTRY_DEFAULT_NETWORK || 'base-sepolia') as NetworkId),
+    
+    // Relay private key for on-chain operations (PRIVATE_KEY is fallback)
+    relayPrivateKey: process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY,
   },
 
   // ============================================================================
@@ -176,7 +205,7 @@ export const config = {
     
     // Payment configuration
     payToAddress: process.env.X402_PAY_TO_ADDRESS,
-    privateKey: process.env.X402_PRIVATE_KEY,
+    privateKey: process.env.X402_PRIVATE_KEY || process.env.PRIVATE_KEY,
     facilitatorUrl: process.env.X402_FACILITATOR_URL,
     facilitatorApiKey: process.env.X402_FACILITATOR_API_KEY,
     settlementMode: process.env.X402_SETTLEMENT_MODE as "facilitator" | "direct" | undefined,
@@ -218,8 +247,8 @@ export const config = {
     // Default chain ID (for backward compatibility)
     chainId: getChainIdForNetwork((process.env.BRIDGE_DEFAULT_NETWORK || 'base-sepolia') as NetworkId),
     
-    // Sequencer configuration
-    sequencerPrivateKey: process.env.BRIDGE_SEQUENCER_PRIVATE_KEY || process.env.RELAY_PRIVATE_KEY,
+    // Sequencer configuration (PRIVATE_KEY is fallback)
+    sequencerPrivateKey: process.env.BRIDGE_SEQUENCER_PRIVATE_KEY || process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY,
     startBlock: process.env.BRIDGE_START_BLOCK
       ? parseInt(process.env.BRIDGE_START_BLOCK)
       : undefined,
@@ -360,7 +389,7 @@ export const authConfig = config.auth;
 export const holsterConfig = config.holster;
 export const storageConfig = config.storage;
 export const relayKeysConfig = config.relayKeys;
-export const blockchainConfig = config.blockchain;
+export const registryConfig = config.registry;
 export const x402Config = config.x402;
 export const bridgeConfig = config.bridge;
 export const dealsConfig = config.deals;

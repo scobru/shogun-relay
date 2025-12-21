@@ -65,12 +65,13 @@ services:
       - DEALS_NETWORKS=base-sepolia,base
       - DEALS_DEFAULT_NETWORK=base-sepolia
       # ============================================================================
-      # On-Chain Registry Configuration
+      # REGISTRY CONFIGURATION (Multi-Chain)
       # ============================================================================
       # Private key for on-chain operations (registration, staking, deals)
       - RELAY_PRIVATE_KEY=0x_your_private_key_here
-      # Chain ID: 84532 = Base Sepolia (testnet), 8453 = Base Mainnet
-      - REGISTRY_CHAIN_ID=84532
+      # Alternative: PRIVATE_KEY=0x_your_private_key_here
+      - REGISTRY_NETWORKS=base-sepolia,base
+      - REGISTRY_DEFAULT_NETWORK=base-sepolia
       # Relay Storage Limits (global IPFS storage limit)
       - RELAY_MAX_STORAGE_GB=10
       - RELAY_STORAGE_WARNING_THRESHOLD=80

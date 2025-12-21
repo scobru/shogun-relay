@@ -27,7 +27,7 @@ import {
   authConfig,
   storageConfig,
   relayKeysConfig,
-  blockchainConfig,
+  registryConfig,
   x402Config,
   dealSyncConfig,
   bridgeConfig,
