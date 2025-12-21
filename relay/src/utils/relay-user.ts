@@ -186,104 +186,234 @@ export function getSubscriptionsNode(): GunNode | undefined {
 
 /**
  * Get subscription data for a user address
+ * Uses robust reading with retry logic and .on() for better sync
  * @param userAddress - The user's wallet address
+ * @param options - Optional settings for retry behavior
  * @returns Promise with subscription data or undefined
  */
-export async function getSubscription(userAddress: string): Promise<SubscriptionData | undefined> {
+export async function getSubscription(
+  userAddress: string,
+  options?: { maxRetries?: number; retryDelayMs?: number; timeoutMs?: number }
+): Promise<SubscriptionData | undefined> {
   if (!relayUser) {
     throw new Error("Relay user not initialized");
   }
 
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      log.debug({ userAddress }, "Timeout reading subscription");
-      resolve(undefined);
-    }, 10000);
+  const maxRetries = options?.maxRetries ?? 3;
+  const retryDelayMs = options?.retryDelayMs ?? 1000;
+  const timeoutMs = options?.timeoutMs ?? 10000;
 
-    relayUser!
-      .get("x402")
-      .get("subscriptions")
-      .get(userAddress)
-      .once((data: Record<string, any>) => {
-        clearTimeout(timeout);
+  // Helper function for single read attempt using .on() for better sync
+  const attemptRead = (attemptNumber: number): Promise<SubscriptionData | undefined> => {
+    return new Promise((resolve) => {
+      let resolved = false;
+      let subscription: any = null;
 
-        if (!data || typeof data !== "object") {
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          subscription?.off?.(); // Cleanup listener
+          log.debug({ userAddress, attempt: attemptNumber }, "Read attempt timed out");
           resolve(undefined);
-          return;
         }
+      }, timeoutMs);
 
-        // Filter out Gun metadata
-        const cleanData: SubscriptionData = {};
-        Object.keys(data).forEach((key) => {
-          if (!["_", "#", ">", "<"].includes(key)) {
-            cleanData[key] = data[key];
+      // Use .on() instead of .once() to get updates as data syncs
+      subscription = relayUser!
+        .get("x402")
+        .get("subscriptions")
+        .get(userAddress)
+        .on((data: Record<string, any>) => {
+          if (resolved) return;
+
+          // Check if we have valid data
+          if (data && typeof data === "object") {
+            // Filter out Gun metadata
+            const cleanData: SubscriptionData = {};
+            let hasRealData = false;
+            
+            Object.keys(data).forEach((key) => {
+              if (!["_", "#", ">", "<"].includes(key)) {
+                cleanData[key] = data[key];
+                hasRealData = true;
+              }
+            });
+
+            // Only resolve if we have actual subscription data (not just metadata)
+            if (hasRealData && (cleanData.tier || cleanData.expiresAt || cleanData.purchasedAt)) {
+              resolved = true;
+              clearTimeout(timeout);
+              subscription?.off?.(); // Cleanup listener
+              log.debug({ userAddress, attempt: attemptNumber }, "Subscription read successfully");
+              resolve(cleanData);
+            }
           }
         });
 
-        resolve(cleanData);
-      });
-  });
+      // Also check with .once() for immediate local data
+      relayUser!
+        .get("x402")
+        .get("subscriptions")
+        .get(userAddress)
+        .once((data: Record<string, any>) => {
+          if (resolved) return;
+
+          if (data && typeof data === "object") {
+            const cleanData: SubscriptionData = {};
+            let hasRealData = false;
+            
+            Object.keys(data).forEach((key) => {
+              if (!["_", "#", ">", "<"].includes(key)) {
+                cleanData[key] = data[key];
+                hasRealData = true;
+              }
+            });
+
+            if (hasRealData && (cleanData.tier || cleanData.expiresAt || cleanData.purchasedAt)) {
+              resolved = true;
+              clearTimeout(timeout);
+              subscription?.off?.();
+              log.debug({ userAddress, attempt: attemptNumber }, "Subscription read from local cache");
+              resolve(cleanData);
+            }
+          }
+        });
+    });
+  };
+
+  // Try with retries
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const result = await attemptRead(attempt);
+    
+    if (result) {
+      return result;
+    }
+
+    // If not last attempt, wait before retry
+    if (attempt < maxRetries) {
+      log.debug({ userAddress, attempt, nextRetryMs: retryDelayMs * attempt }, 
+        "Subscription not found, retrying...");
+      await new Promise(r => setTimeout(r, retryDelayMs * attempt)); // Exponential backoff
+    }
+  }
+
+  log.warn({ userAddress, maxRetries }, "Subscription not found after all retries");
+  return undefined;
 }
 
 /**
  * Save subscription data for a user address
+ * Includes post-save verification to ensure data persistence
  * @param userAddress - The user's wallet address
  * @param subscriptionData - The subscription data to save
+ * @param options - Optional settings for save behavior
  * @returns Promise
  */
 export async function saveSubscription(
   userAddress: string,
-  subscriptionData: SubscriptionData
+  subscriptionData: SubscriptionData,
+  options?: { verifyPersistence?: boolean; maxSaveRetries?: number }
 ): Promise<void> {
   if (!relayUser) {
     throw new Error("Relay user not initialized");
   }
 
-  return new Promise((resolve, reject) => {
-    // Clean and serialize data for GunDB
-    // GunDB doesn't handle null values well, convert them to undefined
-    const cleanedData: Record<string, any> = {};
-    for (const [key, value] of Object.entries(subscriptionData)) {
-      // Skip internal GunDB keys
-      if (["_", "#", ">", "<"].includes(key)) {
-        continue;
-      }
-      // Convert null to undefined (GunDB prefers undefined)
-      if (value === null) {
-        cleanedData[key] = undefined;
+  const verifyPersistence = options?.verifyPersistence ?? true;
+  const maxSaveRetries = options?.maxSaveRetries ?? 3;
+
+  // Clean and serialize data for GunDB
+  // GunDB doesn't handle null values well, convert them to undefined
+  const cleanedData: Record<string, any> = {};
+  for (const [key, value] of Object.entries(subscriptionData)) {
+    // Skip internal GunDB keys
+    if (["_", "#", ">", "<"].includes(key)) {
+      continue;
+    }
+    // Convert null to undefined (GunDB prefers undefined)
+    if (value === null) {
+      cleanedData[key] = undefined;
+    } else {
+      cleanedData[key] = value;
+    }
+  }
+
+  const dataToSave: SubscriptionData = {
+    ...cleanedData,
+    userAddress,
+    updatedAt: Date.now(),
+    updatedBy: relayPub!,
+  } as SubscriptionData;
+
+  // Helper function for single save attempt
+  const attemptSave = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Timeout saving subscription to GunDB"));
+      }, 15000);
+
+      relayUser
+        ?.get("x402")
+        .get("subscriptions")
+        .get(userAddress)
+        .put(dataToSave as Record<string, any>, (ack: GunAck) => {
+          clearTimeout(timeout);
+          if (ack && "err" in ack && ack.err) {
+            const errorMsg = typeof ack.err === "string" ? ack.err : String(ack.err);
+            reject(new Error(errorMsg));
+          } else {
+            resolve();
+          }
+        });
+    });
+  };
+
+  // Try saving with retries
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= maxSaveRetries; attempt++) {
+    try {
+      await attemptSave();
+      log.debug({ userAddress, attempt }, "Subscription save acknowledged");
+
+      // Verify persistence if enabled
+      if (verifyPersistence) {
+        // Small delay to allow data to propagate
+        await new Promise(r => setTimeout(r, 200));
+
+        // Read back to verify
+        const verified = await getSubscription(userAddress, { 
+          maxRetries: 2, 
+          retryDelayMs: 500, 
+          timeoutMs: 5000 
+        });
+
+        if (verified && verified.updatedAt === dataToSave.updatedAt) {
+          log.info({ userAddress, attempt }, "Subscription saved and verified");
+          return;
+        } else if (verified) {
+          log.debug({ userAddress, attempt, savedAt: dataToSave.updatedAt, verifiedAt: verified.updatedAt }, 
+            "Subscription saved (verification timestamp mismatch, likely concurrent update)");
+          return;
+        } else {
+          log.warn({ userAddress, attempt }, "Subscription save not verified, retrying...");
+          lastError = new Error("Save verification failed");
+        }
       } else {
-        cleanedData[key] = value;
+        log.debug({ userAddress }, "Subscription saved (no verification)");
+        return;
       }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      log.warn({ userAddress, attempt, err: lastError.message }, "Save attempt failed");
     }
 
-    const dataToSave: SubscriptionData = {
-      ...cleanedData,
-      userAddress,
-      updatedAt: Date.now(),
-      updatedBy: relayPub!,
-    } as SubscriptionData;
+    // Wait before retry with exponential backoff
+    if (attempt < maxSaveRetries) {
+      await new Promise(r => setTimeout(r, 500 * attempt));
+    }
+  }
 
-    // Add timeout to prevent hanging
-    const timeout = setTimeout(() => {
-      reject(new Error("Timeout saving subscription to GunDB"));
-    }, 10000);
-
-    relayUser
-      ?.get("x402")
-      .get("subscriptions")
-      .get(userAddress)
-      .put(dataToSave as Record<string, any>, (ack: GunAck) => {
-        clearTimeout(timeout);
-        if (ack && "err" in ack && ack.err) {
-          const errorMsg = typeof ack.err === "string" ? ack.err : String(ack.err);
-          log.error({ userAddress, err: errorMsg, data: dataToSave }, "Error saving subscription");
-          reject(new Error(errorMsg));
-        } else {
-          log.debug({ userAddress }, "Subscription saved");
-          resolve();
-        }
-      });
-  });
+  log.error({ userAddress, err: lastError?.message }, "Failed to save subscription after all retries");
+  throw lastError || new Error("Failed to save subscription");
 }
 
 /**
