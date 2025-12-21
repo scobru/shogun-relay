@@ -9,7 +9,7 @@ import { X402Merchant } from "../utils/x402-merchant";
 import { ipfsUpload } from "../utils/ipfs-client";
 import { loggers } from "../utils/logger";
 import type { IncomingMessage, ServerResponse } from "http";
-import { authConfig, blockchainConfig, ipfsConfig, x402Config } from "../config";
+import { authConfig, registryConfig, ipfsConfig, x402Config } from "../config";
 
 // Extended Request interface with custom properties
 interface CustomRequest extends Request {

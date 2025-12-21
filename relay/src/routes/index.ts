@@ -74,7 +74,7 @@ import bridgeRouter from "./bridge";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import { authConfig, ipfsConfig, blockchainConfig, packageConfig } from "../config";
+import { authConfig, ipfsConfig, registryConfig, packageConfig } from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({

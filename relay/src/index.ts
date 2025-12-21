@@ -1355,17 +1355,17 @@ See docs/RELAY_KEYS.md for more information.
       const { ethers } = await import("ethers");
       const { RPC_URLS } = await import("./utils/registry-client");
 
-      const REGISTRY_CHAIN_ID = blockchainConfig.registryChainId;
+      const REGISTRY_CHAIN_ID = registryConfig.chainId;
       const X402_NETWORK = x402Config.defaultNetwork;
       const X402_RPC_URL = x402Config.getRpcUrl();
 
       const rpcStatuses = [];
 
       // Check registry chain RPC
-      const registryConfig = getConfigByChainId(REGISTRY_CHAIN_ID);
-      if (registryConfig && registryConfig.rpc) {
+      const registryChainConfig = getConfigByChainId(REGISTRY_CHAIN_ID);
+      if (registryChainConfig && registryChainConfig.rpc) {
         try {
-          const provider = new ethers.JsonRpcProvider(registryConfig.rpc);
+          const provider = new ethers.JsonRpcProvider(registryChainConfig.rpc);
           const startTime = Date.now();
           const blockNumber: any = await Promise.race([
             provider.getBlockNumber(),
@@ -1376,20 +1376,20 @@ See docs/RELAY_KEYS.md for more information.
           rpcStatuses.push({
             name: `Registry Chain (${REGISTRY_CHAIN_ID})`,
             chainId: REGISTRY_CHAIN_ID,
-            rpc: registryConfig.rpc,
+            rpc: registryChainConfig.rpc,
             status: "online",
             latency: `${latency}ms`,
             blockNumber: blockNumber.toString(),
-            network: (registryConfig as any).network || "unknown",
+            network: (registryChainConfig as any).network || "unknown",
           });
         } catch (error: any) {
           rpcStatuses.push({
             name: `Registry Chain (${REGISTRY_CHAIN_ID})`,
             chainId: REGISTRY_CHAIN_ID,
-            rpc: registryConfig.rpc,
+            rpc: registryChainConfig.rpc,
             status: "offline",
             error: error.message,
-            network: (registryConfig as any).network || "unknown",
+            network: (registryChainConfig as any).network || "unknown",
           });
         }
       }
@@ -1755,8 +1755,8 @@ See docs/RELAY_KEYS.md for more information.
   const DEAL_SYNC_INTERVAL_MS = dealSyncConfig.intervalMs;
   const DEAL_SYNC_FAST_INTERVAL_MS = dealSyncConfig.fastIntervalMs;
   const DEAL_SYNC_INITIAL_DELAY_MS = dealSyncConfig.initialDelayMs;
-  const RELAY_PRIVATE_KEY = blockchainConfig.relayPrivateKey;
-  const REGISTRY_CHAIN_ID = blockchainConfig.registryChainId?.toString();
+  const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+  const REGISTRY_CHAIN_ID = registryConfig.chainId?.toString();
 
   // Store interval/timeout references for cleanup
   let dealSyncInitialTimeout: any = null;
@@ -1781,7 +1781,7 @@ See docs/RELAY_KEYS.md for more information.
 
         const registryClient = createRegistryClientWithSigner(
           RELAY_PRIVATE_KEY!,
-          blockchainConfig.registryChainId
+          registryConfig.chainId
         );
         const relayAddress = registryClient.wallet.address;
 
@@ -1790,7 +1790,7 @@ See docs/RELAY_KEYS.md for more information.
         const relayKeyPair = (relayUser as any)?._?.sea || null;
 
         loggers.server.info({ relayAddress }, `🔄 Starting initial deal sync`);
-        await DealSync.syncDealsWithIPFS(relayAddress, blockchainConfig.registryChainId, {
+        await DealSync.syncDealsWithIPFS(relayAddress, registryConfig.chainId, {
           onlyActive: true,
           dryRun: false,
           gun: gun,
@@ -1812,7 +1812,7 @@ See docs/RELAY_KEYS.md for more information.
 
         const registryClient = createRegistryClientWithSigner(
           RELAY_PRIVATE_KEY!,
-          blockchainConfig.registryChainId
+          registryConfig.chainId
         );
         const relayAddress = registryClient.wallet.address;
 
@@ -1821,7 +1821,7 @@ See docs/RELAY_KEYS.md for more information.
         const relayKeyPair = (relayUser as any)?._?.sea || null;
 
         // Fast sync: only sync new/active deals (lightweight)
-        await DealSync.syncDealsWithIPFS(relayAddress, blockchainConfig.registryChainId, {
+        await DealSync.syncDealsWithIPFS(relayAddress, registryConfig.chainId, {
           onlyActive: true,
           dryRun: false,
           gun: gun,
@@ -1851,7 +1851,7 @@ See docs/RELAY_KEYS.md for more information.
 
         const registryClient = createRegistryClientWithSigner(
           RELAY_PRIVATE_KEY!,
-          blockchainConfig.registryChainId
+          registryConfig.chainId
         );
         const relayAddress = registryClient.wallet.address;
 
@@ -1860,7 +1860,7 @@ See docs/RELAY_KEYS.md for more information.
         const relayKeyPair = (relayUser as any)?._?.sea || null;
 
         loggers.server.info({ relayAddress }, `🔄 Full deal sync`);
-        await DealSync.syncDealsWithIPFS(relayAddress, blockchainConfig.registryChainId, {
+        await DealSync.syncDealsWithIPFS(relayAddress, registryConfig.chainId, {
           onlyActive: true,
           dryRun: false,
           gun: gun,

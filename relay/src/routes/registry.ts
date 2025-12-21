@@ -16,14 +16,14 @@ import {
   REGISTRY_ADDRESSES,
   USDC_ADDRESSES,
 } from "../utils/registry-client.js";
-import { blockchainConfig } from "../config";
+import { registryConfig } from "../config";
 import { loggers } from "../utils/logger";
 
 const router: Router = express.Router();
 
 // Get chain configuration from environment
-const REGISTRY_CHAIN_ID: number = blockchainConfig.registryChainId;
-const RELAY_PRIVATE_KEY: string | undefined = blockchainConfig.relayPrivateKey;
+const REGISTRY_CHAIN_ID: number = registryConfig.chainId;
+const RELAY_PRIVATE_KEY: string | undefined = registryConfig.relayPrivateKey;
 
 /**
  * GET /api/v1/registry/status

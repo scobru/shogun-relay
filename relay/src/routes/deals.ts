@@ -35,7 +35,7 @@ import {
 import * as DealSync from "../utils/deal-sync";
 import { loggers } from "../utils/logger";
 import {
-  blockchainConfig,
+  registryConfig,
   ipfsConfig,
   replicationConfig,
   serverConfig,
@@ -508,8 +508,8 @@ router.post("/create", express.json(), async (req, res) => {
 
     // Return payment instructions for USDC transfer
     // Client must transfer USDC to relay address, then relay will register deal on-chain
-    const REGISTRY_CHAIN_ID = blockchainConfig.registryChainId;
-    const RELAY_PRIVATE_KEY = blockchainConfig.relayPrivateKey;
+    const REGISTRY_CHAIN_ID = registryConfig.chainId;
+    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
 
     // If relayAddress is provided, verify it's registered and get its info
     if (relayAddress) {
@@ -726,8 +726,8 @@ router.post("/:dealId/activate", express.json(), async (req, res) => {
     }
 
     // Verify USDC payment was made to relay
-    const RELAY_PRIVATE_KEY = blockchainConfig.relayPrivateKey;
-    const REGISTRY_CHAIN_ID = blockchainConfig.registryChainId;
+    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+    const REGISTRY_CHAIN_ID = registryConfig.chainId;
 
     if (!RELAY_PRIVATE_KEY || !REGISTRY_CHAIN_ID) {
       return res.status(503).json({
@@ -1172,7 +1172,7 @@ router.get("/by-client/:address", async (req, res) => {
     const chainIdStr = Array.isArray(chainIdRaw) ? chainIdRaw[0] : chainIdRaw;
     const chainId = chainIdStr
       ? parseInt(String(chainIdStr), 10)
-      : parseInt(String(blockchainConfig.registryChainId), 10);
+      : parseInt(String(registryConfig.chainId), 10);
 
     const dealMap = new Map(); // Use map to deduplicate by deal ID
 
@@ -1787,7 +1787,7 @@ router.get("/:dealId/verify", async (req, res) => {
     // If still not found, try to get from StorageDealRegistry (for any dealId, not just onchain_ prefixed)
     if (!deal) {
       try {
-        const REGISTRY_CHAIN_ID = blockchainConfig.registryChainId;
+        const REGISTRY_CHAIN_ID = registryConfig.chainId;
         if (REGISTRY_CHAIN_ID) {
           const { createStorageDealRegistryClient } = await import("../utils/registry-client.js");
           const { ethers } = await import("ethers");
@@ -2519,9 +2519,9 @@ router.post("/:dealId/report", express.json(), async (req, res) => {
     }
 
     // If not found in GunDB, try on-chain StorageDealRegistry
-    if (!deal && blockchainConfig.registryChainId) {
+    if (!deal && registryConfig.chainId) {
       try {
-        const chainId = parseInt(String(blockchainConfig.registryChainId));
+        const chainId = parseInt(String(registryConfig.chainId));
         const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
 
         // Try to get deal from on-chain (using hash of deal ID)
@@ -2568,10 +2568,10 @@ router.post("/:dealId/report", express.json(), async (req, res) => {
       relayAddress = deal.onChainRelay;
     } else if (deal.providerPub && deal.providerPub.startsWith("0x")) {
       relayAddress = deal.providerPub;
-    } else if (blockchainConfig.registryChainId && deal.onChainDealId) {
+    } else if (registryConfig.chainId && deal.onChainDealId) {
       // Try to get relay from on-chain deal
       try {
-        const chainId = parseInt(String(blockchainConfig.registryChainId));
+        const chainId = parseInt(String(registryConfig.chainId));
         const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
         const onChainDeal = await storageDealRegistryClient.getDeal(deal.onChainDealId);
         if (onChainDeal) {
@@ -2599,7 +2599,7 @@ router.post("/:dealId/report", express.json(), async (req, res) => {
 
     // Prepare transaction data
     const chainId =
-      parseInt(String(blockchainConfig.registryChainId)) || blockchainConfig.registryChainId;
+      parseInt(String(registryConfig.chainId)) || registryConfig.chainId;
     const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
     const storageDealRegistryAddress = storageDealRegistryClient.registryAddress;
 
@@ -2824,8 +2824,8 @@ router.post("/:dealId/terminate", express.json(), async (req, res) => {
  */
 router.post("/sync", async (req: Request, res: Response) => {
   try {
-    const RELAY_PRIVATE_KEY = blockchainConfig.relayPrivateKey;
-    const REGISTRY_CHAIN_ID = blockchainConfig.registryChainId;
+    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+    const REGISTRY_CHAIN_ID = registryConfig.chainId;
 
     if (!RELAY_PRIVATE_KEY) {
       return res.status(400).json({
@@ -2891,8 +2891,8 @@ router.post("/sync", async (req: Request, res: Response) => {
  */
 router.get("/sync/status", async (req: Request, res: Response) => {
   try {
-    const RELAY_PRIVATE_KEY = blockchainConfig.relayPrivateKey;
-    const REGISTRY_CHAIN_ID = blockchainConfig.registryChainId;
+    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+    const REGISTRY_CHAIN_ID = registryConfig.chainId;
 
     if (!RELAY_PRIVATE_KEY) {
       return res.status(400).json({

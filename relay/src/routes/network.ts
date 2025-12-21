@@ -17,7 +17,7 @@ import * as FrozenData from "../utils/frozen-data";
 import * as StorageDeals from "../utils/storage-deals";
 import { getRelayUser, getRelayKeyPair } from "../utils/relay-user";
 import { createRegistryClient, REGISTRY_ADDRESSES } from "../utils/registry-client";
-import { authConfig, blockchainConfig, relayConfig } from "../config";
+import { authConfig, registryConfig, relayConfig } from "../config";
 import { loggers } from "../utils/logger";
 
 // Helper to get relay keypair safely for reputation tracking
@@ -321,8 +321,8 @@ router.get("/stats", async (req, res) => {
 
       // Optional: Also check on-chain deals if relay is configured
       // This includes deals registered on-chain but not yet synced to GunDB
-      const RELAY_PRIVATE_KEY = blockchainConfig.relayPrivateKey;
-      const REGISTRY_CHAIN_ID = blockchainConfig.registryChainId;
+      const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+      const REGISTRY_CHAIN_ID = registryConfig.chainId;
 
       if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID && allDeals.length === 0) {
         loggers.server.info(`   🔗 No deals in GunDB, checking on-chain registry as fallback...`);
