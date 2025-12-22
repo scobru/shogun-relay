@@ -473,8 +473,13 @@ export class AnnasArchiveManager {
 
       loggers.server.info(`📚 Added to IPFS: ${path.basename(filePath)} → ${cid}`);
       return cid;
-    } catch (error) {
-      loggers.server.error({ err: error, filePath }, "📚 Failed to add file to IPFS");
+    } catch (error: any) {
+      // Check if IPFS is running
+      if (error.code === 'ECONNREFUSED') {
+        loggers.server.warn(`📚 IPFS daemon not running - cannot pin ${path.basename(filePath)}`);
+      } else {
+        loggers.server.error({ err: error, filePath }, "📚 Failed to add file to IPFS");
+      }
       return null;
     }
   }
@@ -569,7 +574,7 @@ export class AnnasArchiveManager {
    * @param infoHash The torrent's info hash
    * @param deleteFiles Whether to delete files from disk (default: false)
    */
-  public removeTorrent(infoHash: string, deleteFiles: boolean = false): void {
+  public async removeTorrent(infoHash: string, deleteFiles: boolean = false): Promise<void> {
     if (!this.enabled || !this.client) {
       throw new Error("Anna's Archive integration is not enabled");
     }
@@ -580,6 +585,25 @@ export class AnnasArchiveManager {
     }
 
     const torrentName = torrent.name;
+    
+    // Unpin files from IPFS and remove from catalog
+    const catalogEntry = this.catalog.get(infoHash);
+    if (catalogEntry && catalogEntry.files.length > 0) {
+      for (const file of catalogEntry.files) {
+        if (file.ipfsCid) {
+          try {
+            await this.unpinFromIPFS(file.ipfsCid);
+            loggers.server.info(`📚 Unpinned IPFS: ${file.ipfsCid}`);
+          } catch (error) {
+            loggers.server.error({ err: error }, `📚 Failed to unpin ${file.ipfsCid}`);
+          }
+        }
+      }
+      // Remove from catalog
+      this.catalog.delete(infoHash);
+      this.saveCatalog();
+      loggers.server.info(`📚 Removed ${infoHash} from catalog`);
+    }
     
     // Remove from WebTorrent
     torrent.destroy({ destroyStore: deleteFiles });
@@ -603,6 +627,18 @@ export class AnnasArchiveManager {
     } catch (error) {
       loggers.server.error({ err: error }, "📚 Failed to update torrents.json after removal");
     }
+  }
+
+  /**
+   * Unpin a CID from IPFS
+   */
+  private async unpinFromIPFS(cid: string): Promise<void> {
+    const ipfsHost = process.env.IPFS_HOST || 'localhost';
+    const ipfsPort = process.env.IPFS_API_PORT || '5001';
+
+    await fetch(`http://${ipfsHost}:${ipfsPort}/api/v0/pin/rm?arg=${cid}`, {
+      method: 'POST'
+    });
   }
 
   /**

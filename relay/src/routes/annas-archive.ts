@@ -168,11 +168,11 @@ router.delete("/remove/:infoHash", async (req, res) => {
     const { infoHash } = req.params;
     const deleteFiles = req.query.deleteFiles === 'true';
     
-    annasArchiveManager.removeTorrent(infoHash, deleteFiles);
+    await annasArchiveManager.removeTorrent(infoHash, deleteFiles);
     
     res.json({
       success: true,
-      message: `Torrent removed successfully${deleteFiles ? ' (files deleted)' : ''}`
+      message: `Torrent removed${deleteFiles ? ' (files deleted)' : ''}, IPFS pins removed`
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to remove torrent");
