@@ -453,7 +453,7 @@ export class AnnasArchiveManager {
   }
 
   /**
-   * Add a file to IPFS and pin it using CLI
+   * Add a file to IPFS and pin it using the IPFS HTTP API
    */
   private async addFileToIPFS(filePath: string): Promise<string | null> {
     try {
@@ -465,17 +465,23 @@ export class AnnasArchiveManager {
         return null;
       }
 
-      // Use IPFS CLI to add and pin in one command
-      // Set IPFS_PATH to point to correct repo location
-      const result = execSync(`ipfs add -Q --pin "${filePath}"`, {
+      const ipfsHost = process.env.IPFS_HOST || '127.0.0.1';
+      const ipfsPort = process.env.IPFS_API_PORT || '5001';
+
+      // Use curl to POST file to IPFS API (more reliable multipart handling)
+      const curlCmd = `curl -s -X POST "http://${ipfsHost}:${ipfsPort}/api/v0/add?pin=true&quiet=true" -F "file=@${filePath}"`;
+      const result = execSync(curlCmd, {
         encoding: 'utf8',
-        timeout: 60000, // 60 second timeout
-        env: { ...process.env, IPFS_PATH: '/data/ipfs' }
+        timeout: 120000 // 2 minute timeout
       }).trim();
 
-      if (result) {
-        loggers.server.info(`📚 Added to IPFS: ${path.basename(filePath)} → ${result}`);
-        return result;
+      // Parse JSON response to get hash
+      const response = JSON.parse(result);
+      const cid = response.Hash;
+
+      if (cid) {
+        loggers.server.info(`📚 Added to IPFS: ${path.basename(filePath)} → ${cid}`);
+        return cid;
       }
       return null;
     } catch (error: any) {
@@ -483,7 +489,7 @@ export class AnnasArchiveManager {
       if (error.code === 'ECONNREFUSED') {
         loggers.server.warn(`📚 IPFS daemon not running - cannot pin ${path.basename(filePath)}`);
       } else {
-        loggers.server.error({ err: error, filePath }, "📚 Failed to add file to IPFS");
+        loggers.server.error({ err: error, filePath }, `📚 Failed to add file to IPFS`);
       }
       return null;
     }
