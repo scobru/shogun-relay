@@ -208,6 +208,27 @@
             <p id="addStatus" class="md-body-small md-text-secondary md-mt-sm"></p>
         </div>
 
+        <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
+            <h2 class="md-title-medium md-mb-sm">📚 IPFS Catalog</h2>
+            <div class="md-flex md-gap-md md-mb-sm">
+                <div class="stat-card" style="flex: 1; padding: 16px;">
+                    <div class="stat-label">Cataloged Torrents</div>
+                    <div class="stat-value" style="font-size: 1.5rem;" id="catalogTorrents">-</div>
+                </div>
+                <div class="stat-card" style="flex: 1; padding: 16px;">
+                    <div class="stat-label">Total Files on IPFS</div>
+                    <div class="stat-value" style="font-size: 1.5rem;" id="catalogFiles">-</div>
+                </div>
+                <div class="stat-card" style="flex: 1; padding: 16px;">
+                    <div class="stat-label">Catalog Endpoint</div>
+                    <a href="/api/v1/annas-archive/catalog" target="_blank" class="md-body-small"
+                        style="color: var(--md-primary);">
+                        View JSON →
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <h2 class="md-title-large md-mb-md">Active Torrents</h2>
         <div class="torrent-list" id="torrentList">
             <div class="md-padding-lg md-text-center md-text-secondary">
@@ -336,6 +357,20 @@
             }
         }
 
+        async function updateCatalog() {
+            try {
+                const response = await fetch('/api/v1/annas-archive/catalog');
+                const json = await response.json();
+
+                if (json.success) {
+                    document.getElementById('catalogTorrents').textContent = json.count || 0;
+                    document.getElementById('catalogFiles').textContent = json.totalFiles || 0;
+                }
+            } catch (err) {
+                console.error("Failed to update catalog", err);
+            }
+        }
+
         async function pauseTorrent(infoHash) {
             try {
                 const response = await fetch(`/api/v1/annas-archive/pause/${infoHash}`, { method: 'POST' });
@@ -395,19 +430,41 @@
 
                 if (json.success && json.data.torrents.length > 0) {
                     const torrent = json.data.torrents[0];
-                    filesDiv.innerHTML = torrent.files.map(f => `
+
+                    // Also fetch catalog to get IPFS CIDs
+                    const catalogResponse = await fetch('/api/v1/annas-archive/catalog');
+                    const catalogJson = await catalogResponse.json();
+                    const catalogEntry = catalogJson.success ?
+                        catalogJson.catalog.find(e => e.torrentHash === infoHash) : null;
+
+                    filesDiv.innerHTML = torrent.files.map(f => {
+                        const catalogFile = catalogEntry?.files.find(cf => cf.name === f.name);
+                        const ipfsCid = catalogFile?.ipfsCid;
+
+                        return `
                         <div class="file-item">
                             <div>
                                 <div style="font-weight: 500;">${f.name}</div>
                                 <div style="font-size: 0.75rem; color: var(--md-on-surface-variant); margin-top: 4px;">
                                     Path: ${f.path}
                                 </div>
+                                ${ipfsCid ? `
+                                <div style="font-size: 0.75rem; color: var(--md-primary); margin-top: 4px; display: flex; align-items: center; gap: 8px;">
+                                    <span>IPFS: ${ipfsCid.substring(0, 12)}...${ipfsCid.substring(ipfsCid.length - 6)}</span>
+                                    <button onclick="navigator.clipboard.writeText('${ipfsCid}')" style="padding: 2px 8px; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--md-outline); background: transparent; cursor: pointer;" title="Copy CID">
+                                        📋
+                                    </button>
+                                    <a href="http://localhost:8080/ipfs/${ipfsCid}" target="_blank" style="color: var(--md-primary); text-decoration: none;" title="Open in IPFS">
+                                        🔗
+                                    </a>
+                                </div>
+                                ` : '<div style="font-size: 0.75rem; color: var(--md-on-surface-variant); margin-top: 4px;">⏳ IPFS CID pending...</div>'}
                             </div>
                             <span style="font-size: 0.8rem; color: var(--md-on-surface-variant); white-space: nowrap;">
                                 ${formatBytes(f.size)} (${(f.progress * 100).toFixed(1)}%)
                             </span>
                         </div>
-                    `).join('');
+                    `}).join('');
                     filesDiv.classList.add('expanded');
                 } else {
                     filesDiv.innerHTML = '<div class="md-text-center md-text-secondary">No files</div>';
@@ -420,8 +477,13 @@
 
         // Update every 2 seconds
         updateDashboard();
-        setInterval(updateDashboard, 2000);
+        updateCatalog();
+        setInterval(() => {
+            updateDashboard();
+            updateCatalog();
+        }, 2000);
     </script>
 </body>
 
 </html>
+```

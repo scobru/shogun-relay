@@ -4,6 +4,20 @@ import path from "path";
 import { annasArchiveConfig } from "../config/env-config";
 import { loggers } from "./logger";
 
+// Catalog entry for torrents with IPFS mappings
+export interface CatalogEntry {
+  torrentHash: string;
+  torrentName: string;
+  magnetLink?: string;
+  completedAt: number;
+  files: {
+    name: string;
+    path: string;
+    size: number;
+    ipfsCid?: string;
+  }[];
+}
+
 // Define a simple interface for the status
 export interface AnnasArchiveStatus {
   enabled: boolean;
@@ -28,10 +42,13 @@ export class AnnasArchiveManager {
   private enabled: boolean;
   private dataDir: string;
   private torrents: string[] = []; // List of magnet links or torrent file paths
+  private catalogFile: string;
+  private catalog: Map<string, CatalogEntry> = new Map();
 
   constructor() {
     this.enabled = annasArchiveConfig.enabled;
     this.dataDir = annasArchiveConfig.dataDir;
+    this.catalogFile = path.join(this.dataDir, 'catalog.json');
 
     // Default torrents (Placeholder for MVP)
     // Ideally this would fetch from annasArchiveConfig.torrentListUrl
@@ -70,6 +87,9 @@ export class AnnasArchiveManager {
       });
 
       loggers.server.info(`📚 Anna's Archive Manager started. Data dir: ${this.dataDir}`);
+      
+      // Load existing catalog
+      this.loadCatalog();
       
       // Start seeding/downloading configured torrents
       await this.loadTorrents();
@@ -136,7 +156,8 @@ export class AnnasArchiveManager {
               
               torrent.on('done', () => {
                   loggers.server.info(`📚 Torrent download complete: ${torrent.name}`);
-                  // Continues seeding...
+                  // Add files to IPFS and update catalog
+                  this.onTorrentComplete(torrent);
               });
           });
       });
@@ -213,6 +234,124 @@ export class AnnasArchiveManager {
       } catch (error) {
           loggers.server.error({ err: error }, "📚 Failed to persist new torrent");
       }
+  }
+
+  /**
+   * Load catalog from disk
+   */
+  private loadCatalog(): void {
+    try {
+      if (fs.existsSync(this.catalogFile)) {
+        const data = fs.readFileSync(this.catalogFile, 'utf8');
+        const entries: CatalogEntry[] = JSON.parse(data);
+        this.catalog.clear();
+        entries.forEach(entry => {
+          this.catalog.set(entry.torrentHash, entry);
+        });
+        loggers.server.info(`📚 Loaded ${entries.length} entries from catalog`);
+      }
+    } catch (error) {
+      loggers.server.error({ err: error }, "📚 Failed to load catalog");
+    }
+  }
+
+  /**
+   * Save catalog to disk
+   */
+  private saveCatalog(): void {
+    try {
+      const entries = Array.from(this.catalog.values());
+      fs.writeFileSync(this.catalogFile, JSON.stringify(entries, null, 2));
+      loggers.server.debug(`📚 Saved ${entries.length} entries to catalog`);
+    } catch (error) {
+      loggers.server.error({ err: error }, "📚 Failed to save catalog");
+    }
+  }
+
+  /**
+   * Add a file to IPFS and pin it
+   */
+  private async addFileToIPFS(filePath: string): Promise<string | null> {
+    try {
+      const FormData = (await import('form-data')).default;
+      const formData = new FormData();
+      formData.append('file', fs.createReadStream(filePath));
+
+      // Add to IPFS
+      const addResponse = await fetch('http://localhost:5001/api/v0/add', {
+        method: 'POST',
+        body: formData as any
+      });
+
+      if (!addResponse.ok) {
+        throw new Error(`IPFS add failed: ${addResponse.status}`);
+      }
+
+      const result = await addResponse.json() as { Hash: string };
+      const cid = result.Hash;
+
+      // Pin the file
+      await fetch(`http://localhost:5001/api/v0/pin/add?arg=${cid}`, {
+        method: 'POST'
+      });
+
+      loggers.server.info(`📚 Added to IPFS: ${path.basename(filePath)} → ${cid}`);
+      return cid;
+    } catch (error) {
+      loggers.server.error({ err: error, filePath }, "📚 Failed to add file to IPFS");
+      return null;
+    }
+  }
+
+  /**
+   * Handle torrent completion - add files to IPFS
+   */
+  private async onTorrentComplete(torrent: any): Promise<void> {
+    loggers.server.info(`📚 Torrent completed: ${torrent.name}`);
+
+    const entry: CatalogEntry = {
+      torrentHash: torrent.infoHash,
+      torrentName: torrent.name,
+      magnetLink: torrent.magnetURI,
+      completedAt: Date.now(),
+      files: []
+    };
+
+    // Process each file
+    for (const file of torrent.files) {
+      const filePath = path.join(this.dataDir, file.path);
+      
+      // Check if file already has IPFS CID
+      const existingEntry = this.catalog.get(torrent.infoHash);
+      const existingFile = existingEntry?.files.find(f => f.path === file.path);
+      
+      let ipfsCid = existingFile?.ipfsCid;
+      
+      if (!ipfsCid) {
+        // Add to IPFS if not already done
+        ipfsCid = await this.addFileToIPFS(filePath) || undefined;
+      }
+
+      entry.files.push({
+        name: file.name,
+        path: file.path,
+        size: file.length,
+        ipfsCid: ipfsCid
+      });
+    }
+
+    // Update catalog
+    this.catalog.set(torrent.infoHash, entry);
+    this.saveCatalog();
+
+    loggers.server.info(`📚 Cataloged ${entry.files.length} files from torrent ${torrent.name}`);
+  }
+
+  /**
+   * Get catalog for sharing with other relays
+   */
+  public getCatalog(): CatalogEntry[] {
+    return Array.from(this.catalog.values());
   }
 
   /**

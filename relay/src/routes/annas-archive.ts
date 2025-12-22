@@ -147,4 +147,32 @@ router.get("/files/:infoHash?", async (req, res) => {
   }
 });
 
+/**
+ * GET /catalog
+ * Get catalog of all torrents with IPFS CIDs
+ * This allows other relays to discover and replicate content
+ */
+router.get("/catalog", async (req, res) => {
+  try {
+    const catalog = annasArchiveManager.getCatalog();
+    
+    res.json({
+      success: true,
+      relay: {
+        url: process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`,
+        ipfsGateway: process.env.IPFS_GATEWAY || 'http://localhost:8080/ipfs'
+      },
+      catalog: catalog,
+      count: catalog.length,
+      totalFiles: catalog.reduce((sum, entry) => sum + entry.files.length, 0)
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to get catalog");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
 export default router;
