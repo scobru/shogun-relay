@@ -77,11 +77,18 @@
         }
 
         .torrent-item {
-            display: flex;
-            align-items: center;
             padding: 16px 24px;
             border-bottom: 1px solid var(--md-outline-variant);
+        }
+
+        .torrent-header {
+            display: flex;
+            align-items: center;
             gap: 16px;
+        }
+
+        .torrent-paused {
+            opacity: 0.6;
         }
 
         .torrent-item:last-child {
@@ -101,6 +108,62 @@
             background-color: var(--md-primary);
             width: 0%;
             transition: width 0.5s ease;
+        }
+
+        .file-list {
+            margin-top: 12px;
+            padding: 12px;
+            background-color: var(--md-surface-container-low);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .file-list.expanded {
+            display: block;
+        }
+
+        .file-item {
+            padding: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+            border-bottom: 1px solid var(--md-outline-variant);
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.875rem;
+            border-radius: 8px;
+            border: 1px solid var(--md-outline);
+            background: var(--md-surface);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-small:hover {
+            background: var(--md-surface-variant);
+        }
+
+        .btn-pause {
+            color: var(--md-secondary);
+        }
+
+        .btn-remove {
+            color: var(--md-error);
+        }
+
+        .btn-files {
+            color: var(--md-primary);
         }
     </style>
 </head>
@@ -231,22 +294,38 @@
                     list.innerHTML = '<div class="md-padding-lg md-text-center md-text-secondary">No active torrents</div>';
                 } else {
                     list.innerHTML = data.torrents.map(t => `
-                        <div class="torrent-item">
-                            <div style="width: 200px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                ${t.name || 'Unknown Torrent'}
+                        <div class="torrent-item ${t.paused ? 'torrent-paused' : ''}" data-hash="${t.infoHash}">
+                            <div class="torrent-header">
+                                <div style="width: 200px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    ${t.paused ? '⏸️ ' : ''}${t.name || 'Unknown Torrent'}
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${(t.progress * 100).toFixed(1)}%"></div>
+                                </div>
+                                <div style="min-width: 80px; text-align: right;">
+                                    ${(t.progress * 100).toFixed(1)}%
+                                </div>
+                                <div style="min-width: 150px; font-size: 0.9em; color: var(--md-on-surface-variant);">
+                                    ↓ ${formatSpeed(t.downloadSpeed)}<br>
+                                    ↑ ${formatSpeed(t.uploadSpeed)}
+                                </div>
+                                <div style="min-width: 80px; text-align: right; color: var(--md-primary);">
+                                    ${t.peers} peers
+                                </div>
+                                <div class="btn-group">
+                                    <button class="btn-small btn-pause" onclick="${t.paused ? 'resumeTorrent' : 'pauseTorrent'}('${t.infoHash}')">
+                                        ${t.paused ? '▶️ Resume' : '⏸️ Pause'}
+                                    </button>
+                                    <button class="btn-small btn-files" onclick="toggleFiles('${t.infoHash}')">
+                                        📁 Files (${t.files})
+                                    </button>
+                                    <button class="btn-small btn-remove" onclick="removeTorrent('${t.infoHash}')">
+                                        🗑️ Remove
+                                    </button>
+                                </div>
                             </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${(t.progress * 100).toFixed(1)}%"></div>
-                            </div>
-                            <div style="min-width: 80px; text-align: right;">
-                                ${(t.progress * 100).toFixed(1)}%
-                            </div>
-                            <div style="min-width: 150px; font-size: 0.9em; color: var(--md-on-surface-variant);">
-                                ↓ ${formatSpeed(t.downloadSpeed)}<br>
-                                ↑ ${formatSpeed(t.uploadSpeed)}
-                            </div>
-                            <div style="min-width: 80px; text-align: right; color: var(--md-primary);">
-                                ${t.peers} peers
+                            <div class="file-list" id="files-${t.infoHash}">
+                                <div class="md-text-center md-text-secondary">Loading files...</div>
                             </div>
                         </div>
                     `).join('');
@@ -254,6 +333,77 @@
 
             } catch (err) {
                 console.error("Failed to update dashboard", err);
+            }
+        }
+
+        async function pauseTorrent(infoHash) {
+            try {
+                const response = await fetch(`/api/v1/annas-archive/pause/${infoHash}`, { method: 'POST' });
+                const json = await response.json();
+                if (json.success) {
+                    updateDashboard();
+                }
+            } catch (err) {
+                console.error('Failed to pause torrent', err);
+            }
+        }
+
+        async function resumeTorrent(infoHash) {
+            try {
+                const response = await fetch(`/api/v1/annas-archive/resume/${infoHash}`, { method: 'POST' });
+                const json = await response.json();
+                if (json.success) {
+                    updateDashboard();
+                }
+            } catch (err) {
+                console.error('Failed to resume torrent', err);
+            }
+        }
+
+        async function removeTorrent(infoHash) {
+            if (!confirm('Remove this torrent? Files will be kept on disk.')) return;
+
+            try {
+                const response = await fetch(`/api/v1/annas-archive/remove/${infoHash}`, { method: 'DELETE' });
+                const json = await response.json();
+                if (json.success) {
+                    updateDashboard();
+                }
+            } catch (err) {
+                console.error('Failed to remove torrent', err);
+            }
+        }
+
+        async function toggleFiles(infoHash) {
+            const filesDiv = document.getElementById(`files-${infoHash}`);
+
+            if (filesDiv.classList.contains('expanded')) {
+                filesDiv.classList.remove('expanded');
+                return;
+            }
+
+            // Load files if not already loaded
+            try {
+                const response = await fetch(`/api/v1/annas-archive/files/${infoHash}`);
+                const json = await response.json();
+
+                if (json.success && json.data.torrents.length > 0) {
+                    const torrent = json.data.torrents[0];
+                    filesDiv.innerHTML = torrent.files.map(f => `
+                        <div class="file-item">
+                            <span>${f.name}</span>
+                            <span style="font-size: 0.8rem; color: var(--md-on-surface-variant);">
+                                ${formatBytes(f.size)} (${(f.progress * 100).toFixed(1)}%)
+                            </span>
+                        </div>
+                    `).join('');
+                    filesDiv.classList.add('expanded');
+                } else {
+                    filesDiv.innerHTML = '<div class="md-text-center md-text-secondary">No files</div>';
+                }
+            } catch (err) {
+                console.error('Failed to load files', err);
+                filesDiv.innerHTML = '<div class="md-text-center md-text-error">Failed to load files</div>';
             }
         }
 
