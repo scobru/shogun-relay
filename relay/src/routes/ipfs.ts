@@ -249,8 +249,27 @@ router.post("/api/v0/cat", (req, res, next) => {
     }
 
     const ipfsReq = http.request(requestOptions, (ipfsRes) => {
-      // Set appropriate headers
-      res.setHeader("Content-Type", "application/octet-stream");
+      // Check if IPFS returned an error (non-2xx status)
+      if (ipfsRes.statusCode && ipfsRes.statusCode >= 400) {
+        let errorData = "";
+        ipfsRes.on("data", (chunk) => {
+          errorData += chunk.toString();
+        });
+        ipfsRes.on("end", () => {
+          if (!res.headersSent) {
+            loggers.server.error({ cid, statusCode: ipfsRes.statusCode, errorData }, `❌ IPFS API v0 cat returned error`);
+            res.status(ipfsRes.statusCode || 500).json({
+              success: false,
+              error: errorData || `IPFS error: ${ipfsRes.statusCode}`,
+            });
+          }
+        });
+        return;
+      }
+
+      // Preserve Content-Type from IPFS if available, otherwise use octet-stream
+      const contentType = ipfsRes.headers["content-type"] || "application/octet-stream";
+      res.setHeader("Content-Type", contentType);
       res.setHeader("Cache-Control", "public, max-age=31536000");
 
       // Pipe the response directly
