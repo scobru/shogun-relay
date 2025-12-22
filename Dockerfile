@@ -78,13 +78,16 @@ ARG ANNAS_ARCHIVE_MAX_TB
 
 
 # Install required system packages
+# build-base provides make, gcc, g++ needed for native modules like better-sqlite3
 RUN apk add  \
     git \
     curl \
     wget \
     dos2unix \
     supervisor \
-    gcompat
+    gcompat \
+    build-base \
+    python3
 
 # Download and install IPFS Kubo (separate step for better caching and retry)
 # Note: IPFS Kubo binaries are compiled for glibc, Alpine uses musl libc - gcompat provides compatibility
