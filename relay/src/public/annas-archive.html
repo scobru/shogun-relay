@@ -348,11 +348,11 @@
                 if (data.torrents.length === 0) {
                     list.innerHTML = '<div class="md-padding-lg md-text-center md-text-secondary">No active torrents</div>';
                 } else {
-                    // Save expanded states before updating
+                    // Save expanded states AND their content before updating
                     const expandedStates = new Map();
                     document.querySelectorAll('.file-list.expanded').forEach(el => {
                         const hash = el.id.replace('files-', '');
-                        expandedStates.set(hash, true);
+                        expandedStates.set(hash, el.innerHTML); // Save actual content
                     });
 
                     list.innerHTML = data.torrents.map(t => `
@@ -390,19 +390,11 @@
                                 </div>
                             </div>
                             <div class="file-list ${expandedStates.has(t.infoHash) ? 'expanded' : ''}" id="files-${t.infoHash}">
-                                <div class="md-text-center md-text-secondary">Loading files...</div>
+                                ${expandedStates.has(t.infoHash) ? expandedStates.get(t.infoHash) : '<div class="md-text-center md-text-secondary">Click Files to expand</div>'}
                             </div>
                         </div>
                     `).join('');
-
-                    // Re-load file lists for expanded items
-                    expandedStates.forEach((_, hash) => {
-                        const filesDiv = document.getElementById(`files-${hash}`);
-                        if (filesDiv && filesDiv.classList.contains('expanded')) {
-                            // Re-trigger file loading without event to avoid closing
-                            loadFilesForTorrent(hash);
-                        }
-                    });
+                    // Content is preserved via expandedStates, no need to reload
                 }
 
             } catch (err) {
