@@ -149,22 +149,16 @@ WORKDIR /app
 # Copy configuration files first
 COPY docker/ /app/docker/
 
-# Convert script line endings from CRLF to LF
-RUN dos2unix /app/docker/init-ipfs.sh
-RUN dos2unix /app/docker/entrypoint.sh
-RUN dos2unix /app/docker/verify-volumes.sh || true
-
-# Set executable permissions for scripts
-RUN chmod +x /app/docker/init-ipfs.sh
-RUN chmod +x /app/docker/entrypoint.sh
-RUN chmod +x /app/docker/verify-volumes.sh || true
-
-# Copy entrypoint to final location and ensure it's executable
-RUN cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh && \
-    chmod +x /usr/local/bin/entrypoint.sh
-
-# Create environment files with Docker-optimized settings
-RUN cp /app/docker/relay.env /app/relay/.env
+# Convert line endings and set permissions in single layer (better cache)
+RUN dos2unix /app/docker/init-ipfs.sh \
+    && dos2unix /app/docker/entrypoint.sh \
+    && dos2unix /app/docker/verify-volumes.sh || true \
+    && chmod +x /app/docker/init-ipfs.sh \
+    && chmod +x /app/docker/entrypoint.sh \
+    && chmod +x /app/docker/verify-volumes.sh || true \
+    && cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh \
+    && cp /app/docker/relay.env /app/relay/.env
 
 # Copy package files and scripts (needed for postinstall)
 COPY relay/package*.json /app/relay/
