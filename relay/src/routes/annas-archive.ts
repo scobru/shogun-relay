@@ -54,4 +54,97 @@ router.post("/add", express.json(), async (req, res) => {
   }
 });
 
+/**
+ * POST /pause/:infoHash
+ * Pause a torrent
+ */
+router.post("/pause/:infoHash", async (req, res) => {
+  try {
+    const { infoHash } = req.params;
+    
+    annasArchiveManager.pauseTorrent(infoHash);
+    
+    res.json({
+      success: true,
+      message: "Torrent paused successfully"
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to pause torrent");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * POST /resume/:infoHash
+ * Resume a paused torrent
+ */
+router.post("/resume/:infoHash", async (req, res) => {
+  try {
+    const { infoHash } = req.params;
+    
+    annasArchiveManager.resumeTorrent(infoHash);
+    
+    res.json({
+      success: true,
+      message: "Torrent resumed successfully"
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to resume torrent");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * DELETE /remove/:infoHash
+ * Remove a torrent (query param ?deleteFiles=true to also delete files)
+ */
+router.delete("/remove/:infoHash", async (req, res) => {
+  try {
+    const { infoHash } = req.params;
+    const deleteFiles = req.query.deleteFiles === 'true';
+    
+    annasArchiveManager.removeTorrent(infoHash, deleteFiles);
+    
+    res.json({
+      success: true,
+      message: `Torrent removed successfully${deleteFiles ? ' (files deleted)' : ''}`
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to remove torrent");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * GET /files/:infoHash?
+ * Get files for a specific torrent or all torrents
+ */
+router.get("/files/:infoHash?", async (req, res) => {
+  try {
+    const { infoHash } = req.params;
+    
+    const files = annasArchiveManager.getFiles(infoHash);
+    
+    res.json({
+      success: true,
+      data: files
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to get files");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
 export default router;

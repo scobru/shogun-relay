@@ -18,6 +18,8 @@ export interface AnnasArchiveStatus {
     downloadSpeed: number;
     uploadSpeed: number;
     peers: number;
+    paused: boolean;
+    files: number;
   }[];
 }
 
@@ -214,6 +216,115 @@ export class AnnasArchiveManager {
   }
 
   /**
+   * Pause a torrent
+   */
+  public pauseTorrent(infoHash: string): void {
+    if (!this.enabled || !this.client) {
+      throw new Error("Anna's Archive integration is not enabled");
+    }
+
+    const torrent = this.client.torrents.find(t => t.infoHash === infoHash);
+    if (!torrent) {
+      throw new Error(`Torrent not found: ${infoHash}`);
+    }
+
+    torrent.pause();
+    loggers.server.info(`📚 Paused torrent: ${torrent.name} (${infoHash.substring(0, 12)}...)`);
+  }
+
+  /**
+   * Resume a paused torrent
+   */
+  public resumeTorrent(infoHash: string): void {
+    if (!this.enabled || !this.client) {
+      throw new Error("Anna's Archive integration is not enabled");
+    }
+
+    const torrent = this.client.torrents.find(t => t.infoHash === infoHash);
+    if (!torrent) {
+      throw new Error(`Torrent not found: ${infoHash}`);
+    }
+
+    torrent.resume();
+    loggers.server.info(`📚 Resumed torrent: ${torrent.name} (${infoHash.substring(0, 12)}...)`);
+  }
+
+  /**
+   * Remove a torrent from the client
+   * @param infoHash The torrent's info hash
+   * @param deleteFiles Whether to delete files from disk (default: false)
+   */
+  public removeTorrent(infoHash: string, deleteFiles: boolean = false): void {
+    if (!this.enabled || !this.client) {
+      throw new Error("Anna's Archive integration is not enabled");
+    }
+
+    const torrent = this.client.torrents.find(t => t.infoHash === infoHash);
+    if (!torrent) {
+      throw new Error(`Torrent not found: ${infoHash}`);
+    }
+
+    const torrentName = torrent.name;
+    
+    // Remove from WebTorrent
+    torrent.destroy({ destroyStore: deleteFiles });
+    loggers.server.info(`📚 Removed torrent: ${torrentName} (deleteFiles: ${deleteFiles})`);
+
+    // Remove from torrents.json persistence
+    try {
+      const torrentsFile = path.join(this.dataDir, 'torrents.json');
+      if (fs.existsSync(torrentsFile)) {
+        const fileContent = fs.readFileSync(torrentsFile, 'utf8');
+        let existingTorrents: string[] = JSON.parse(fileContent);
+        
+        // Filter out any magnet link that contains this infoHash
+        const filtered = existingTorrents.filter(mag => !mag.includes(infoHash));
+        
+        if (filtered.length !== existingTorrents.length) {
+          fs.writeFileSync(torrentsFile, JSON.stringify(filtered, null, 2));
+          loggers.server.info("📚 Removed torrent from persistent configuration");
+        }
+      }
+    } catch (error) {
+      loggers.server.error({ err: error }, "📚 Failed to update torrents.json after removal");
+    }
+  }
+
+  /**
+   * Get files for a specific torrent or all torrents
+   * @param infoHash Optional torrent info hash. If not provided, returns files for all torrents
+   */
+  public getFiles(infoHash?: string): any {
+    if (!this.enabled || !this.client) {
+      return { torrents: [] };
+    }
+
+    let torrents = this.client.torrents;
+    
+    if (infoHash) {
+      const torrent = torrents.find(t => t.infoHash === infoHash);
+      if (!torrent) {
+        throw new Error(`Torrent not found: ${infoHash}`);
+      }
+      torrents = [torrent];
+    }
+
+    return {
+      torrents: torrents.map(t => ({
+        infoHash: t.infoHash,
+        name: t.name,
+        files: t.files.map(f => ({
+          name: f.name,
+          path: f.path,
+          size: f.length,
+          downloaded: f.downloaded,
+          progress: f.progress
+        }))
+      }))
+    };
+  }
+
+  /**
    * Get current status
    */
   public getStatus(): AnnasArchiveStatus {
@@ -240,7 +351,9 @@ export class AnnasArchiveManager {
           progress: t.progress,
           downloadSpeed: t.downloadSpeed,
           uploadSpeed: t.uploadSpeed,
-          peers: t.numPeers
+          peers: t.numPeers,
+          paused: t.paused,
+          files: t.files.length
       }))
     };
   }
