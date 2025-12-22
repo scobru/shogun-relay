@@ -80,7 +80,7 @@ ARG ANNAS_ARCHIVE_MAX_TB
 # Install required system packages
 # build-base provides make, gcc, g++ needed for native modules like better-sqlite3
 # cmake is needed for node-datachannel (webtorrent dependency)
-# openssl-dev provides SSL headers for node-datachannel
+# openssl-dev + libressl-dev provide SSL headers and libraries for node-datachannel
 RUN apk add  \
     git \
     curl \
@@ -91,7 +91,9 @@ RUN apk add  \
     build-base \
     python3 \
     cmake \
-    openssl-dev
+    openssl-dev \
+    openssl-libs-static \
+    linux-headers
 
 # Download and install IPFS Kubo (separate step for better caching and retry)
 # Note: IPFS Kubo binaries are compiled for glibc, Alpine uses musl libc - gcompat provides compatibility
