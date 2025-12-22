@@ -644,19 +644,12 @@
 
                 if (data.success) {
                     progressBar.style.width = '100%';
-                    statusText.textContent = `✅ Success! Torrent: ${data.name}`;
+                    statusText.textContent = `✅ ${data.message}`;
                     statusText.style.color = 'var(--md-primary)';
 
-                    // Copy magnet to clipboard
-                    navigator.clipboard.writeText(data.magnetURI);
-
-                    // Show magnet
-                    setTimeout(() => {
-                        statusText.textContent = `📋 Magnet copied! ${data.magnetURI.substring(0, 60)}...`;
-                    }, 1500);
-
-                    // Update dashboard
-                    setTimeout(() => updateDashboard(), 1000);
+                    // Update dashboard after a delay to show new torrent
+                    setTimeout(() => updateDashboard(), 2000);
+                    setTimeout(() => updateDashboard(), 5000);
 
                     // Reset after 8s
                     setTimeout(() => {

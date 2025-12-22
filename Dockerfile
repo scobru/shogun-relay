@@ -2,6 +2,8 @@
 # Includes: IPFS, Relay Server
 
 FROM node:20-slim
+# use cache
+
 
 # Build arguments (may be passed by CapRover or other deployment systems)
 ARG ADMIN_PASSWORD
@@ -89,7 +91,7 @@ RUN apt-get update && apt-get install -y \
     python3 \
     cmake \
     libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* 
 
 # Download and install IPFS Kubo (separate step for better caching and retry)
 # Note: Debian-based image uses glibc, so IPFS binary works natively

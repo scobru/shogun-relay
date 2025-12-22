@@ -76,6 +76,7 @@ router.post("/add", express.json(), async (req, res) => {
 /**
  * POST /create
  * Upload files and create a torrent from them
+ * Responds immediately after upload, creates torrent in background
  */
 router.post("/create", upload.array('files', 20), async (req, res) => {
   try {
@@ -93,16 +94,21 @@ router.post("/create", upload.array('files', 20), async (req, res) => {
     // Get file paths
     const filePaths = files.map(f => f.path);
     
-    // Create and seed torrent
-    const result = await annasArchiveManager.createTorrent(filePaths);
+    // Start torrent creation in background (don't await)
+    annasArchiveManager.createTorrent(filePaths)
+      .then(result => {
+        loggers.server.info(`📚 Torrent created: ${result.name} - ${result.magnetURI.substring(0, 60)}...`);
+      })
+      .catch(err => {
+        loggers.server.error({ err }, "📚 Background torrent creation failed");
+      });
     
+    // Respond immediately with files info
     res.json({
       success: true,
-      message: "Torrent created and seeding",
-      magnetURI: result.magnetURI,
-      infoHash: result.infoHash,
-      name: result.name,
-      files: files.map(f => f.originalname)
+      message: "Files uploaded, torrent creation started. Check Active Torrents in a few seconds.",
+      files: files.map(f => f.originalname),
+      note: "Refresh the dashboard to see the new torrent"
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to create torrent");
