@@ -46,7 +46,6 @@ import {
 } from "./utils/security";
 import { startPeriodicPeerSync } from "./utils/peer-discovery";
 import { annasArchiveManager } from "./utils/annas-archive";
-import annasArchiveRouter from "./routes/annas-archive";
 
 dotenv.config();
 
