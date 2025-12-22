@@ -42,6 +42,13 @@ services:
       # Example: RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
       # Or: RELAY_SEA_KEYPAIR_PATH=/app/keys/relay-keypair.json
       # ============================================================================
+      # ANNA'S ARCHIVE
+      # ============================================================================
+      - ANNAS_ARCHIVE_ENABLED=${ANNAS_ARCHIVE_ENABLED:-true}
+      - ANNAS_ARCHIVE_DATA_DIR=/app/relay/data/annas-archive
+      - ANNAS_ARCHIVE_MAX_TB=${ANNAS_ARCHIVE_MAX_TB:-0.05}
+      # ============================================================================
+      # ============================================================================
       # X402 PAYMENT CONFIGURATION (Multi-Chain)
       # ============================================================================
       - X402_PAY_TO_ADDRESS=0xYourWalletAddressHere

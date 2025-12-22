@@ -58,7 +58,10 @@ export class AnnasArchiveManager {
     try {
       // Dynamic import for WebTorrent if needed, or just use the imported one
        // @ts-ignore - WebTorrent types might be tricky with ESM/CommonJS mix
-      this.client = new WebTorrent();
+      this.client = new WebTorrent({
+          // @ts-ignore - Disable uTP to avoid segmentation faults on Alpine Linux (utp-native)
+          utp: false
+      });
 
       this.client.on('error', (err) => {
           loggers.server.error({ err }, "📚 Anna's Archive WebTorrent Error");
