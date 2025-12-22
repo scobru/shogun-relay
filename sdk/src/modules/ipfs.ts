@@ -173,8 +173,17 @@ export class IpfsModule {
       headers["x-user-address"] = userAddress;
     }
 
+    // Explicitly don't set Content-Type - let browser set it with boundary for FormData
     return this.client.post("/api/v1/ipfs/upload", formData, {
       headers: headers,
+      // Ensure axios doesn't serialize FormData as JSON
+      transformRequest: [(data) => {
+        // If it's FormData, return as-is (axios will handle it)
+        if (data instanceof FormData) {
+          return data;
+        }
+        return data;
+      }],
     });
   }
 
@@ -205,8 +214,17 @@ export class IpfsModule {
       headers["x-user-address"] = userAddress;
     }
 
+    // Explicitly don't set Content-Type - let browser set it with boundary for FormData
     return this.client.post("/api/v1/ipfs/upload-directory", formData, {
       headers: headers,
+      // Ensure axios doesn't serialize FormData as JSON
+      transformRequest: [(data) => {
+        // If it's FormData, return as-is (axios will handle it)
+        if (data instanceof FormData) {
+          return data;
+        }
+        return data;
+      }],
     });
   }
 

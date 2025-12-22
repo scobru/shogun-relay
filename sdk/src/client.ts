@@ -25,6 +25,12 @@ export class ApiClient {
       if (this.config.token) {
         req.headers["Authorization"] = `Bearer ${this.config.token}`;
       }
+      
+      // If data is FormData, remove Content-Type header to let browser set it with boundary
+      if (req.data instanceof FormData) {
+        delete req.headers["Content-Type"];
+      }
+      
       return req;
     });
   }
