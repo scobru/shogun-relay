@@ -309,6 +309,12 @@ router.post(
         contentType,
         relayUrl,
         originalName,
+        // Campi aggiuntivi per directory e metadati completi
+        files,
+        fileCount,
+        isDirectory,
+        displayName,
+        uploadedAt,
       } = req.body;
 
       if (!hash || !userAddress) {
@@ -337,12 +343,18 @@ router.post(
           hash: hash,
           userAddress: userAddress,
           timestamp: timestamp || now,
-          uploadedAt: timestamp || now,
+          uploadedAt: uploadedAt || timestamp || now,
           savedAt: new Date().toISOString(),
         };
 
+        // Campi base
         if (fileName) {
           hashRecord.fileName = fileName;
+        }
+
+        if (displayName) {
+          hashRecord.displayName = displayName;
+        } else if (fileName) {
           hashRecord.displayName = fileName;
         }
 
@@ -364,6 +376,25 @@ router.post(
 
         if (originalName) {
           hashRecord.originalName = originalName;
+        }
+
+        // Campi per directory
+        if (typeof isDirectory === "boolean") {
+          hashRecord.isDirectory = isDirectory;
+        }
+
+        if (typeof fileCount === "number") {
+          hashRecord.fileCount = fileCount;
+        }
+
+        // IMPORTANTE: Salva il campo 'files' per le directory
+        // Questo contiene la lista dei file nella directory
+        if (files && Array.isArray(files)) {
+          hashRecord.files = files;
+          loggers.uploads.debug(
+            { fileCount: files.length },
+            "Saving directory with files array"
+          );
         }
 
         loggers.uploads.debug({ hashRecord }, "Saving hash record");
