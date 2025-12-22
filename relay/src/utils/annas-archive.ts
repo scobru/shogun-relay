@@ -44,11 +44,35 @@ export class AnnasArchiveManager {
   private torrents: string[] = []; // List of magnet links or torrent file paths
   private catalogFile: string;
   private catalog: Map<string, CatalogEntry> = new Map();
+  private gun: any;
+  private relayKey: string;
 
   constructor() {
     this.enabled = annasArchiveConfig.enabled;
     this.dataDir = annasArchiveConfig.dataDir;
     this.catalogFile = path.join(this.dataDir, 'catalog.json');
+    
+    // Initialize GunDB for decentralized catalog
+    if (this.enabled) {
+      try {
+        const Gun = require('gun');
+        this.gun = Gun({
+          peers: process.env.GUN_PEERS?.split(',') || [
+            'https://gun-relay.scobrudot.dev/gun',
+            'http://localhost:8765/gun'
+          ]
+        });
+        
+        // Generate or load relay key
+        this.relayKey = process.env.RELAY_PUBLIC_KEY || 
+                        `relay-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        loggers.server.info(`📚 GunDB initialized for relay: ${this.relayKey}`);
+      } catch (error) {
+        loggers.server.error({ err: error }, "📚 Failed to initialize GunDB");
+        this.gun = null;
+      }
+    }
 
     // Default torrents (Placeholder for MVP)
     // Ideally this would fetch from annasArchiveConfig.torrentListUrl
@@ -90,6 +114,14 @@ export class AnnasArchiveManager {
       
       // Load existing catalog
       this.loadCatalog();
+      
+      // Subscribe to GunDB network
+      this.subscribeToNetwork();
+      
+      // Publish current catalog if we have any
+      if (this.catalog.size > 0) {
+        this.publishCatalog();
+      }
       
       // Start seeding/downloading configured torrents
       await this.loadTorrents();
@@ -262,10 +294,104 @@ export class AnnasArchiveManager {
     try {
       const entries = Array.from(this.catalog.values());
       fs.writeFileSync(this.catalogFile, JSON.stringify(entries, null, 2));
-      loggers.server.debug(`📚 Saved ${entries.length} entries to catalog`);
+      
+      // Publish to GunDB network
+      this.publishCatalog();
+      
+      loggers.server.debug(`📚 Saved ${entries.length} entries locally and to network`);
     } catch (error) {
       loggers.server.error({ err: error }, "📚 Failed to save catalog");
     }
+  }
+
+  /**
+   * Publish catalog to GunDB network
+   */
+  private publishCatalog(): void {
+    if (!this.gun) return;
+
+    try {
+      const catalogData: any = {
+        relayUrl: process.env.PUBLIC_URL || 'http://localhost:3000',
+        ipfsGateway: process.env.IPFS_GATEWAY || 'http://localhost:8080/ipfs',
+        lastUpdated: Date.now(),
+        torrents: {}
+      };
+
+      // Convert catalog Map to object
+      this.catalog.forEach((entry, hash) => {
+        catalogData.torrents[hash] = {
+          name: entry.torrentName,
+          magnetURI: entry.magnetLink,
+          completedAt: entry.completedAt,
+          files: entry.files
+        };
+      });
+
+      // Publish to GunDB
+      this.gun.get('annas-archive')
+        .get('catalog')
+        .get(this.relayKey)
+        .put(catalogData);
+
+      loggers.server.info(`📚 Published ${this.catalog.size} torrents to GunDB network`);
+    } catch (error) {
+      loggers.server.error({ err: error }, "📚 Failed to publish to GunDB");
+    }
+  }
+
+  /**
+   * Subscribe to network catalog updates
+   */
+  private subscribeToNetwork(): void {
+    if (!this.gun) return;
+
+    try {
+      this.gun.get('annas-archive')
+        .get('catalog')
+        .map()
+        .on((relayData: any, relayKey: string) => {
+          if (relayKey === this.relayKey) return; // Skip own data
+          if (!relayData || !relayData.torrents) return;
+
+          const torrentCount = Object.keys(relayData.torrents).length;
+          loggers.server.info(`📚 Discovered relay: ${relayKey} with ${torrentCount} torrents`);
+        });
+
+      loggers.server.info("📚 Subscribed to GunDB network catalog");
+    } catch (error) {
+      loggers.server.error({ err: error}, "📚 Failed to subscribe to GunDB");
+    }
+  }
+
+  /**
+   * Get network catalog from all relays
+   */
+  public async getNetworkCatalog(): Promise<any[]> {
+    if (!this.gun) return [];
+
+    return new Promise((resolve) => {
+      const relays: any[] = [];
+      const timeout = setTimeout(() => resolve(relays), 5000);
+
+      this.gun.get('annas-archive')
+        .get('catalog')
+        .map()
+        .once((relayData: any, relayKey: string) => {
+          if (relayData && relayKey !== this.relayKey) {
+            relays.push({
+              relayKey,
+              ...relayData
+            });
+          }
+        });
+
+      // Give it 2 seconds to collect
+      setTimeout(() => {
+        clearTimeout(timeout);
+        resolve(relays);
+      }, 2000);
+    });
   }
 
   /**

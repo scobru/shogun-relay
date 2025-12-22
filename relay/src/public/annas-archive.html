@@ -229,6 +229,18 @@
             </div>
         </div>
 
+        <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2 class="md-title-medium">🌐 Network Discovery</h2>
+                <button onclick="discoverNetwork()" class="md-btn md-btn-filled">
+                    🔍 Discover Network
+                </button>
+            </div>
+            <div id="networkRelays" class="md-body-small md-text-secondary">
+                Click "Discover Network" to find torrents from other relays
+            </div>
+        </div>
+
         <h2 class="md-title-large md-mb-md">Active Torrents</h2>
         <div class="torrent-list" id="torrentList">
             <div class="md-padding-lg md-text-center md-text-secondary">
@@ -444,6 +456,69 @@
                 console.error('Failed to copy magnet', err);
                 alert('Failed to copy magnet link');
             });
+        }
+
+        async function discoverNetwork() {
+            const relaysDiv = document.getElementById('networkRelays');
+            relaysDiv.innerHTML = '<div class="md-text-center">🔍 Discovering network...</div>';
+
+            try {
+                const response = await fetch('/api/v1/annas-archive/network');
+                const json = await response.json();
+
+                if (json.success && json.network.length > 0) {
+                    relaysDiv.innerHTML = `
+                        <div class="md-body-small md-mb-md">
+                            📡 Found ${json.relays} relay(s) with ${json.totalTorrents} total torrents
+                        </div>
+                        ${json.network.map(relay => {
+                        const torrents = relay.torrents || {};
+                        const torrentList = Object.entries(torrents);
+                        return `
+                            <div class="md-card md-card-outlined" style="padding: 16px; margin-bottom: 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <div>
+                                        <div style="font-weight: 500;">${relay.relayUrl || 'Unknown Relay'}</div>
+                                        <div style="font-size: 0.75rem; color: var(--md-on-surface-variant);">
+                                            ${torrentList.length} torrents • Updated: ${new Date(relay.lastUpdated).toLocaleString()}
+                                        </div>
+                                    </div>
+                                </div>
+                                <details style="margin-top: 8px;">
+                                    <summary style="cursor: pointer; color: var(--md-primary);">
+                                        View Torrents (${torrentList.length})
+                                    </summary>
+                                    <div style="margin-top: 12px; max-height: 300px; overflow-y: auto;">
+                                        ${torrentList.map(([hash, torrent]) => `
+                                            <div style="padding: 8px; border-bottom: 1px solid var(--md-outline-variant); display: flex; justify-content: space-between; align-items: center;">
+                                                <div style="flex: 1;">
+                                                    <div style="font-weight: 500; font-size: 0.875rem;">${torrent.name}</div>
+                                                    <div style="font-size: 0.75rem; color: var(--md-on-surface-variant);">
+                                                        ${torrent.files?.length || 0} files
+                                                    </div>
+                                                </div>
+                                                <button onclick="addTorrentFromNetwork('${torrent.magnetURI}')" class="btn-small">
+                                                    ➕ Add
+                                                </button>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </details>
+                            </div>
+                        `}).join('')}
+                    `;
+                } else {
+                    relaysDiv.innerHTML = '<div class="md-text-center md-text-secondary">No other relays found on network</div>';
+                }
+            } catch (err) {
+                console.error('Network discovery failed', err);
+                relaysDiv.innerHTML = '<div class="md-text-center md-text-error">❌ Discovery failed</div>';
+            }
+        }
+
+        async function addTorrentFromNetwork(magnetURI) {
+            document.getElementById('magnetLink').value = magnetURI;
+            await addTorrent();
         }
 
         async function loadFilesForTorrent(infoHash) {

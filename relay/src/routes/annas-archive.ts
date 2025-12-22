@@ -175,4 +175,29 @@ router.get("/catalog", async (req, res) => {
   }
 });
 
+/**
+ * GET /network
+ * Get torrents from entire GunDB network (all relays)
+ */
+router.get("/network", async (req, res) => {
+  try {
+    const networkCatalog = await annasArchiveManager.getNetworkCatalog();
+    
+    res.json({
+      success: true,
+      network: networkCatalog,
+      relays: networkCatalog.length,
+      totalTorrents: networkCatalog.reduce((sum, relay) => 
+        sum + Object.keys(relay.torrents || {}).length, 0
+      )
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to get network catalog");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
 export default router;
