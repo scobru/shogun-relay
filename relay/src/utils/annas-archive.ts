@@ -496,7 +496,40 @@ export class AnnasArchiveManager {
   }
 
   /**
-   * Handle torrent completion - add files to IPFS
+   * Manually pin a file from a torrent to IPFS
+   * Returns the CID if successful
+   */
+  public async pinFile(infoHash: string, filePath: string): Promise<{ success: boolean; cid?: string; error?: string }> {
+    const entry = this.catalog.get(infoHash);
+    if (!entry) {
+      return { success: false, error: 'Torrent not found in catalog' };
+    }
+
+    const file = entry.files.find(f => f.path === filePath);
+    if (!file) {
+      return { success: false, error: 'File not found in torrent' };
+    }
+
+    if (file.ipfsCid) {
+      return { success: true, cid: file.ipfsCid }; // Already pinned
+    }
+
+    const fullPath = path.join(this.dataDir, filePath);
+    const cid = await this.addFileToIPFS(fullPath);
+    
+    if (cid) {
+      // Update catalog with CID
+      file.ipfsCid = cid;
+      this.saveCatalog();
+      return { success: true, cid };
+    }
+    
+    return { success: false, error: 'Failed to add to IPFS - check if daemon is running' };
+  }
+
+  /**
+   * Handle torrent completion - catalog files
+
    */
   private async onTorrentComplete(torrent: any): Promise<void> {
     loggers.server.info(`📚 Torrent completed: ${torrent.name}`);
@@ -509,26 +542,17 @@ export class AnnasArchiveManager {
       files: []
     };
 
-    // Process each file
+    // Catalog each file (no auto-pin - user can pin manually via dashboard)
     for (const file of torrent.files) {
-      const filePath = path.join(this.dataDir, file.path);
-      
-      // Check if file already has IPFS CID
+      // Check if file already has IPFS CID from previous pin
       const existingEntry = this.catalog.get(torrent.infoHash);
       const existingFile = existingEntry?.files.find(f => f.path === file.path);
       
-      let ipfsCid = existingFile?.ipfsCid;
-      
-      if (!ipfsCid) {
-        // Add to IPFS if not already done
-        ipfsCid = await this.addFileToIPFS(filePath) || undefined;
-      }
-
       entry.files.push({
         name: file.name,
         path: file.path,
         size: file.length,
-        ipfsCid: ipfsCid
+        ipfsCid: existingFile?.ipfsCid // Preserve existing CID if any
       });
     }
 

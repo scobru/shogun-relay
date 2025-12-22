@@ -190,7 +190,46 @@ router.delete("/remove/:infoHash", async (req, res) => {
 });
 
 /**
+ * POST /pin
+ * Manually pin a file from a torrent to IPFS
+ */
+router.post("/pin", async (req, res) => {
+  try {
+    const { infoHash, filePath } = req.body;
+    
+    if (!infoHash || !filePath) {
+      return res.status(400).json({
+        success: false,
+        error: "infoHash and filePath are required"
+      });
+    }
+    
+    const result = await annasArchiveManager.pinFile(infoHash, filePath);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        cid: result.cid,
+        message: `File pinned to IPFS: ${result.cid}`
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to pin file to IPFS");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
  * GET /files/:infoHash?
+
  * Get files for a specific torrent or all torrents
  */
 router.get("/files/:infoHash?", async (req, res) => {

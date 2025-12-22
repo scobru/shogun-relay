@@ -454,23 +454,72 @@
             }
         }
 
+        function showToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed; 
+                bottom: 20px; 
+                right: 20px; 
+                background: ${isError ? 'var(--md-error)' : 'var(--md-primary)'}; 
+                color: ${isError ? 'var(--md-on-error)' : 'var(--md-on-primary)'}; 
+                padding: 12px 24px; 
+                border-radius: 8px; 
+                z-index: 9999; 
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                animation: slideIn 0.3s ease;
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
         function copyMagnet(magnetURI) {
             navigator.clipboard.writeText(magnetURI).then(() => {
-                // Show toast notification
-                const toast = document.createElement('div');
-                toast.textContent = '✅ Magnet link copied!';
-                toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--md-primary); color: white; padding: 12px 24px; border-radius: 8px; z-index: 9999; animation: slideIn 0.3s ease;';
-                document.body.appendChild(toast);
-                setTimeout(() => {
-                    toast.style.opacity = '0';
-                    toast.style.transition = 'opacity 0.3s';
-                    setTimeout(() => toast.remove(), 300);
-                }, 2000);
+                showToast('✅ Magnet link copied!');
             }).catch(err => {
                 console.error('Failed to copy magnet', err);
-                alert('Failed to copy magnet link');
+                showToast('❌ Failed to copy magnet', true);
             });
         }
+
+        async function pinToIPFS(infoHash, filePath) {
+            // Find the button that triggered this
+            const btn = event.target.closest('button');
+            if (!btn) return;
+
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Pinning...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/v1/annas-archive/pin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ infoHash, filePath })
+                });
+                const json = await response.json();
+
+                if (json.success) {
+                    showToast(`✅ File pinned: ${json.cid.substring(0, 10)}...`);
+                    // Refresh dashboard to show updated state
+                    updateDashboard();
+                } else {
+                    showToast(`❌ Error: ${json.error}`, true);
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                console.error('Failed to pin file', err);
+                showToast('❌ Failed to connect to server', true);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
 
         async function discoverNetwork() {
             const relaysDiv = document.getElementById('networkRelays');
@@ -573,7 +622,14 @@
                                         🔗
                                     </a>
                                 </div>
-                                ` : '<div style="font-size: 0.75rem; color: var(--md-on-surface-variant); margin-top: 4px;">⏳ IPFS CID pending...</div>'}
+                                ` : `
+                                <div style="font-size: 0.75rem; margin-top: 4px; display: flex; align-items: center; gap: 8px;">
+                                    <span style="color: var(--md-on-surface-variant);">Not pinned to IPFS</span>
+                                    <button onclick="pinToIPFS('${infoHash}', '${f.path}')" class="btn-small" style="padding: 2px 8px; font-size: 0.7rem;" title="Pin to IPFS">
+                                        📌 Pin
+                                    </button>
+                                </div>
+                                `}
                             </div>
                             <span style="font-size: 0.8rem; color: var(--md-on-surface-variant); white-space: nowrap;">
                                 ${formatBytes(f.size)} (${(f.progress * 100).toFixed(1)}%)
