@@ -451,23 +451,30 @@ export class AnnasArchiveManager {
     try {
       const FormData = (await import('form-data')).default;
       const formData = new FormData();
-      formData.append('file', fs.createReadStream(filePath));
+      formData.append('file', fs.createReadStream(filePath), {
+        filename: path.basename(filePath)
+      });
 
-      // Add to IPFS
-      const addResponse = await fetch('http://localhost:5001/api/v0/add', {
+      const ipfsHost = process.env.IPFS_HOST || 'localhost';
+      const ipfsPort = process.env.IPFS_API_PORT || '5001';
+
+      // Add to IPFS with proper headers
+      const addResponse = await fetch(`http://${ipfsHost}:${ipfsPort}/api/v0/add`, {
         method: 'POST',
-        body: formData as any
+        body: formData as any,
+        headers: formData.getHeaders()
       });
 
       if (!addResponse.ok) {
-        throw new Error(`IPFS add failed: ${addResponse.status}`);
+        const errText = await addResponse.text();
+        throw new Error(`IPFS add failed: ${addResponse.status} - ${errText}`);
       }
 
       const result = await addResponse.json() as { Hash: string };
       const cid = result.Hash;
 
       // Pin the file
-      await fetch(`http://localhost:5001/api/v0/pin/add?arg=${cid}`, {
+      await fetch(`http://${ipfsHost}:${ipfsPort}/api/v0/pin/add?arg=${cid}`, {
         method: 'POST'
       });
 
