@@ -316,7 +316,7 @@
                                     <button class="btn-small btn-pause" onclick="${t.paused ? 'resumeTorrent' : 'pauseTorrent'}('${t.infoHash}')">
                                         ${t.paused ? '▶️ Resume' : '⏸️ Pause'}
                                     </button>
-                                    <button class="btn-small btn-files" onclick="toggleFiles('${t.infoHash}')">
+                                    <button class="btn-small btn-files" onclick="toggleFiles('${t.infoHash}', event)">
                                         📁 Files (${t.files})
                                     </button>
                                     <button class="btn-small btn-remove" onclick="removeTorrent('${t.infoHash}')">
@@ -374,7 +374,13 @@
             }
         }
 
-        async function toggleFiles(infoHash) {
+        async function toggleFiles(infoHash, event) {
+            // Prevent event propagation to avoid conflicts with other click handlers
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+
             const filesDiv = document.getElementById(`files-${infoHash}`);
 
             if (filesDiv.classList.contains('expanded')) {
@@ -391,8 +397,13 @@
                     const torrent = json.data.torrents[0];
                     filesDiv.innerHTML = torrent.files.map(f => `
                         <div class="file-item">
-                            <span>${f.name}</span>
-                            <span style="font-size: 0.8rem; color: var(--md-on-surface-variant);">
+                            <div>
+                                <div style="font-weight: 500;">${f.name}</div>
+                                <div style="font-size: 0.75rem; color: var(--md-on-surface-variant); margin-top: 4px;">
+                                    Path: ${f.path}
+                                </div>
+                            </div>
+                            <span style="font-size: 0.8rem; color: var(--md-on-surface-variant); white-space: nowrap;">
                                 ${formatBytes(f.size)} (${(f.progress * 100).toFixed(1)}%)
                             </span>
                         </div>
