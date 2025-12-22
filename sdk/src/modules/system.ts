@@ -11,7 +11,7 @@ export interface HealthResponse {
 }
 
 export class SystemModule {
-  private client: ApiClient;
+  private readonly client: ApiClient;
 
   constructor(client: ApiClient) {
     this.client = client;
@@ -24,5 +24,13 @@ export class SystemModule {
 
   public async getStats(): Promise<any> {
     return this.client.get("/api/v1/system/stats");
+  }
+
+  /**
+   * Simple health check endpoint
+   * @returns Promise with health status
+   */
+  public async health(): Promise<any> {
+    return this.client.get("/health");
   }
 }

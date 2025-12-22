@@ -111,6 +111,14 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 | `POST /api/v1/ipfs/pin/add` | Pin content |
 | `GET /api/v1/ipfs/pin/ls` | List pins |
 
+### User Uploads & Metadata
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/user-uploads/system-hashes-map` | Get complete file metadata map |
+| `POST /api/v1/user-uploads/save-system-hash` | Save file metadata (admin) |
+| `DELETE /api/v1/user-uploads/remove-system-hash/:cid` | Remove file metadata |
+
 ### Bridge
 
 | Endpoint | Description |

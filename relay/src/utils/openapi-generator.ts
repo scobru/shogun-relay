@@ -3915,6 +3915,254 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
           },
         },
       },
+      "/api/v1/user-uploads/system-hashes-map": {
+        get: {
+          tags: ["User Uploads"],
+          summary: "Get system hashes map",
+          description:
+            "Get the complete system hashes map with metadata for all files. Returns all file metadata stored in the GunDB systemhash node.",
+          operationId: "getSystemHashesMap",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          responses: {
+            "200": {
+              description: "System hashes map with metadata",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      systemHashes: {
+                        type: "object",
+                        description: "Map of CID to metadata objects",
+                        additionalProperties: {
+                          type: "object",
+                          properties: {
+                            hash: { type: "string" },
+                            userAddress: { type: "string" },
+                            timestamp: { type: "number" },
+                            uploadedAt: { type: "number" },
+                            fileName: { type: "string" },
+                            displayName: { type: "string" },
+                            originalName: { type: "string" },
+                            fileSize: { type: "number" },
+                            contentType: { type: "string" },
+                            isEncrypted: { type: "boolean" },
+                            isDirectory: { type: "boolean" },
+                            fileCount: { type: "number" },
+                            files: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  name: { type: "string" },
+                                  path: { type: "string" },
+                                  size: { type: "number" },
+                                  mimetype: { type: "string" },
+                                  originalName: { type: "string" },
+                                  isEncrypted: { type: "boolean" },
+                                },
+                              },
+                            },
+                            relayUrl: { type: "string" },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error - GunDB not available",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/user-uploads/save-system-hash": {
+        post: {
+          tags: ["User Uploads"],
+          summary: "Save file metadata to system hash map",
+          description:
+            "Save file or directory metadata to the GunDB systemhash node. Used by drive applications to track file metadata.",
+          operationId: "saveSystemHash",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["hash", "userAddress"],
+                  properties: {
+                    hash: { type: "string", description: "IPFS CID" },
+                    userAddress: { type: "string", description: "User identifier" },
+                    timestamp: { type: "number", description: "Upload timestamp" },
+                    fileName: { type: "string", description: "File name" },
+                    displayName: { type: "string", description: "Display name" },
+                    originalName: { type: "string", description: "Original file name" },
+                    fileSize: { type: "number", description: "File size in bytes" },
+                    contentType: { type: "string", description: "MIME type" },
+                    isEncrypted: { type: "boolean", description: "Whether file is encrypted" },
+                    isDirectory: { type: "boolean", description: "Whether this is a directory" },
+                    fileCount: { type: "number", description: "Number of files in directory" },
+                    files: {
+                      type: "array",
+                      description: "File list for directories",
+                      items: {
+                        type: "object",
+                        properties: {
+                          name: { type: "string" },
+                          path: { type: "string" },
+                          size: { type: "number" },
+                          mimetype: { type: "string" },
+                          originalName: { type: "string" },
+                          isEncrypted: { type: "boolean" },
+                        },
+                      },
+                    },
+                    relayUrl: { type: "string", description: "URL to retrieve file" },
+                    uploadedAt: { type: "number", description: "Upload timestamp" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Metadata saved successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                      hash: { type: "string" },
+                      userAddress: { type: "string" },
+                      timestamp: { type: "number" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Bad request - missing required fields",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error - GunDB not available",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/user-uploads/remove-system-hash/{cid}": {
+        delete: {
+          tags: ["User Uploads"],
+          summary: "Remove file metadata from system hash map",
+          description:
+            "Remove file metadata from the GunDB systemhash node. Used when deleting files from drive applications.",
+          operationId: "removeSystemHash",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          parameters: [
+            {
+              name: "cid",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "IPFS CID to remove",
+            },
+          ],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    userAddress: {
+                      type: "string",
+                      description: "User identifier (defaults to 'drive-user')",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Metadata removed successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                      hash: { type: "string" },
+                      userAddress: { type: "string" },
+                      timestamp: { type: "number" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Bad request - CID required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error - GunDB not available",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   };
 }

@@ -188,6 +188,132 @@ Pin a CID to IPFS.
 }
 ```
 
+### User Uploads & Metadata
+
+These endpoints are used by drive applications to manage file metadata in the GunDB systemhash node.
+
+#### GET `/api/v1/user-uploads/system-hashes-map`
+Get the complete system hashes map with metadata for all files.
+
+**Headers:**
+- `Authorization: Bearer <token>` (admin token required)
+
+**Response:**
+```json
+{
+  "success": true,
+  "systemHashes": {
+    "QmHash1...": {
+      "hash": "QmHash1...",
+      "userAddress": "drive-user",
+      "timestamp": 1704067200000,
+      "uploadedAt": 1704067200000,
+      "fileName": "example.txt",
+      "displayName": "example.txt",
+      "originalName": "example.txt",
+      "fileSize": 1024,
+      "contentType": "text/plain",
+      "isEncrypted": false,
+      "relayUrl": "http://localhost:8765/api/v1/ipfs/cat/QmHash1..."
+    },
+    "QmDirectoryHash...": {
+      "hash": "QmDirectoryHash...",
+      "userAddress": "drive-user",
+      "timestamp": 1704067200000,
+      "isDirectory": true,
+      "fileCount": 5,
+      "displayName": "My Folder",
+      "files": [
+        {
+          "name": "file1.txt",
+          "path": "file1.txt",
+          "size": 512,
+          "mimetype": "text/plain"
+        }
+      ]
+    }
+  },
+  "count": 2,
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+#### POST `/api/v1/user-uploads/save-system-hash`
+Save file or directory metadata to the system hash map.
+
+**Headers:**
+- `Authorization: Bearer <token>` (admin token required)
+- `Content-Type: application/json`
+
+**Body:**
+```json
+{
+  "hash": "QmHash...",
+  "userAddress": "drive-user",
+  "timestamp": 1704067200000,
+  "fileName": "example.txt",
+  "displayName": "example.txt",
+  "originalName": "example.txt",
+  "fileSize": 1024,
+  "contentType": "text/plain",
+  "isEncrypted": false,
+  "isDirectory": false,
+  "fileCount": 0,
+  "files": [],
+  "relayUrl": "http://localhost:8765/api/v1/ipfs/cat/QmHash...",
+  "uploadedAt": 1704067200000
+}
+```
+
+**Required fields:**
+- `hash`: IPFS CID
+- `userAddress`: User identifier
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Hash saved to systemhash node successfully",
+  "hash": "QmHash...",
+  "userAddress": "drive-user",
+  "timestamp": 1704067200000
+}
+```
+
+#### DELETE `/api/v1/user-uploads/remove-system-hash/:cid`
+Remove file metadata from the system hash map.
+
+**Headers:**
+- `Authorization: Bearer <token>` (admin token required)
+- `Content-Type: application/json`
+
+**Parameters:**
+- `cid`: IPFS CID to remove (path parameter)
+
+**Body (optional):**
+```json
+{
+  "userAddress": "drive-user"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Hash removed from systemhash node successfully",
+  "hash": "QmHash...",
+  "userAddress": "drive-user",
+  "timestamp": 1704067200000
+}
+```
+
+**Notes:**
+- These endpoints are primarily used by drive applications built on top of the relay
+- Metadata is stored in GunDB's `shogun.systemhash` node
+- The system hash map enables applications to track file metadata, directory structures, and file relationships
+- See the SDK documentation for browser-friendly methods to interact with these endpoints
+
 ### x402 Subscriptions
 
 #### GET `/api/v1/x402/tiers`
