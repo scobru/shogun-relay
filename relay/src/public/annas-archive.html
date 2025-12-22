@@ -344,6 +344,9 @@
                                     <button class="btn-small btn-pause" onclick="${t.paused ? 'resumeTorrent' : 'pauseTorrent'}('${t.infoHash}')">
                                         ${t.paused ? '▶️ Resume' : '⏸️ Pause'}
                                     </button>
+                                    <button class="btn-small" onclick="copyMagnet('${t.magnetURI}')" title="Copy Magnet Link">
+                                        🧲 Magnet
+                                    </button>
                                     <button class="btn-small btn-files" onclick="toggleFiles('${t.infoHash}', event)">
                                         📁 Files (${t.files})
                                     </button>
@@ -423,6 +426,24 @@
             } catch (err) {
                 console.error('Failed to remove torrent', err);
             }
+        }
+
+        function copyMagnet(magnetURI) {
+            navigator.clipboard.writeText(magnetURI).then(() => {
+                // Show toast notification
+                const toast = document.createElement('div');
+                toast.textContent = '✅ Magnet link copied!';
+                toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--md-primary); color: white; padding: 12px 24px; border-radius: 8px; z-index: 9999; animation: slideIn 0.3s ease;';
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transition = 'opacity 0.3s';
+                    setTimeout(() => toast.remove(), 300);
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy magnet', err);
+                alert('Failed to copy magnet link');
+            });
         }
 
         async function loadFilesForTorrent(infoHash) {

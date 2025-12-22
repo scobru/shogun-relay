@@ -492,7 +492,8 @@ export class AnnasArchiveManager {
           uploadSpeed: t.uploadSpeed,
           peers: t.numPeers,
           paused: t.paused,
-          files: t.files.length
+          files: t.files.length,
+          magnetURI: t.magnetURI
       }))
     };
   }
