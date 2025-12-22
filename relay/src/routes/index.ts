@@ -540,6 +540,11 @@ export default (app: express.Application) => {
     res.sendFile(path.resolve(publicPath, "endpoints.html"));
   });
 
+  app.get("/annas-archive.html", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "annas-archive.html"));
+  });
+
   // Route per servire i file JavaScript dalla directory lib
   app.get("/lib/:filename", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
