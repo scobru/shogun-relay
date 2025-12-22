@@ -622,76 +622,56 @@
 
             // Show progress
             progressDiv.style.display = 'block';
-            statusText.textContent = 'Creating torrent...';
+            statusText.textContent = 'Uploading files to server...';
             progressBar.style.width = '10%';
 
             try {
-                // Import WebTorrent client-side (if not already loaded)
-                if (typeof WebTorrent === 'undefined') {
-                    statusText.textContent = 'Loading WebTorrent library...';
-                    await new Promise((resolve, reject) => {
-                        const script = document.createElement('script');
-                        script.src = 'https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js';
-                        script.onload = resolve;
-                        script.onerror = reject;
-                        document.head.appendChild(script);
-                    });
-                }
+                // Create FormData with files
+                const formData = new FormData();
+                files.forEach(file => formData.append('files', file));
 
-                statusText.textContent = 'Seeding files...';
-                progressBar.style.width = '50%';
+                progressBar.style.width = '30%';
+                statusText.textContent = 'Creating torrent on server...';
 
-                // Create client and seed files
-                const client = new WebTorrent();
-
-                client.seed(files, {
-                    announce: [
-                        'wss://tracker.btorrent.xyz',
-                        'wss://tracker.openwebtorrent.com',
-                        'wss://tracker.webtorrent.dev'
-                    ]
-                }, (torrent) => {
-                    progressBar.style.width = '90%';
-                    statusText.textContent = 'Torrent created! Adding to relay...';
-
-                    // Send magnet to backend
-                    fetch('/api/v1/annas-archive/add', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ magnet: torrent.magnetURI })
-                    })
-                        .then(r => r.json())
-                        .then(data => {
-                            if (data.success) {
-                                progressBar.style.width = '100%';
-                                statusText.textContent = `✅ Success! Magnet: ${torrent.magnetURI.substring(0, 80)}...`;
-                                statusText.style.color = 'var(--md-primary)';
-
-                                // Copy magnet to clipboard
-                                navigator.clipboard.writeText(torrent.magnetURI);
-
-                                // Update dashboard
-                                setTimeout(() => updateDashboard(), 1000);
-
-                                // Reset after 5s
-                                setTimeout(() => {
-                                    progressDiv.style.display = 'none';
-                                    fileInput.value = '';
-                                    progressBar.style.width = '0%';
-                                    statusText.textContent = '';
-                                    statusText.style.color = '';
-                                }, 5000);
-                            } else {
-                                throw new Error(data.message || 'Failed to add torrent');
-                            }
-                        })
-                        .catch(err => {
-                            statusText.textContent = `❌ Error: ${err.message}`;
-                            statusText.style.color = 'var(--md-error)';
-                        });
+                // Upload to server and create torrent
+                const response = await fetch('/api/v1/annas-archive/create', {
+                    method: 'POST',
+                    body: formData
                 });
 
+                progressBar.style.width = '70%';
+                const data = await response.json();
+
+                if (data.success) {
+                    progressBar.style.width = '100%';
+                    statusText.textContent = `✅ Success! Torrent: ${data.name}`;
+                    statusText.style.color = 'var(--md-primary)';
+
+                    // Copy magnet to clipboard
+                    navigator.clipboard.writeText(data.magnetURI);
+
+                    // Show magnet
+                    setTimeout(() => {
+                        statusText.textContent = `📋 Magnet copied! ${data.magnetURI.substring(0, 60)}...`;
+                    }, 1500);
+
+                    // Update dashboard
+                    setTimeout(() => updateDashboard(), 1000);
+
+                    // Reset after 8s
+                    setTimeout(() => {
+                        progressDiv.style.display = 'none';
+                        fileInput.value = '';
+                        progressBar.style.width = '0%';
+                        statusText.textContent = '';
+                        statusText.style.color = '';
+                    }, 8000);
+                } else {
+                    throw new Error(data.error || 'Failed to create torrent');
+                }
+
             } catch (error) {
+                progressBar.style.width = '0%';
                 statusText.textContent = `❌ Error: ${error.message}`;
                 statusText.style.color = 'var(--md-error)';
             }

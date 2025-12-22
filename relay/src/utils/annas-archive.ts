@@ -269,6 +269,56 @@ export class AnnasArchiveManager {
   }
 
   /**
+   * Create a torrent from files and start seeding
+   */
+  public async createTorrent(filePaths: string[]): Promise<{magnetURI: string, infoHash: string, name: string}> {
+    if (!this.enabled || !this.client) {
+      throw new Error("Anna's Archive integration is not enabled");
+    }
+
+    return new Promise((resolve, reject) => {
+      try {
+        // Seed the files
+        this.client!.seed(filePaths, {
+          announce: [
+            'udp://tracker.opentrackr.org:1337/announce',
+            'udp://tracker.openbittorrent.com:6969/announce',
+            'udp://open.stealth.si:80/announce',
+            'udp://exodus.desync.com:6969/announce'
+          ]
+        }, (torrent) => {
+          loggers.server.info(`📚 Created and seeding torrent: ${torrent.name}`);
+          loggers.server.info(`📚 Magnet: ${torrent.magnetURI.substring(0, 80)}...`);
+
+          // Save to torrents.json for persistence
+          const torrentsFile = path.join(this.dataDir, 'torrents.json');
+          let savedTorrents: string[] = [];
+          if (fs.existsSync(torrentsFile)) {
+            savedTorrents = JSON.parse(fs.readFileSync(torrentsFile, 'utf8'));
+          }
+          if (!savedTorrents.includes(torrent.magnetURI)) {
+            savedTorrents.push(torrent.magnetURI);
+            fs.writeFileSync(torrentsFile, JSON.stringify(savedTorrents, null, 2));
+          }
+
+          // Trigger catalog update when done
+          torrent.on('done', () => {
+            this.onTorrentComplete(torrent);
+          });
+
+          resolve({
+            magnetURI: torrent.magnetURI,
+            infoHash: torrent.infoHash,
+            name: torrent.name
+          });
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
    * Load catalog from disk
    */
   private loadCatalog(): void {

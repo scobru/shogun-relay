@@ -1,8 +1,27 @@
 import express from "express";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { annasArchiveManager } from "../utils/annas-archive";
 import { loggers } from "../utils/logger";
 
 const router = express.Router();
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(process.cwd(), 'data', 'annas-archive', 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Keep original filename
+    cb(null, file.originalname);
+  }
+});
+const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } }); // 500MB limit
 
 /**
  * GET /status
@@ -47,6 +66,46 @@ router.post("/add", express.json(), async (req, res) => {
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to add torrent");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * POST /create
+ * Upload files and create a torrent from them
+ */
+router.post("/create", upload.array('files', 20), async (req, res) => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    
+    if (!files || files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "No files uploaded"
+      });
+    }
+
+    loggers.server.info(`📚 Creating torrent from ${files.length} files`);
+
+    // Get file paths
+    const filePaths = files.map(f => f.path);
+    
+    // Create and seed torrent
+    const result = await annasArchiveManager.createTorrent(filePaths);
+    
+    res.json({
+      success: true,
+      message: "Torrent created and seeding",
+      magnetURI: result.magnetURI,
+      infoHash: result.infoHash,
+      name: result.name,
+      files: files.map(f => f.originalname)
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to create torrent");
     res.status(500).json({
       success: false,
       error: error.message || "Internal Server Error",
