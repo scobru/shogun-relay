@@ -445,41 +445,29 @@ export class AnnasArchiveManager {
   }
 
   /**
-   * Add a file to IPFS and pin it
+   * Add a file to IPFS and pin it using CLI
    */
   private async addFileToIPFS(filePath: string): Promise<string | null> {
     try {
-      const FormData = (await import('form-data')).default;
-      const formData = new FormData();
-      formData.append('file', fs.createReadStream(filePath), {
-        filename: path.basename(filePath)
-      });
-
-      const ipfsHost = process.env.IPFS_HOST || 'localhost';
-      const ipfsPort = process.env.IPFS_API_PORT || '5001';
-
-      // Add to IPFS with proper headers
-      const addResponse = await fetch(`http://${ipfsHost}:${ipfsPort}/api/v0/add`, {
-        method: 'POST',
-        body: formData as any,
-        headers: formData.getHeaders()
-      });
-
-      if (!addResponse.ok) {
-        const errText = await addResponse.text();
-        throw new Error(`IPFS add failed: ${addResponse.status} - ${errText}`);
+      const { execSync } = await import('child_process');
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        loggers.server.warn(`📚 File not found: ${filePath}`);
+        return null;
       }
 
-      const result = await addResponse.json() as { Hash: string };
-      const cid = result.Hash;
+      // Use IPFS CLI to add and pin in one command
+      const result = execSync(`ipfs add -Q --pin "${filePath}"`, {
+        encoding: 'utf8',
+        timeout: 60000 // 60 second timeout
+      }).trim();
 
-      // Pin the file
-      await fetch(`http://${ipfsHost}:${ipfsPort}/api/v0/pin/add?arg=${cid}`, {
-        method: 'POST'
-      });
-
-      loggers.server.info(`📚 Added to IPFS: ${path.basename(filePath)} → ${cid}`);
-      return cid;
+      if (result) {
+        loggers.server.info(`📚 Added to IPFS: ${path.basename(filePath)} → ${result}`);
+        return result;
+      }
+      return null;
     } catch (error: any) {
       // Check if IPFS is running
       if (error.code === 'ECONNREFUSED') {
