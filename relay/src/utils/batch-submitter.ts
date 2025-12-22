@@ -31,7 +31,9 @@ function getBridgeClient(): BridgeClient {
   const privateKey = bridgeConfig.sequencerPrivateKey;
 
   if (!rpcUrl) {
-    throw new Error("Bridge not configured: BRIDGE_RPC_URL or configure BRIDGE_NETWORKS with valid RPC");
+    throw new Error(
+      "Bridge not configured: BRIDGE_RPC_URL or configure BRIDGE_NETWORKS with valid RPC"
+    );
   }
 
   bridgeClient = createBridgeClient({

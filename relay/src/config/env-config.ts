@@ -5,7 +5,7 @@
  * All environment variables should be imported from this file instead of directly from process.env.
  *
  * Priority: Environment variables > Default values
- * 
+ *
  * Multi-Chain Support:
  * - X402_NETWORKS, X402_DEFAULT_NETWORK, X402_<NETWORK>_RPC
  * - BRIDGE_NETWORKS, BRIDGE_DEFAULT_NETWORK, BRIDGE_<NETWORK>_RPC
@@ -15,12 +15,7 @@
 import dotenv from "dotenv";
 import path from "path";
 import ip from "ip";
-import { 
-  parseNetworkList, 
-  getRpcForNetwork, 
-  getChainIdForNetwork,
-  type NetworkId 
-} from "./chains";
+import { parseNetworkList, getRpcForNetwork, getChainIdForNetwork, type NetworkId } from "./chains";
 
 dotenv.config();
 
@@ -53,7 +48,7 @@ export const config = {
     name: process.env.RELAY_NAME || "shogun-relay",
     environment: process.env.NODE_ENV || "development",
     protected: process.env.RELAY_PROTECTED === "true",
-    endpoint: process.env.RELAY_ENDPOINT,
+    endpoint: process.env.RELAY_ENDPOINT || process.env.RELAY_HOST + ":" + process.env.RELAY_PORT,
     peers: process.env.RELAY_PEERS ? process.env.RELAY_PEERS.split(",") : [],
   },
 
@@ -137,34 +132,38 @@ export const config = {
 
   registry: {
     // Multi-chain configuration
-    networks: parseNetworkList(process.env.REGISTRY_NETWORKS, ['base-sepolia']),
-    defaultNetwork: (process.env.REGISTRY_DEFAULT_NETWORK || 'base-sepolia') as NetworkId,
-    
+    networks: parseNetworkList(process.env.REGISTRY_NETWORKS, ["base-sepolia"]),
+    defaultNetwork: (process.env.REGISTRY_DEFAULT_NETWORK || "base-sepolia") as NetworkId,
+
     // Get RPC URL for specific network (or default)
     getRpcUrl: (network?: NetworkId): string => {
-      const targetNetwork = network || (process.env.REGISTRY_DEFAULT_NETWORK || 'base-sepolia') as NetworkId;
+      const targetNetwork =
+        network || ((process.env.REGISTRY_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
       return getRpcForNetwork(targetNetwork, undefined); // No service-specific override for registry
     },
-    
+
     // Get chain ID for specific network (or default)
     getChainId: (network?: NetworkId): number => {
-      const targetNetwork = network || (process.env.REGISTRY_DEFAULT_NETWORK || 'base-sepolia') as NetworkId;
+      const targetNetwork =
+        network || ((process.env.REGISTRY_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
       return getChainIdForNetwork(targetNetwork);
     },
-    
+
     // RPC URLs map for all configured networks
     rpcUrls: (() => {
-      const networks = parseNetworkList(process.env.REGISTRY_NETWORKS, ['base-sepolia']);
+      const networks = parseNetworkList(process.env.REGISTRY_NETWORKS, ["base-sepolia"]);
       const urls: Record<string, string> = {};
       for (const network of networks) {
         urls[network] = getRpcForNetwork(network);
       }
       return urls;
     })(),
-    
+
     // Default chain ID (for backward compatibility)
-    chainId: getChainIdForNetwork((process.env.REGISTRY_DEFAULT_NETWORK || 'base-sepolia') as NetworkId),
-    
+    chainId: getChainIdForNetwork(
+      (process.env.REGISTRY_DEFAULT_NETWORK || "base-sepolia") as NetworkId
+    ),
+
     // Relay private key for on-chain operations (PRIVATE_KEY is fallback)
     relayPrivateKey: process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY,
   },
@@ -175,34 +174,38 @@ export const config = {
 
   x402: {
     // Multi-chain configuration
-    networks: parseNetworkList(process.env.X402_NETWORKS, ['base-sepolia']),
-    defaultNetwork: (process.env.X402_DEFAULT_NETWORK || 'base-sepolia') as NetworkId,
-    
+    networks: parseNetworkList(process.env.X402_NETWORKS, ["base-sepolia"]),
+    defaultNetwork: (process.env.X402_DEFAULT_NETWORK || "base-sepolia") as NetworkId,
+
     // Get RPC URL for specific network (or default)
     getRpcUrl: (network?: NetworkId): string => {
-      const targetNetwork = network || (process.env.X402_DEFAULT_NETWORK || 'base-sepolia') as NetworkId;
-      return getRpcForNetwork(targetNetwork, 'x402');
+      const targetNetwork =
+        network || ((process.env.X402_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
+      return getRpcForNetwork(targetNetwork, "x402");
     },
-    
+
     // Get chain ID for specific network (or default)
     getChainId: (network?: NetworkId): number => {
-      const targetNetwork = network || (process.env.X402_DEFAULT_NETWORK || 'base-sepolia') as NetworkId;
+      const targetNetwork =
+        network || ((process.env.X402_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
       return getChainIdForNetwork(targetNetwork);
     },
-    
+
     // RPC URLs map for all configured networks
     rpcUrls: (() => {
-      const networks = parseNetworkList(process.env.X402_NETWORKS, ['base-sepolia']);
+      const networks = parseNetworkList(process.env.X402_NETWORKS, ["base-sepolia"]);
       const urls: Record<string, string> = {};
       for (const network of networks) {
-        urls[network] = getRpcForNetwork(network, 'x402');
+        urls[network] = getRpcForNetwork(network, "x402");
       }
       return urls;
     })(),
-    
+
     // Default chain ID (for backward compatibility)
-    chainId: getChainIdForNetwork((process.env.X402_DEFAULT_NETWORK || 'base-sepolia') as NetworkId),
-    
+    chainId: getChainIdForNetwork(
+      (process.env.X402_DEFAULT_NETWORK || "base-sepolia") as NetworkId
+    ),
+
     // Payment configuration
     payToAddress: process.env.X402_PAY_TO_ADDRESS,
     privateKey: process.env.X402_PRIVATE_KEY || process.env.PRIVATE_KEY,
@@ -217,54 +220,61 @@ export const config = {
 
   bridge: {
     enabled: process.env.BRIDGE_ENABLED !== "false",
-    
+
     // Multi-chain configuration
-    networks: parseNetworkList(process.env.BRIDGE_NETWORKS, ['base-sepolia']),
-    defaultNetwork: (process.env.BRIDGE_DEFAULT_NETWORK || 'base-sepolia') as NetworkId,
-    
+    networks: parseNetworkList(process.env.BRIDGE_NETWORKS, ["base-sepolia"]),
+    defaultNetwork: (process.env.BRIDGE_DEFAULT_NETWORK || "base-sepolia") as NetworkId,
+
     // Get RPC URL for specific network (or default)
     getRpcUrl: (network?: NetworkId): string => {
-      const targetNetwork = network || (process.env.BRIDGE_DEFAULT_NETWORK || 'base-sepolia') as NetworkId;
-      return getRpcForNetwork(targetNetwork, 'bridge');
+      const targetNetwork =
+        network || ((process.env.BRIDGE_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
+      return getRpcForNetwork(targetNetwork, "bridge");
     },
-    
+
     // Get chain ID for specific network (or default)
     getChainId: (network?: NetworkId): number => {
-      const targetNetwork = network || (process.env.BRIDGE_DEFAULT_NETWORK || 'base-sepolia') as NetworkId;
+      const targetNetwork =
+        network || ((process.env.BRIDGE_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
       return getChainIdForNetwork(targetNetwork);
     },
-    
+
     // RPC URLs map for all configured networks
     rpcUrls: (() => {
-      const networks = parseNetworkList(process.env.BRIDGE_NETWORKS, ['base-sepolia']);
+      const networks = parseNetworkList(process.env.BRIDGE_NETWORKS, ["base-sepolia"]);
       const urls: Record<string, string> = {};
       for (const network of networks) {
-        urls[network] = getRpcForNetwork(network, 'bridge');
+        urls[network] = getRpcForNetwork(network, "bridge");
       }
       return urls;
     })(),
-    
+
     // Default chain ID (for backward compatibility)
-    chainId: getChainIdForNetwork((process.env.BRIDGE_DEFAULT_NETWORK || 'base-sepolia') as NetworkId),
-    
+    chainId: getChainIdForNetwork(
+      (process.env.BRIDGE_DEFAULT_NETWORK || "base-sepolia") as NetworkId
+    ),
+
     // Sequencer configuration (PRIVATE_KEY is fallback)
-    sequencerPrivateKey: process.env.BRIDGE_SEQUENCER_PRIVATE_KEY || process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY,
+    sequencerPrivateKey:
+      process.env.BRIDGE_SEQUENCER_PRIVATE_KEY ||
+      process.env.RELAY_PRIVATE_KEY ||
+      process.env.PRIVATE_KEY,
     startBlock: process.env.BRIDGE_START_BLOCK
       ? parseInt(process.env.BRIDGE_START_BLOCK)
       : undefined,
     minConfirmations: parseInt(process.env.BRIDGE_MIN_CONFIRMATIONS || "3") || 3,
-    
+
     // Auto batch submission
     autoBatchEnabled: process.env.BRIDGE_AUTO_BATCH_ENABLED !== "false",
     autoBatchIntervalMs:
       parseInt(process.env.BRIDGE_AUTO_BATCH_INTERVAL_MS || "300000") || 5 * 60 * 1000,
     autoBatchMinWithdrawals: parseInt(process.env.BRIDGE_AUTO_BATCH_MIN_WITHDRAWALS || "1") || 1,
-    
+
     // Security: Allowed chain IDs
     validChainIds: process.env.BRIDGE_VALID_CHAIN_IDS
       ? process.env.BRIDGE_VALID_CHAIN_IDS.split(",")
-        .map((id) => parseInt(id.trim()))
-        .filter((id) => !isNaN(id))
+          .map((id) => parseInt(id.trim()))
+          .filter((id) => !isNaN(id))
       : [1, 11155111, 8453, 84532, 42161, 421614, 10, 11155420, 137, 80002],
   },
 
@@ -274,33 +284,37 @@ export const config = {
 
   deals: {
     // Multi-chain configuration
-    networks: parseNetworkList(process.env.DEALS_NETWORKS, ['base-sepolia']),
-    defaultNetwork: (process.env.DEALS_DEFAULT_NETWORK || 'base-sepolia') as NetworkId,
-    
+    networks: parseNetworkList(process.env.DEALS_NETWORKS, ["base-sepolia"]),
+    defaultNetwork: (process.env.DEALS_DEFAULT_NETWORK || "base-sepolia") as NetworkId,
+
     // Get RPC URL for specific network (or default)
     getRpcUrl: (network?: NetworkId): string => {
-      const targetNetwork = network || (process.env.DEALS_DEFAULT_NETWORK || 'base-sepolia') as NetworkId;
-      return getRpcForNetwork(targetNetwork, 'deals');
+      const targetNetwork =
+        network || ((process.env.DEALS_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
+      return getRpcForNetwork(targetNetwork, "deals");
     },
-    
+
     // Get chain ID for specific network (or default)
     getChainId: (network?: NetworkId): number => {
-      const targetNetwork = network || (process.env.DEALS_DEFAULT_NETWORK || 'base-sepolia') as NetworkId;
+      const targetNetwork =
+        network || ((process.env.DEALS_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
       return getChainIdForNetwork(targetNetwork);
     },
-    
+
     // RPC URLs map for all configured networks
     rpcUrls: (() => {
-      const networks = parseNetworkList(process.env.DEALS_NETWORKS, ['base-sepolia']);
+      const networks = parseNetworkList(process.env.DEALS_NETWORKS, ["base-sepolia"]);
       const urls: Record<string, string> = {};
       for (const network of networks) {
-        urls[network] = getRpcForNetwork(network, 'deals');
+        urls[network] = getRpcForNetwork(network, "deals");
       }
       return urls;
     })(),
-    
+
     // Default chain ID (for backward compatibility)
-    chainId: getChainIdForNetwork((process.env.DEALS_DEFAULT_NETWORK || 'base-sepolia') as NetworkId),
+    chainId: getChainIdForNetwork(
+      (process.env.DEALS_DEFAULT_NETWORK || "base-sepolia") as NetworkId
+    ),
   },
 
   // ============================================================================
@@ -320,7 +334,8 @@ export const config = {
 
   wormhole: {
     cleanupEnabled: process.env.WORMHOLE_CLEANUP_ENABLED !== "false",
-    cleanupIntervalMs: parseInt(process.env.WORMHOLE_CLEANUP_INTERVAL_MS || "3600000") || 60 * 60 * 1000,
+    cleanupIntervalMs:
+      parseInt(process.env.WORMHOLE_CLEANUP_INTERVAL_MS || "3600000") || 60 * 60 * 1000,
     maxAgeSecs: parseInt(process.env.WORMHOLE_MAX_AGE_SECS || "86400") || 24 * 60 * 60,
   },
 

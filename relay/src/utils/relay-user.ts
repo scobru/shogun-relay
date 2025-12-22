@@ -11,6 +11,7 @@
 
 import { loggers } from "./logger";
 const log = loggers.relayUser;
+import { authConfig } from "../config/env-config";
 
 // Module state
 let relayUser: GunUser | undefined = undefined;
@@ -231,7 +232,7 @@ export async function getSubscription(
             // Filter out Gun metadata
             const cleanData: SubscriptionData = {};
             let hasRealData = false;
-            
+
             Object.keys(data).forEach((key) => {
               if (!["_", "#", ">", "<"].includes(key)) {
                 cleanData[key] = data[key];
@@ -261,7 +262,7 @@ export async function getSubscription(
           if (data && typeof data === "object") {
             const cleanData: SubscriptionData = {};
             let hasRealData = false;
-            
+
             Object.keys(data).forEach((key) => {
               if (!["_", "#", ">", "<"].includes(key)) {
                 cleanData[key] = data[key];
@@ -273,7 +274,10 @@ export async function getSubscription(
               resolved = true;
               clearTimeout(timeout);
               subscription?.off?.();
-              log.debug({ userAddress, attempt: attemptNumber }, "Subscription read from local cache");
+              log.debug(
+                { userAddress, attempt: attemptNumber },
+                "Subscription read from local cache"
+              );
               resolve(cleanData);
             }
           }
@@ -284,16 +288,18 @@ export async function getSubscription(
   // Try with retries
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const result = await attemptRead(attempt);
-    
+
     if (result) {
       return result;
     }
 
     // If not last attempt, wait before retry
     if (attempt < maxRetries) {
-      log.debug({ userAddress, attempt, nextRetryMs: retryDelayMs * attempt }, 
-        "Subscription not found, retrying...");
-      await new Promise(r => setTimeout(r, retryDelayMs * attempt)); // Exponential backoff
+      log.debug(
+        { userAddress, attempt, nextRetryMs: retryDelayMs * attempt },
+        "Subscription not found, retrying..."
+      );
+      await new Promise((r) => setTimeout(r, retryDelayMs * attempt)); // Exponential backoff
     }
   }
 
@@ -377,21 +383,23 @@ export async function saveSubscription(
       // Verify persistence if enabled
       if (verifyPersistence) {
         // Small delay to allow data to propagate
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise((r) => setTimeout(r, 200));
 
         // Read back to verify
-        const verified = await getSubscription(userAddress, { 
-          maxRetries: 2, 
-          retryDelayMs: 500, 
-          timeoutMs: 5000 
+        const verified = await getSubscription(userAddress, {
+          maxRetries: 2,
+          retryDelayMs: 500,
+          timeoutMs: 5000,
         });
 
         if (verified && verified.updatedAt === dataToSave.updatedAt) {
           log.info({ userAddress, attempt }, "Subscription saved and verified");
           return;
         } else if (verified) {
-          log.debug({ userAddress, attempt, savedAt: dataToSave.updatedAt, verifiedAt: verified.updatedAt }, 
-            "Subscription saved (verification timestamp mismatch, likely concurrent update)");
+          log.debug(
+            { userAddress, attempt, savedAt: dataToSave.updatedAt, verifiedAt: verified.updatedAt },
+            "Subscription saved (verification timestamp mismatch, likely concurrent update)"
+          );
           return;
         } else {
           log.warn({ userAddress, attempt }, "Subscription save not verified, retrying...");
@@ -408,11 +416,14 @@ export async function saveSubscription(
 
     // Wait before retry with exponential backoff
     if (attempt < maxSaveRetries) {
-      await new Promise(r => setTimeout(r, 500 * attempt));
+      await new Promise((r) => setTimeout(r, 500 * attempt));
     }
   }
 
-  log.error({ userAddress, err: lastError?.message }, "Failed to save subscription after all retries");
+  log.error(
+    { userAddress, err: lastError?.message },
+    "Failed to save subscription after all retries"
+  );
   throw lastError || new Error("Failed to save subscription");
 }
 
@@ -593,6 +604,26 @@ export async function deleteUpload(userAddress: string, hash: string): Promise<v
       });
   });
 }
+
+/**
+ * Middleware to require admin authentication
+ */
+export const adminAuthMiddleware = (req: any, res: any, next: any) => {
+  const authHeader = req.headers["authorization"];
+  const bearerToken = authHeader && authHeader.split(" ")[1];
+  const customToken = req.headers["token"];
+  const token = bearerToken || customToken;
+
+  if (!token) {
+    return res.status(401).json({ success: false, error: "Unauthorized - Token required" });
+  }
+
+  if (token === authConfig.adminPassword) {
+    next();
+  } else {
+    return res.status(401).json({ success: false, error: "Unauthorized - Invalid token" });
+  }
+};
 
 export default {
   initRelayUser,

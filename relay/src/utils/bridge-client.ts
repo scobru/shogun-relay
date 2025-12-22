@@ -21,6 +21,7 @@ export interface BridgeConfig {
   chainId: number;
   privateKey?: string; // Optional, for sequencer operations
   // contractAddress is no longer needed - SDK gets it from deployments automatically
+  contractAddress?: string;
 }
 
 export interface DepositEvent {

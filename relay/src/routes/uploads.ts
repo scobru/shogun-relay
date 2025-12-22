@@ -412,10 +412,7 @@ router.post(
               "Saving directory with files array as JSON string"
             );
           } catch (error) {
-            loggers.uploads.warn(
-              { err: error },
-              "Failed to stringify files array, skipping"
-            );
+            loggers.uploads.warn({ err: error }, "Failed to stringify files array, skipping");
           }
         }
 

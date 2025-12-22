@@ -1080,7 +1080,8 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
         post: {
           tags: ["IPFS"],
           summary: "Upload directory to IPFS",
-          description: "Upload multiple files as a directory to IPFS. Maintains directory structure using relative paths. Files are uploaded with wrap-with-directory=true to preserve structure.",
+          description:
+            "Upload multiple files as a directory to IPFS. Maintains directory structure using relative paths. Files are uploaded with wrap-with-directory=true to preserve structure.",
           operationId: "uploadDirectoryToIPFS",
           security: [{ bearerAuth: [] }, { tokenHeader: [] }],
           requestBody: {
@@ -1096,7 +1097,8 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
                         type: "string",
                         format: "binary",
                       },
-                      description: "Multiple files with relative paths (e.g., index.html, css/style.css, js/app.js)",
+                      description:
+                        "Multiple files with relative paths (e.g., index.html, css/style.css, js/app.js)",
                     },
                   },
                   required: ["files"],
