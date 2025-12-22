@@ -1,9 +1,17 @@
-import WebTorrent from "webtorrent";
-import fs from "fs";
-import path from "path";
-import { annasArchiveConfig } from "../config/env-config";
-import { loggers } from "./logger";
+import WebTorrent from 'webtorrent';
+import path from 'path';
+import fs from 'fs';
+import { createRequire } from 'module';
+import { loggers } from './logger';
+import { annasArchiveConfig } from '../config/env-config';
 
+// Create require for CJS modules
+const require = createRequire(import.meta.url);
+
+interface TorrentInfo {
+  magnetURI?: string;
+  torrentPath?: string;
+}
 // Catalog entry for torrents with IPFS mappings
 export interface CatalogEntry {
   torrentHash: string;
@@ -458,9 +466,11 @@ export class AnnasArchiveManager {
       }
 
       // Use IPFS CLI to add and pin in one command
+      // Set IPFS_PATH to point to correct repo location
       const result = execSync(`ipfs add -Q --pin "${filePath}"`, {
         encoding: 'utf8',
-        timeout: 60000 // 60 second timeout
+        timeout: 60000, // 60 second timeout
+        env: { ...process.env, IPFS_PATH: '/data/ipfs' }
       }).trim();
 
       if (result) {
