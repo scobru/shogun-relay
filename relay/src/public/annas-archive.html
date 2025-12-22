@@ -209,6 +209,28 @@
         </div>
 
         <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
+            <h2 class="md-title-medium md-mb-sm">🔨 Create Torrent</h2>
+            <p class="md-body-small md-text-secondary md-mb-md">
+                Select files to create and seed a new torrent
+            </p>
+            <div style="display: flex; gap: 12px; align-items: flex-end;">
+                <div style="flex: 1;">
+                    <label class="md-label-small">Select Files</label>
+                    <input type="file" id="torrentFiles" multiple
+                        style="width: 100%; padding: 12px; border: 1px solid var(--md-outline); border-radius: 8px; background: var(--md-surface); color: var(--md-on-surface);">
+                </div>
+                <button onclick="createTorrent()" class="md-btn md-btn-filled">
+                    🔨 Create & Seed
+                </button>
+            </div>
+            <div id="createProgress" style="margin-top: 12px; display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="createProgressBar" style="width: 0%"></div>
+                </div>
+                <p id="createStatus" class="md-body-small md-text-secondary md-mt-sm"></p>
+            </div>
+        </div>
+        <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
             <h2 class="md-title-medium md-mb-sm">📚 IPFS Catalog</h2>
             <div class="md-flex md-gap-md md-mb-sm">
                 <div class="stat-card" style="flex: 1; padding: 16px;">
@@ -594,6 +616,95 @@
             filesDiv.classList.add('expanded');
         }
 
+        async function createTorrent() {
+            const fileInput = document.getElementById('torrentFiles');
+            const progressDiv = document.getElementById('createProgress');
+            const progressBar = document.getElementById('createProgressBar');
+            const statusText = document.getElementById('createStatus');
+
+            const files = Array.from(fileInput.files);
+            if (files.length === 0) {
+                alert('Please select at least one file');
+                return;
+            }
+
+            // Show progress
+            progressDiv.style.display = 'block';
+            statusText.textContent = 'Creating torrent...';
+            progressBar.style.width = '10%';
+
+            try {
+                // Import WebTorrent client-side (if not already loaded)
+                if (typeof WebTorrent === 'undefined') {
+                    statusText.textContent = 'Loading WebTorrent library...';
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js';
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                }
+
+                statusText.textContent = 'Seeding files...';
+                progressBar.style.width = '50%';
+
+                // Create client and seed files
+                const client = new WebTorrent();
+
+                client.seed(files, {
+                    announce: [
+                        'wss://tracker.btorrent.xyz',
+                        'wss://tracker.openwebtorrent.com',
+                        'wss://tracker.webtorrent.dev'
+                    ]
+                }, (torrent) => {
+                    progressBar.style.width = '90%';
+                    statusText.textContent = 'Torrent created! Adding to relay...';
+
+                    // Send magnet to backend
+                    fetch('/api/v1/annas-archive/add', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ magnet: torrent.magnetURI })
+                    })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) {
+                                progressBar.style.width = '100%';
+                                statusText.textContent = `✅ Success! Magnet: ${torrent.magnetURI.substring(0, 80)}...`;
+                                statusText.style.color = 'var(--md-primary)';
+
+                                // Copy magnet to clipboard
+                                navigator.clipboard.writeText(torrent.magnetURI);
+
+                                // Update dashboard
+                                setTimeout(() => updateDashboard(), 1000);
+
+                                // Reset after 5s
+                                setTimeout(() => {
+                                    progressDiv.style.display = 'none';
+                                    fileInput.value = '';
+                                    progressBar.style.width = '0%';
+                                    statusText.textContent = '';
+                                    statusText.style.color = '';
+                                }, 5000);
+                            } else {
+                                throw new Error(data.message || 'Failed to add torrent');
+                            }
+                        })
+                        .catch(err => {
+                            statusText.textContent = `❌ Error: ${err.message}`;
+                            statusText.style.color = 'var(--md-error)';
+                        });
+                });
+
+            } catch (error) {
+                statusText.textContent = `❌ Error: ${error.message}`;
+                statusText.style.color = 'var(--md-error)';
+            }
+        }
+
         // Update every 2 seconds
         updateDashboard();
         updateCatalog();
@@ -605,4 +716,3 @@
 </body>
 
 </html>
-```
