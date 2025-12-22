@@ -388,6 +388,22 @@ export const config = {
   // PACKAGE METADATA
   // ============================================================================
 
+
+  // ============================================================================
+  // ANNA'S ARCHIVE CONFIGURATION
+  // ============================================================================
+
+  annasArchive: {
+    enabled: process.env.ANNAS_ARCHIVE_ENABLED === "true",
+    torrentListUrl:
+      process.env.ANNAS_ARCHIVE_TORRENT_LIST_URL ||
+      "https://annas-archive.li/dyn/generate_torrents",
+    dataDir:
+      process.env.ANNAS_ARCHIVE_DATA_DIR ||
+      path.join(process.cwd(), "data", "annas-archive"),
+    maxTb: parseFloat(process.env.ANNAS_ARCHIVE_MAX_TB || "0"),
+  },
+
   package: {
     version: process.env.npm_package_version || "1.0.0",
   },
@@ -414,6 +430,7 @@ export const replicationConfig = config.replication;
 export const loggingConfig = config.logging;
 export const pricingConfig = config.pricing;
 export const packageConfig = config.package;
+export const annasArchiveConfig = config.annasArchive;
 
 // ============================================================================
 // EXPORT DEFAULT

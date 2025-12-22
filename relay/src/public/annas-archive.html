@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anna's Archive - Shogun Relay</title>
+    <link rel="stylesheet" href="styles/google-md3.css">
+    <script src="lib/admin-auth.js"></script>
+    <style>
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--md-outline-variant);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .status-active {
+            background-color: var(--md-primary-container);
+            color: var(--md-on-primary-container);
+        }
+
+        .status-inactive {
+            background-color: var(--md-surface-variant);
+            color: var(--md-on-surface-variant);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background-color: var(--md-surface-container);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--md-outline-variant);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 500;
+            color: var(--md-primary);
+            margin: 8px 0;
+        }
+
+        .stat-label {
+            color: var(--md-on-surface-variant);
+            font-size: 0.875rem;
+        }
+
+        .torrent-list {
+            background-color: var(--md-surface);
+            border-radius: 16px;
+            border: 1px solid var(--md-outline-variant);
+            overflow: hidden;
+        }
+
+        .torrent-item {
+            display: flex;
+            align-items: center;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--md-outline-variant);
+            gap: 16px;
+        }
+
+        .torrent-item:last-child {
+            border-bottom: none;
+        }
+
+        .progress-bar {
+            flex-grow: 1;
+            height: 8px;
+            background-color: var(--md-surface-variant);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--md-primary);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-container">
+        <header class="header-section">
+            <div class="md-flex-col">
+                <h1 class="md-display-small">Anna's Archive Relay</h1>
+                <p class="md-body-medium md-text-secondary">Contributing to open knowledge preservation</p>
+            </div>
+            <div id="statusBadge" class="status-badge status-inactive">
+                Checking Status...
+            </div>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Active Torrents</div>
+                <div class="stat-value" id="activeTorrents">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Download Speed</div>
+                <div class="stat-value" id="downloadSpeed">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Upload Speed</div>
+                <div class="stat-value" id="uploadSpeed">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Ratio</div>
+                <div class="stat-value" id="ratio">-</div>
+            </div>
+        </div>
+
+        <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
+            <h2 class="md-title-medium md-mb-sm">Add Custom Torrent</h2>
+            <div class="md-flex md-gap-sm">
+                <input type="text" id="magnetLink" class="md-input" style="flex: 1;" placeholder="Magnet Link or URL">
+                <button class="md-btn md-btn-filled" onclick="addTorrent()">Add</button>
+            </div>
+            <p id="addStatus" class="md-body-small md-text-secondary md-mt-sm"></p>
+        </div>
+
+        <h2 class="md-title-large md-mb-md">Active Torrents</h2>
+        <div class="torrent-list" id="torrentList">
+            <div class="md-padding-lg md-text-center md-text-secondary">
+                Loading torrents...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function formatBytes(bytes, decimals = 2) {
+            if (!+bytes) return '0 B';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        }
+
+        function formatSpeed(bytes) {
+            return `${formatBytes(bytes)}/s`;
+        }
+
+        async function addTorrent() {
+            const input = document.getElementById('magnetLink');
+            const status = document.getElementById('addStatus');
+            const magnet = input.value.trim();
+
+            if (!magnet) return;
+
+            status.textContent = "Adding...";
+            status.style.color = "var(--md-text-secondary)";
+
+            try {
+                const response = await fetch('/api/v1/annas-archive/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ magnet })
+                });
+
+                const json = await response.json();
+
+                if (json.success) {
+                    status.textContent = "✅ " + json.message;
+                    status.style.color = "var(--md-primary)";
+                    input.value = "";
+                    setTimeout(updateDashboard, 1000); // Refresh list
+                } else {
+                    status.textContent = "❌ " + (json.error || "Failed to add");
+                    status.style.color = "var(--md-error)";
+                }
+            } catch (err) {
+                status.textContent = "❌ Network error";
+                status.style.color = "var(--md-error)";
+            }
+        }
+
+        async function updateDashboard() {
+            try {
+                const response = await fetch('/api/v1/annas-archive/status');
+                const json = await response.json();
+
+                if (!json.success) return;
+                const data = json.data;
+
+                // Update Status Badge
+                const badge = document.getElementById('statusBadge');
+                if (data.enabled) {
+                    badge.className = 'status-badge status-active';
+                    badge.innerHTML = '● Contributing Active';
+                } else {
+                    badge.className = 'status-badge status-inactive';
+                    badge.innerHTML = '○ Disabled';
+                }
+
+                // Update Stats
+                document.getElementById('activeTorrents').textContent = data.activeTorrents;
+                document.getElementById('downloadSpeed').textContent = formatSpeed(data.downloadSpeed);
+                document.getElementById('uploadSpeed').textContent = formatSpeed(data.uploadSpeed);
+                document.getElementById('ratio').textContent = data.ratio.toFixed(2);
+
+                // Update Torrent List
+                const list = document.getElementById('torrentList');
+                if (data.torrents.length === 0) {
+                    list.innerHTML = '<div class="md-padding-lg md-text-center md-text-secondary">No active torrents</div>';
+                } else {
+                    list.innerHTML = data.torrents.map(t => `
+                        <div class="torrent-item">
+                            <div style="width: 200px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                ${t.name || 'Unknown Torrent'}
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${(t.progress * 100).toFixed(1)}%"></div>
+                            </div>
+                            <div style="min-width: 80px; text-align: right;">
+                                ${(t.progress * 100).toFixed(1)}%
+                            </div>
+                            <div style="min-width: 150px; font-size: 0.9em; color: var(--md-on-surface-variant);">
+                                ↓ ${formatSpeed(t.downloadSpeed)}<br>
+                                ↑ ${formatSpeed(t.uploadSpeed)}
+                            </div>
+                            <div style="min-width: 80px; text-align: right; color: var(--md-primary);">
+                                ${t.peers} peers
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+            } catch (err) {
+                console.error("Failed to update dashboard", err);
+            }
+        }
+
+        // Update every 2 seconds
+        updateDashboard();
+        setInterval(updateDashboard, 2000);
+    </script>
+</body>
+
+</html>

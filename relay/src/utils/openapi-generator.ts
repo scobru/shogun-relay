@@ -326,6 +326,30 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
             },
           },
         },
+        AnnasArchiveStatus: {
+          type: "object",
+          properties: {
+            enabled: { type: "boolean" },
+            activeTorrents: { type: "number" },
+            downloadSpeed: { type: "number" },
+            uploadSpeed: { type: "number" },
+            ratio: { type: "number" },
+            torrents: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  infoHash: { type: "string" },
+                  name: { type: "string" },
+                  progress: { type: "number" },
+                  downloadSpeed: { type: "number" },
+                  uploadSpeed: { type: "number" },
+                  peers: { type: "number" },
+                },
+              },
+            },
+          },
+        },
         X402Subscription: {
           type: "object",
           properties: {
@@ -618,6 +642,92 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
             },
             "503": {
               description: "Service unavailable",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/annas-archive/status": {
+        get: {
+          tags: ["Anna's Archive"],
+          summary: "Get integration status",
+          description: "Get current status, active torrents and speeds",
+          operationId: "getAnnasArchiveStatus",
+          responses: {
+            "200": {
+              description: "Status information",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      data: { $ref: "#/components/schemas/AnnasArchiveStatus" },
+                    },
+                  },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/annas-archive/add": {
+        post: {
+          tags: ["Anna's Archive"],
+          summary: "Add manual torrent",
+          description: "Add a magnet link or torrent file manually",
+          operationId: "addAnnasArchiveTorrent",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    magnet: { type: "string", description: "Magnet link or URL" },
+                  },
+                  required: ["magnet"],
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Success response",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Bad request",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/Error" },

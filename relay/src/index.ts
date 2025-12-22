@@ -45,6 +45,8 @@ import {
   createProductionErrorHandler,
 } from "./utils/security";
 import { startPeriodicPeerSync } from "./utils/peer-discovery";
+import { annasArchiveManager } from "./utils/annas-archive";
+import annasArchiveRouter from "./routes/annas-archive";
 
 dotenv.config();
 
@@ -2164,6 +2166,13 @@ See docs/RELAY_KEYS.md for more information.
   process.on("SIGTERM", shutdown);
 
   loggers.server.info({ host, port }, `🚀 Shogun Relay Server running`);
+
+  // Initialize Anna's Archive integration
+  try {
+    await annasArchiveManager.start();
+  } catch (error) {
+    loggers.server.error({ err: error }, "❌ Failed to initialize Anna's Archive integration");
+  }
 
   return {
     server,

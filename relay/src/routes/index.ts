@@ -71,6 +71,7 @@ import networkRouter from "./network";
 import dealsRouter from "./deals";
 import registryRouter from "./registry";
 import bridgeRouter from "./bridge";
+import annasArchiveRouter from "./annas-archive";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
@@ -629,6 +630,9 @@ export default (app: express.Application) => {
 
   // Route per L2 Bridge (deposits, withdrawals, batch submission)
   app.use(`${baseRoute}/bridge`, bridgeRouter);
+
+  // Route per Anna's Archive (Torrents/Preservation)
+  app.use(`${baseRoute}/annas-archive`, annasArchiveRouter);
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {

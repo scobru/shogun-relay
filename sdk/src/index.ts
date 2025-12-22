@@ -7,9 +7,11 @@ import { DealsModule } from "./modules/deals";
 import { RegistryModule } from "./modules/registry";
 import { UploadsModule } from "./modules/uploads";
 import { BridgeModule } from "./modules/bridge";
+import { AnnasArchiveModule } from "./modules/annas-archive";
 
 // Export types
 export * from "./types";
+export * from "./modules/annas-archive";
 
 export class ShogunRelaySDK {
   private client: ApiClient;
@@ -22,6 +24,7 @@ export class ShogunRelaySDK {
   public registry: RegistryModule;
   public uploads: UploadsModule;
   public bridge: BridgeModule;
+  public annasArchive: AnnasArchiveModule;
 
   constructor(config: ApiClientConfig) {
     this.client = new ApiClient(config);
@@ -34,6 +37,7 @@ export class ShogunRelaySDK {
     this.registry = new RegistryModule(this.client);
     this.uploads = new UploadsModule(this.client);
     this.bridge = new BridgeModule(this.client);
+    this.annasArchive = new AnnasArchiveModule(this.client);
   }
 
   public setToken(token: string) {
