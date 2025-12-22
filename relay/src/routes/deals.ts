@@ -1699,7 +1699,7 @@ router.post("/:dealId/renew", express.json(), async (req, res) => {
         paymentRequired: {
           x402Version: 1,
           scheme: "exact",
-          network: x402Config.network || "base-sepolia",
+          network: x402Config.defaultNetwork || "base-sepolia",
           maxAmountRequired: Math.ceil((renewalPricing as any).totalPriceUSDC * 1000000).toString(),
           resource: `deal-renewal-${dealId}`,
           description: `Renewal: ${additionalDays} additional days`,
@@ -1715,7 +1715,7 @@ router.post("/:dealId/renew", express.json(), async (req, res) => {
     }
     const merchant = new X402Merchant({
       payToAddress,
-      network: x402Config.network as any,
+      network: x402Config.defaultNetwork as any,
       settlementMode: x402Config.settlementMode as "facilitator" | "direct",
       facilitatorUrl: x402Config.facilitatorUrl as string,
       privateKey: x402Config.privateKey,

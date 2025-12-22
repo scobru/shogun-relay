@@ -558,15 +558,60 @@ router.post(
     const adminToken = bearerToken || customToken;
     const isAdmin = adminToken === authConfig.adminPassword;
 
-    // Check for user address header (for x402 subscription-based uploads)
+    // Check for user address header (required for ALL uploads, including admin)
     const userAddressRaw = req.headers["x-user-address"];
     const userAddress = Array.isArray(userAddressRaw) ? userAddressRaw[0] : userAddressRaw;
 
-    if (isAdmin) {
+    // Get wallet signature for verification
+    const signatureRaw = req.headers["x-wallet-signature"];
+    const signature = Array.isArray(signatureRaw) ? signatureRaw[0] : signatureRaw;
+
+    // Helper function to verify wallet signature
+    const verifyWalletSignature = async (addr: string, sig: string): Promise<boolean> => {
+      if (!sig || !sig.startsWith("0x") || sig.length < 100) {
+        return false;
+      }
+      try {
+        const { ethers } = await import("ethers");
+        const expectedMessage = "I Love Shogun";
+        const recoveredAddress = ethers.verifyMessage(expectedMessage, sig);
+        return recoveredAddress.toLowerCase() === addr.toLowerCase();
+      } catch (error) {
+        loggers.server.warn({ error }, "Wallet signature verification failed");
+        return false;
+      }
+    };
+
+    // Admin with userAddress - admin can bypass subscription but still needs userAddress and signature
+    // Admin only accesses their own files, not all users' files
+    if (isAdmin && userAddress && typeof userAddress === "string") {
+      // For admin, signature verification is optional (they have the admin token)
       req.authType = "admin";
+      req.userAddress = userAddress;
+      loggers.server.info({ userAddress }, `Admin upload - accessing own files only`);
       next();
     } else if (userAddress && typeof userAddress === "string") {
-      // User-based upload - can be for subscriptions OR storage deals
+      // User-based upload - verify wallet signature first
+      if (!signature) {
+        return res.status(401).json({
+          success: false,
+          error: "Wallet signature required",
+          hint: "Sign 'I Love Shogun' with your wallet and provide X-Wallet-Signature header",
+        });
+      }
+
+      // Verify the signature matches the claimed userAddress
+      const isValidSignature = await verifyWalletSignature(userAddress, signature);
+      if (!isValidSignature) {
+        loggers.server.warn({ userAddress }, "Invalid wallet signature for upload");
+        return res.status(401).json({
+          success: false,
+          error: "Invalid wallet signature",
+          hint: "Signature does not match the claimed wallet address",
+        });
+      }
+
+      loggers.server.info({ userAddress }, "Wallet signature verified for upload");
       req.authType = "user";
       req.userAddress = userAddress;
 
@@ -584,7 +629,7 @@ router.post(
         req.isDealUpload = true;
         next();
       } else if (x402Config.payToAddress as string) {
-        // For subscription-based uploads, check subscription status
+        // For subscription-based uploads (including Drive), check subscription status
         const gun = req.app.get("gunInstance");
         if (!gun) {
           return res.status(500).json({

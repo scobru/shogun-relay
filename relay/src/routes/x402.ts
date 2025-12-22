@@ -36,12 +36,12 @@ function getMerchant(): X402Merchant {
 
     merchant = new X402Merchant({
       payToAddress,
-      network: (x402Config.network || "base-sepolia") as NetworkKey,
+      network: (x402Config.defaultNetwork || "base-sepolia") as NetworkKey,
       facilitatorUrl: x402Config.facilitatorUrl || "",
       facilitatorApiKey: x402Config.facilitatorApiKey || "",
       settlementMode: (x402Config.settlementMode || "facilitator") as "facilitator" | "direct",
       privateKey: x402Config.privateKey || "",
-      rpcUrl: x402Config.rpcUrl || "",
+      rpcUrl: x402Config.getRpcUrl() || "",
     });
   }
   return merchant;
@@ -88,7 +88,7 @@ router.get("/tiers", async (req, res) => {
     const response: any = {
       success: true,
       tiers,
-      network: x402Config.network || "base-sepolia",
+      network: x402Config.defaultNetwork || "base-sepolia",
     };
 
     // Include relay storage info if available
@@ -540,7 +540,7 @@ router.post("/update-usage/:userAddress", async (req, res) => {
 router.get("/config", (req, res) => {
   try {
     const payToAddress = x402Config.payToAddress;
-    const network = x402Config.network || "base-sepolia";
+    const network = x402Config.defaultNetwork || "base-sepolia";
     const configured = !!payToAddress;
 
     res.json({
