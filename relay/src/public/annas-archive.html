@@ -314,6 +314,13 @@
                 if (data.torrents.length === 0) {
                     list.innerHTML = '<div class="md-padding-lg md-text-center md-text-secondary">No active torrents</div>';
                 } else {
+                    // Save expanded states before updating
+                    const expandedStates = new Map();
+                    document.querySelectorAll('.file-list.expanded').forEach(el => {
+                        const hash = el.id.replace('files-', '');
+                        expandedStates.set(hash, true);
+                    });
+
                     list.innerHTML = data.torrents.map(t => `
                         <div class="torrent-item ${t.paused ? 'torrent-paused' : ''}" data-hash="${t.infoHash}">
                             <div class="torrent-header">
@@ -345,11 +352,20 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="file-list" id="files-${t.infoHash}">
+                            <div class="file-list ${expandedStates.has(t.infoHash) ? 'expanded' : ''}" id="files-${t.infoHash}">
                                 <div class="md-text-center md-text-secondary">Loading files...</div>
                             </div>
                         </div>
                     `).join('');
+
+                    // Re-load file lists for expanded items
+                    expandedStates.forEach((_, hash) => {
+                        const filesDiv = document.getElementById(`files-${hash}`);
+                        if (filesDiv && filesDiv.classList.contains('expanded')) {
+                            // Re-trigger file loading without event to avoid closing
+                            loadFilesForTorrent(hash);
+                        }
+                    });
                 }
 
             } catch (err) {
@@ -409,21 +425,10 @@
             }
         }
 
-        async function toggleFiles(infoHash, event) {
-            // Prevent event propagation to avoid conflicts with other click handlers
-            if (event) {
-                event.stopPropagation();
-                event.preventDefault();
-            }
-
+        async function loadFilesForTorrent(infoHash) {
             const filesDiv = document.getElementById(`files-${infoHash}`);
+            if (!filesDiv) return;
 
-            if (filesDiv.classList.contains('expanded')) {
-                filesDiv.classList.remove('expanded');
-                return;
-            }
-
-            // Load files if not already loaded
             try {
                 const response = await fetch(`/api/v1/annas-archive/files/${infoHash}`);
                 const json = await response.json();
@@ -465,7 +470,6 @@
                             </span>
                         </div>
                     `}).join('');
-                    filesDiv.classList.add('expanded');
                 } else {
                     filesDiv.innerHTML = '<div class="md-text-center md-text-secondary">No files</div>';
                 }
@@ -473,6 +477,25 @@
                 console.error('Failed to load files', err);
                 filesDiv.innerHTML = '<div class="md-text-center md-text-error">Failed to load files</div>';
             }
+        }
+
+        async function toggleFiles(infoHash, event) {
+            // Prevent event propagation to avoid conflicts with other click handlers
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+
+            const filesDiv = document.getElementById(`files-${infoHash}`);
+
+            if (filesDiv.classList.contains('expanded')) {
+                filesDiv.classList.remove('expanded');
+                return;
+            }
+
+            // Load files and expand
+            await loadFilesForTorrent(infoHash);
+            filesDiv.classList.add('expanded');
         }
 
         // Update every 2 seconds
