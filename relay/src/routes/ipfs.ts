@@ -290,6 +290,97 @@ router.post("/api/v0/cat", (req, res, next) => {
   }
 });
 
+// Endpoint per recuperare file da una directory IPFS
+// Format: /api/v1/ipfs/cat-directory/:directoryCid/:filePath(*)
+router.get("/cat-directory/:directoryCid/:filePath(*)", async (req: CustomRequest, res: Response) => {
+  try {
+    const { directoryCid, filePath } = req.params;
+
+    if (!directoryCid || !filePath) {
+      return res.status(400).json({
+        success: false,
+        error: "Directory CID and file path are required",
+      });
+    }
+
+    loggers.server.debug(
+      { directoryCid, filePath },
+      `📄 IPFS Cat from directory request`
+    );
+
+    // Costruisci il path completo per IPFS: CID/path
+    const ipfsPath = `${directoryCid}/${filePath}`;
+
+    const requestOptions: {
+      hostname: string;
+      port: number;
+      path: string;
+      method: string;
+      headers: Record<string, string>;
+    } = {
+      hostname: "127.0.0.1",
+      port: 5001,
+      path: `/api/v0/cat?arg=${encodeURIComponent(directoryCid)}/${filePath}`,
+      method: "POST",
+      headers: {
+        "Content-Length": "0",
+      } as Record<string, string>,
+    };
+
+    if (IPFS_API_TOKEN) {
+      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    const ipfsReq = http.request(requestOptions, (ipfsRes) => {
+      // Set appropriate headers
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader("Cache-Control", "public, max-age=31536000");
+
+      // Pipe the response directly
+      ipfsRes.pipe(res);
+
+      ipfsRes.on("error", (err) => {
+        loggers.server.error({ err, directoryCid, filePath }, `❌ IPFS Cat from directory error`);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            error: err.message,
+          });
+        }
+      });
+    });
+
+    ipfsReq.on("error", (err) => {
+      loggers.server.error({ err, directoryCid, filePath }, `❌ IPFS Cat from directory request error`);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: err.message,
+        });
+      }
+    });
+
+    ipfsReq.setTimeout(30000, () => {
+      ipfsReq.destroy();
+      if (!res.headersSent) {
+        res.status(408).json({
+          success: false,
+          error: "Content retrieval timeout",
+        });
+      }
+    });
+
+    ipfsReq.end();
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    loggers.server.error({ err: error }, `❌ IPFS Cat from directory error`);
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
 // Custom IPFS API endpoints with better error handling
 router.post("/api/:endpoint(*)", async (req: CustomRequest, res: Response) => {
   try {
