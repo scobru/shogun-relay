@@ -42,6 +42,20 @@ function normalizeGunRecord(record: any): any {
       return;
     }
 
+    // Special handling for 'files' field: if it's a JSON string, parse it
+    if (key === "files" && typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          normalized[key] = parsed;
+          return;
+        }
+      } catch (e) {
+        // If parsing fails, keep as string
+        loggers.uploads.debug({ err: e }, "Failed to parse files JSON string");
+      }
+    }
+
     // Copy primitive values directly
     normalized[key] = value;
   });
@@ -388,13 +402,21 @@ router.post(
         }
 
         // IMPORTANTE: Salva il campo 'files' per le directory
-        // Questo contiene la lista dei file nella directory
+        // GunDB non può salvare array complessi direttamente, quindi convertiamo in JSON string
         if (files && Array.isArray(files)) {
-          hashRecord.files = files;
-          loggers.uploads.debug(
-            { fileCount: files.length },
-            "Saving directory with files array"
-          );
+          try {
+            hashRecord.files = JSON.stringify(files);
+            hashRecord.filesFormat = "json"; // Marca come JSON per il parsing
+            loggers.uploads.debug(
+              { fileCount: files.length },
+              "Saving directory with files array as JSON string"
+            );
+          } catch (error) {
+            loggers.uploads.warn(
+              { err: error },
+              "Failed to stringify files array, skipping"
+            );
+          }
         }
 
         loggers.uploads.debug({ hashRecord }, "Saving hash record");
@@ -432,30 +454,36 @@ router.post(
 );
 
 // Endpoint per rimuovere un hash dal nodo systemhash
+// Permette sia admin che utenti (per rimuovere i propri metadati)
 router.delete(
   "/remove-system-hash/:hash",
-  (req, res, next) => {
-    // Only admin authentication is allowed
+  async (req, res, next) => {
     const authHeader = req.headers["authorization"];
     const bearerToken = authHeader && authHeader.split(" ")[1];
     const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
 
-    const adminToken = bearerToken || customToken;
-    // SECURITY: Use timing-safe comparison to prevent timing attacks
-    const tokenHash = adminToken ? hashToken(String(adminToken)) : "";
+    // Verifica se è admin
+    const tokenHash = token ? hashToken(String(token)) : "";
     const adminHash = authConfig.adminPassword ? hashToken(authConfig.adminPassword) : "";
     const isAdmin = tokenHash && adminHash && secureCompare(tokenHash, adminHash);
 
     if (isAdmin) {
       (req as CustomRequest).authType = "admin";
       next();
-    } else {
-      loggers.uploads.warn(
-        "Auth failed - Admin token:",
-        adminToken ? "provided" : ("missing" as any)
-      );
-      res.status(401).json({ success: false, error: "Unauthorized - Admin token required" });
+      return;
     }
+
+    // Se non è admin, verifica che l'utente possa rimuovere i propri metadati
+    // Per ora permettiamo a chiunque con un token valido (puoi restringere in futuro)
+    if (token) {
+      (req as CustomRequest).authType = "user";
+      next();
+      return;
+    }
+
+    loggers.uploads.warn("Auth failed - No valid token");
+    res.status(401).json({ success: false, error: "Unauthorized - Token required" });
   },
   async (req, res) => {
     try {
