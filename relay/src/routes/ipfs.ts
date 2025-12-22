@@ -216,6 +216,18 @@ router.post("/api/v0/cat", (req, res, next) => {
     // We need to encode the CID part but keep slashes for path navigation
     // Format: /api/v0/cat?arg=QmDirectory/index.html
     // The slash should NOT be encoded, only special characters in the path components
+    // For paths with slashes, encode only the CID part, keep slashes for navigation
+    // Split by first slash, encode CID, then encode path components but keep slashes
+    let ipfsPath: string;
+    if (cid.includes('/')) {
+      const [directoryCid, ...pathParts] = cid.split('/');
+      // Encode each path component individually to handle spaces and special chars
+      const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
+      ipfsPath = `/api/v0/cat?arg=${encodeURIComponent(directoryCid)}/${encodedPath}`;
+    } else {
+      ipfsPath = `/api/v0/cat?arg=${encodeURIComponent(cid)}`;
+    }
+
     const requestOptions: {
       hostname: string;
       port: number;
@@ -225,11 +237,7 @@ router.post("/api/v0/cat", (req, res, next) => {
     } = {
       hostname: "127.0.0.1",
       port: 5001,
-      // For paths with slashes, encode only the CID part, keep slashes for navigation
-      // Split by first slash, encode CID, then append path
-      path: cid.includes('/')
-        ? `/api/v0/cat?arg=${encodeURIComponent(cid.split('/')[0])}/${cid.split('/').slice(1).join('/')}`
-        : `/api/v0/cat?arg=${encodeURIComponent(cid)}`,
+      path: ipfsPath,
       method: "POST",
       headers: {
         "Content-Length": "0",
