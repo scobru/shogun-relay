@@ -267,8 +267,42 @@ router.post("/api/v0/cat", (req, res, next) => {
         return;
       }
 
-      // Preserve Content-Type from IPFS if available, otherwise use octet-stream
-      const contentType = ipfsRes.headers["content-type"] || "application/octet-stream";
+      // Determine Content-Type: prefer IPFS header, otherwise deduce from file extension
+      let contentType = ipfsRes.headers["content-type"];
+      
+      // If IPFS didn't provide a Content-Type, try to deduce it from the file path
+      if (!contentType || contentType === "application/octet-stream" || contentType === "text/plain") {
+        // Extract filename from path (cid might be "CID/path/to/file.ext")
+        const pathParts = cid.split("/");
+        const filename = pathParts.length > 1 ? pathParts[pathParts.length - 1] : "";
+        const ext = filename.split(".").pop()?.toLowerCase() || "";
+        
+        // MIME type mapping
+        const mimeTypes: Record<string, string> = {
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          png: "image/png",
+          gif: "image/gif",
+          webp: "image/webp",
+          svg: "image/svg+xml",
+          mp4: "video/mp4",
+          webm: "video/webm",
+          mp3: "audio/mpeg",
+          wav: "audio/wav",
+          pdf: "application/pdf",
+          txt: "text/plain",
+          json: "application/json",
+          html: "text/html",
+          css: "text/css",
+          js: "application/javascript",
+          xml: "application/xml",
+          zip: "application/zip",
+        };
+        
+        contentType = mimeTypes[ext] || "application/octet-stream";
+        loggers.server.debug({ filename, ext, contentType }, `📝 Deduced Content-Type from filename`);
+      }
+      
       res.setHeader("Content-Type", contentType);
       res.setHeader("Cache-Control", "public, max-age=31536000");
 
