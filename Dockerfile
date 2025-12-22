@@ -1,7 +1,7 @@
 # Shogun Relay Full Stack Container
 # Includes: IPFS, Relay Server
 
-FROM node:20-alpine
+FROM node:20-slim
 
 # Build arguments (may be passed by CapRover or other deployment systems)
 ARG ADMIN_PASSWORD
@@ -78,25 +78,21 @@ ARG ANNAS_ARCHIVE_MAX_TB
 
 
 # Install required system packages
-# build-base provides make, gcc, g++ needed for native modules like better-sqlite3
-# cmake is needed for node-datachannel (webtorrent dependency)
-# openssl-dev + libressl-dev provide SSL headers and libraries for node-datachannel
-RUN apk add  \
+# Using apt-get for Debian-based image
+RUN apt-get update && apt-get install -y \
     git \
     curl \
     wget \
     dos2unix \
     supervisor \
-    gcompat \
-    build-base \
+    build-essential \
     python3 \
     cmake \
-    openssl-dev \
-    openssl-libs-static \
-    linux-headers
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Download and install IPFS Kubo (separate step for better caching and retry)
-# Note: IPFS Kubo binaries are compiled for glibc, Alpine uses musl libc - gcompat provides compatibility
+# Note: Debian-based image uses glibc, so IPFS binary works natively
 RUN set -ex \
     && ARCH=$(uname -m) \
     && case $ARCH in \
@@ -131,9 +127,9 @@ RUN set -ex \
 # Create symlink for Node.js (supervisord expects it in /usr/bin)
 RUN ln -sf /usr/local/bin/node /usr/bin/node
 
-# Create users and set up directories
+# Create users and set up directories (Debian syntax)
 # Note: These directories will be preserved if volumes are mounted
-RUN adduser -D -s /bin/sh ipfs \
+RUN useradd -m -s /bin/bash ipfs \
     && mkdir -p /data/ipfs \
     && mkdir -p /app/relay \
     && mkdir -p /app/relay/data \
