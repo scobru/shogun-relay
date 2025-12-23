@@ -643,9 +643,23 @@ async function initializeServer() {
       const fs = await import("fs");
       const path = await import("path");
 
+      // Determine the actual keypair file path
+      let keypairFilePath = relayKeysConfig.seaKeypairPath;
+      
+      // Check if the path is a directory - if so, append default filename
+      if (fs.existsSync(keypairFilePath) && fs.statSync(keypairFilePath).isDirectory()) {
+        loggers.server.info(`📁 RELAY_SEA_KEYPAIR_PATH is a directory, using default filename`);
+        keypairFilePath = path.join(keypairFilePath, "relay-keypair.json");
+      }
+      
+      // Also handle case where path ends with / (directory notation) but doesn't exist
+      if (keypairFilePath.endsWith("/") || keypairFilePath.endsWith("\\")) {
+        keypairFilePath = path.join(keypairFilePath, "relay-keypair.json");
+      }
+
       // Check if file exists
-      if (!fs.existsSync(relayKeysConfig.seaKeypairPath)) {
-        loggers.server.warn({ path: relayKeysConfig.seaKeypairPath }, `⚠️ Keypair file not found`);
+      if (!fs.existsSync(keypairFilePath)) {
+        loggers.server.warn({ path: keypairFilePath }, `⚠️ Keypair file not found`);
         loggers.server.info(`🔑 Generating new keypair automatically...`);
 
         // Generate new keypair
@@ -654,7 +668,7 @@ async function initializeServer() {
         const newKeyPair = await Gun.SEA.pair();
 
         // Ensure directory exists
-        const keyPairDir = path.dirname(relayKeysConfig.seaKeypairPath);
+        const keyPairDir = path.dirname(keypairFilePath);
         if (keyPairDir && keyPairDir !== ".") {
           if (!fs.existsSync(keyPairDir)) {
             fs.mkdirSync(keyPairDir, { recursive: true });
@@ -663,22 +677,22 @@ async function initializeServer() {
 
         // Save to file
         fs.writeFileSync(
-          relayKeysConfig.seaKeypairPath,
+          keypairFilePath,
           JSON.stringify(newKeyPair, null, 2),
           "utf8"
         );
         relayKeyPair = newKeyPair;
 
         loggers.server.info(
-          `✅ Generated and saved new keypair to ${relayKeysConfig.seaKeypairPath}`
+          `✅ Generated and saved new keypair to ${keypairFilePath}`
         );
         loggers.server.info({ pub: newKeyPair.pub.substring(0, 30) }, `🔑 Public key`);
         loggers.server.warn(`⚠️ IMPORTANT: Save this keypair file securely!`);
       } else {
         // File exists, load it
-        const keyPairContent = fs.readFileSync(relayKeysConfig.seaKeypairPath, "utf8");
+        const keyPairContent = fs.readFileSync(keypairFilePath, "utf8");
         relayKeyPair = JSON.parse(keyPairContent);
-        loggers.server.info(`🔑 Loaded SEA keypair from ${relayKeysConfig.seaKeypairPath}`);
+        loggers.server.info(`🔑 Loaded SEA keypair from ${keypairFilePath}`);
       }
     } catch (error: any) {
       loggers.server.error(

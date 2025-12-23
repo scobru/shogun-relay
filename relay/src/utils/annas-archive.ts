@@ -63,11 +63,18 @@ export class AnnasArchiveManager {
     // Initialize GunDB for decentralized catalog
     if (this.enabled) {
       try {
-        const Gun = require('gun');
+        // Use gun/gun.js directly to avoid bullet-catcher's isValid requirement
+        // This is a client Gun instance, not the main server
+        const Gun = require('gun/gun.js');
+        require('gun/lib/radix.js');
+        require('gun/lib/radisk.js');
+        require('gun/lib/store.js');
         // Use centralized relay peers config (supports RELAY_PEERS and GUN_PEERS)
         const { relayConfig } = require('../config/env-config');
         this.gun = Gun({
-          peers: relayConfig.peers
+          peers: relayConfig.peers,
+          localStorage: false,
+          radisk: false
         });
         
         // Generate or load relay key
