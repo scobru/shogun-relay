@@ -11,7 +11,7 @@ import "gun/sea";
 import "gun/lib/stats";
 import "gun/lib/webrtc";
 import "gun/axe";
-import "gun/wire";
+import "gun/lib/wire";
 import "./utils/bullet-catcher";
 import Holster from "@mblaney/holster/src/holster.js";
 import multer from "multer";
@@ -358,12 +358,12 @@ async function initializeServer() {
    * @param {string} token - The token to hash
    * @returns {string} SHA-256 hash of the token
    */
-  function hashToken(token: string) {
+  /* function hashToken(token: string) {
     return crypto
       .createHash("sha256")
       .update(token || "")
       .digest("hex");
-  }
+  } */
 
   // Get stored admin password hash (or compute on first use)
   let adminPasswordHash: string | null = null;
