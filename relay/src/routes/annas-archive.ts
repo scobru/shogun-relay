@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { annasArchiveManager } from "../utils/annas-archive";
 import { loggers } from "../utils/logger";
+import { relayConfig, ipfsConfig } from "../config/env-config";
 
 const router = express.Router();
 
@@ -259,9 +260,6 @@ router.get("/files/:infoHash?", async (req, res) => {
 router.get("/catalog", async (req, res) => {
   try {
     const catalog = annasArchiveManager.getCatalog();
-    
-    // Use centralized config for proper public URLs
-    const { relayConfig, ipfsConfig } = require('../config/env-config');
     
     // Build public relay URL - strip /gun suffix if present
     let relayEndpoint = relayConfig.endpoint || process.env.PUBLIC_URL || 'http://localhost:3000';
