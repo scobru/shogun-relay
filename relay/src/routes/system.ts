@@ -16,6 +16,7 @@ router.get("/health", (req, res) => {
   res.json({
     success: true,
     message: "Shogun Relay is running",
+    relayName: config.relay.name,
     timestamp: Date.now(),
     uptime: process.uptime(),
     version: packageConfig.version || "1.0.0",
@@ -27,7 +28,7 @@ router.get("/relay-info", (req, res) => {
   res.json({
     success: true,
     relay: {
-      name: "Shogun Relay",
+      name: config.relay.name,
       version: packageConfig.version || "1.0.0",
       uptime: process.uptime(),
       timestamp: Date.now(),
