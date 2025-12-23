@@ -13,10 +13,17 @@ const getGunInstance = (req: Request): any => {
 
 // Health check endpoint
 router.get("/health", (req, res) => {
+  // Get relay public key from app context if available
+  const relayPub = req.app.get("relayUserPub") || null;
+  
   res.json({
     success: true,
     message: "Shogun Relay is running",
     relayName: config.relay.name,
+    relay: {
+      pub: relayPub,
+    },
+    relayPub: relayPub,
     timestamp: Date.now(),
     uptime: process.uptime(),
     version: packageConfig.version || "1.0.0",
