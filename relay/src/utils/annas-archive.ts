@@ -311,7 +311,7 @@ export class AnnasArchiveManager {
             'udp://tracker.torrent.eu.org:451/announce',
             'udp://opentracker.i2p.rocks:6969/announce'
           ]
-        }, (torrent) => {
+        }, async (torrent) => {
           loggers.server.info(`📚 Created and seeding torrent: ${torrent.name}`);
           loggers.server.info(`📚 InfoHash: ${torrent.infoHash}`);
           loggers.server.info(`📚 Magnet: ${torrent.magnetURI.substring(0, 80)}...`);
@@ -338,7 +338,9 @@ export class AnnasArchiveManager {
 
           // For seeded torrents, 'done' event never fires (already 100% complete)
           // So we immediately add to catalog
-          this.onTorrentComplete(torrent);
+          loggers.server.info(`📚 About to add torrent ${torrent.name} (${torrent.infoHash}) to catalog...`);
+          await this.onTorrentComplete(torrent);
+          loggers.server.info(`📚 Catalog now has ${this.catalog.size} entries`);
 
           resolve({
             magnetURI: torrent.magnetURI,
