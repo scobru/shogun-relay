@@ -9,6 +9,8 @@ services:
       - "5001:5001" # IPFS API
       - "8080:8080" # IPFS Gateway
       - "4001:4001" # IPFS Swarm
+      - "6881:6881" # BitTorrent/WebTorrent peer connections (Anna's Archive)
+      - "6881:6881/udp" # BitTorrent UDP (DHT)
     volumes:
       # Persist IPFS data (repository, pins, blocks)
       - ipfs-data:/data/ipfs
