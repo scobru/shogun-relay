@@ -10,6 +10,8 @@ import Gun from "gun";
 import "gun/sea";
 import "gun/lib/stats";
 import "gun/lib/webrtc";
+import "gun/axe";
+import "gun/wire";
 import "./utils/bullet-catcher";
 import Holster from "@mblaney/holster/src/holster.js";
 import multer from "multer";
