@@ -403,7 +403,7 @@ export class AnnasArchiveManager {
       
       loggers.server.debug(`📚 Saved ${entries.length} entries locally and to network`);
     } catch (error) {
-      loggers.server.error({ err: error }, "📚 Failed to save catalog");
+              loggers.server.error({ err: error }, "📚 Failed to save catalog");
     }
   }
 
@@ -414,9 +414,24 @@ export class AnnasArchiveManager {
     if (!this.gun) return;
 
     try {
+      // Import centralized config for proper public URLs
+      const { relayConfig, ipfsConfig } = require('../config/env-config');
+      
+      // Build public relay URL from endpoint config
+      // Strip /gun suffix if present (RELAY_ENDPOINT is for GunDB, not HTTP)
+      let relayEndpoint = relayConfig.endpoint || process.env.PUBLIC_URL || 'http://localhost:3000';
+      if (relayEndpoint.endsWith('/gun')) {
+        relayEndpoint = relayEndpoint.slice(0, -4);
+      }
+      // Ensure URL has protocol
+      const relayUrl = relayEndpoint.startsWith('http') ? relayEndpoint : `https://${relayEndpoint}`;
+      
+      // Build IPFS gateway URL - use configured gateway or derive from relay URL
+      const ipfsGateway = ipfsConfig.gatewayUrl || `${relayUrl}/ipfs`;
+      
       const catalogData: any = {
-        relayUrl: process.env.PUBLIC_URL || 'http://localhost:3000',
-        ipfsGateway: process.env.IPFS_GATEWAY || 'http://localhost:8080/ipfs',
+        relayUrl: relayUrl,
+        ipfsGateway: ipfsGateway,
         lastUpdated: Date.now(),
         torrents: {}
       };
@@ -438,6 +453,7 @@ export class AnnasArchiveManager {
         .put(catalogData);
 
       loggers.server.info(`📚 Published ${this.catalog.size} torrents to GunDB network`);
+      loggers.server.info(`📚 Relay URL: ${relayUrl}, IPFS Gateway: ${ipfsGateway}`);
     } catch (error) {
       loggers.server.error({ err: error }, "📚 Failed to publish to GunDB");
     }
