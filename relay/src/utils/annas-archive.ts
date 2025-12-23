@@ -53,7 +53,7 @@ export class AnnasArchiveManager {
   private catalogFile: string;
   private catalog: Map<string, CatalogEntry> = new Map();
   private gun: any;
-  private relayKey: string;
+  private relayKey: string = '';
 
   constructor() {
     this.enabled = annasArchiveConfig.enabled;
@@ -64,11 +64,10 @@ export class AnnasArchiveManager {
     if (this.enabled) {
       try {
         const Gun = require('gun');
+        // Use centralized relay peers config (supports RELAY_PEERS and GUN_PEERS)
+        const { relayConfig } = require('../config/env-config');
         this.gun = Gun({
-          peers: process.env.GUN_PEERS?.split(',') || [
-            'https://gun-relay.scobrudot.dev/gun',
-            'http://localhost:8765/gun'
-          ]
+          peers: relayConfig.peers
         });
         
         // Generate or load relay key
@@ -76,6 +75,7 @@ export class AnnasArchiveManager {
                         `relay-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
         loggers.server.info(`📚 GunDB initialized for relay: ${this.relayKey}`);
+        loggers.server.info(`📚 GunDB peers: ${relayConfig.peers.join(', ')}`);
       } catch (error) {
         loggers.server.error({ err: error }, "📚 Failed to initialize GunDB");
         this.gun = null;

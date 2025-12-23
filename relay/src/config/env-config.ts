@@ -49,7 +49,21 @@ export const config = {
     environment: process.env.NODE_ENV || "development",
     protected: process.env.RELAY_PROTECTED === "true",
     endpoint: process.env.RELAY_ENDPOINT || process.env.RELAY_HOST + ":" + process.env.RELAY_PORT,
-    peers: process.env.RELAY_PEERS ? process.env.RELAY_PEERS.split(",") : [],
+    // GunDB peers - supports both RELAY_PEERS and GUN_PEERS for backward compatibility
+    peers: (() => {
+      const peersEnv = process.env.RELAY_PEERS || process.env.GUN_PEERS;
+      if (peersEnv) {
+        return peersEnv.split(",").map(p => p.trim()).filter(p => p.length > 0);
+      }
+      // Default public Gun peers
+      return [
+        'https://gun-manhattan.herokuapp.com/gun',
+        'https://peer.wallie.io/gun',
+        'https://gundb-relay-mlccl.ondigitalocean.app/gun',
+        'https://plankton-app-6qfp3.ondigitalocean.app/gun',
+        'https://gun.defucc.me/gun',
+      ];
+    })(),
   },
 
   // ============================================================================
