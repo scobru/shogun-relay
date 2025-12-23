@@ -292,7 +292,17 @@ export class AnnasArchiveManager {
             'udp://tracker.opentrackr.org:1337/announce',
             'udp://tracker.openbittorrent.com:6969/announce',
             'udp://open.stealth.si:80/announce',
-            'udp://exodus.desync.com:6969/announce'
+            'udp://exodus.desync.com:6969/announce',
+            'udp://tracker.torrent.eu.org:451/announce',
+            'udp://tracker.moeking.me:6969/announce',
+            'udp://opentracker.i2p.rocks:6969/announce',
+            'udp://tracker.internetwarriors.net:1337/announce',
+            'udp://tracker.leechers-paradise.org:6969/announce',
+            'udp://coppersurfer.tk:6969/announce',
+            'udp://tracker.zer0day.to:1337/announce',
+            'wss://tracker.openwebtorrent.com',
+            'wss://tracker.btorrent.xyz',
+            'wss://tracker.webtorrent.dev' 
           ]
         }, (torrent) => {
           loggers.server.info(`📚 Created and seeding torrent: ${torrent.name}`);

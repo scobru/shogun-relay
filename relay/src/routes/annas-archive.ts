@@ -268,7 +268,8 @@ router.get("/catalog", async (req, res) => {
       },
       catalog: catalog,
       count: catalog.length,
-      totalFiles: catalog.reduce((sum, entry) => sum + entry.files.length, 0)
+      totalFiles: catalog.reduce((sum, entry) => sum + entry.files.length, 0),
+      totalPinnedFiles: catalog.reduce((sum, entry) => sum + entry.files.filter(f => f.ipfsCid).length, 0)
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to get catalog");

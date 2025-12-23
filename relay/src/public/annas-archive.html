@@ -409,7 +409,7 @@
 
                 if (json.success) {
                     document.getElementById('catalogTorrents').textContent = json.count || 0;
-                    document.getElementById('catalogFiles').textContent = json.totalFiles || 0;
+                    document.getElementById('catalogFiles').textContent = json.totalPinnedFiles || 0;
                 }
             } catch (err) {
                 console.error("Failed to update catalog", err);
