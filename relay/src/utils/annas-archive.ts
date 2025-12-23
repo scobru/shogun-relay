@@ -81,11 +81,10 @@ export class AnnasArchiveManager {
           isValid: isValidAllowAll // Required by bullet-catcher
         });
         
-        // Generate or load relay key
-        this.relayKey = process.env.RELAY_PUBLIC_KEY || 
-                        `relay-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        // Initialize with temporary key - will be updated with real pub key via setRelayPubKey()
+        this.relayKey = `relay-temp-${Date.now()}`;
         
-        loggers.server.info(`📚 GunDB initialized for relay: ${this.relayKey}`);
+        loggers.server.info(`📚 GunDB initialized with temporary key: ${this.relayKey}`);
         loggers.server.info(`📚 GunDB peers: ${relayConfig.peers.join(', ')}`);
       } catch (error) {
         loggers.server.error({ err: error }, "📚 Failed to initialize GunDB");
@@ -103,11 +102,18 @@ export class AnnasArchiveManager {
 
   /**
    * Initialize and start the service
+   * @param relayPubKey The relay's public key for GunDB catalog publishing
    */
-  public async start(): Promise<void> {
+  public async start(relayPubKey?: string): Promise<void> {
     if (!this.enabled) {
       loggers.server.info("📚 Anna's Archive integration is DISABLED");
       return;
+    }
+
+    // Set relay key from the provided pub key
+    if (relayPubKey) {
+      this.relayKey = relayPubKey;
+      loggers.server.info(`📚 Using relay public key: ${relayPubKey.substring(0, 20)}...`);
     }
 
     loggers.server.info("📚 Initializing Anna's Archive Manager...");

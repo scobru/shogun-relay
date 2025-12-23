@@ -2182,7 +2182,7 @@ See docs/RELAY_KEYS.md for more information.
 
   // Initialize Anna's Archive integration
   try {
-    await annasArchiveManager.start();
+    await annasArchiveManager.start(relayPub);
   } catch (error) {
     loggers.server.error({ err: error }, "❌ Failed to initialize Anna's Archive integration");
   }
