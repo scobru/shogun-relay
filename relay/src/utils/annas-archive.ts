@@ -152,17 +152,14 @@ export class AnnasArchiveManager {
       });
 
       loggers.server.info(`📚 Anna's Archive Manager started. Data dir: ${this.dataDir}`);
-      
       // Load existing catalog
       this.loadCatalog();
       
       // Subscribe to GunDB network
       this.subscribeToNetwork();
       
-      // Publish current catalog if we have any
-      if (this.catalog.size > 0) {
-        this.publishCatalog();
-      }
+      // Always publish catalog to GunDB so we are discoverable (even if empty)
+      this.publishCatalog();
       
       // Start seeding/downloading configured torrents
       await this.loadTorrents();
