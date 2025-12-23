@@ -445,6 +445,7 @@ export class AnnasArchiveManager {
         relayUrl: relayUrl,
         ipfsGateway: ipfsGateway,
         lastUpdated: Date.now(),
+        torrentCount: this.catalog.size,
         torrents: {}
       };
 
@@ -458,13 +459,20 @@ export class AnnasArchiveManager {
         };
       });
 
-      // Publish to GunDB
+      // Publish under the same "relays" path that network-stats uses
+      // This makes Anna's Archive catalogs discoverable alongside relay info
+      this.gun.get('relays')
+        .get(this.relayKey)
+        .get('annasArchive')
+        .put(catalogData);
+      
+      // Also publish to the dedicated annas-archive path for backward compatibility
       this.gun.get('annas-archive')
         .get('catalog')
         .get(this.relayKey)
         .put(catalogData);
 
-      loggers.server.info(`📚 Published ${this.catalog.size} torrents to GunDB network`);
+      loggers.server.info(`📚 Published ${this.catalog.size} torrents to GunDB (relays/${this.relayKey?.substring(0)}/annasArchive)`);
       loggers.server.info(`📚 Relay URL: ${relayUrl}, IPFS Gateway: ${ipfsGateway}`);
     } catch (error) {
       loggers.server.error({ err: error }, "📚 Failed to publish to GunDB");
@@ -499,29 +507,63 @@ export class AnnasArchiveManager {
    * Get network catalog from all relays
    */
   public async getNetworkCatalog(): Promise<any[]> {
-    if (!this.gun) return [];
+    if (!this.gun) {
+      loggers.server.warn("📚 GunDB not initialized for network catalog");
+      return [];
+    }
+
+    loggers.server.info(`📚 Fetching network catalog... (own key: ${this.relayKey?.substring(0, 20)}...)`);
 
     return new Promise((resolve) => {
-      const relays: any[] = [];
-      const timeout = setTimeout(() => resolve(relays), 5000);
+      const relays: Map<string, any> = new Map();
+      const timeout = setTimeout(() => {
+        loggers.server.info(`📚 Network catalog timeout. Found ${relays.size} relays`);
+        resolve(Array.from(relays.values()));
+      }, 8000);
 
+      // Search in BOTH paths: relays/{host}/annasArchive AND annas-archive/catalog
+      
+      // Path 1: Check under relays path (same as network-stats)
+      this.gun.get('relays')
+        .map()
+        .once((relayData: any, host: string) => {
+          if (!relayData || host === this.relayKey) return;
+          
+          // Check if this relay has annasArchive data
+          this.gun.get('relays')
+            .get(host)
+            .get('annasArchive')
+            .once((annasData: any) => {
+              if (annasData && annasData.relayUrl) {
+                loggers.server.debug(`📚 Found relay via relays path: ${host?.substring(0, 20)}...`);
+                relays.set(host, {
+                  relayKey: host,
+                  ...annasData
+                });
+              }
+            });
+        });
+
+      // Path 2: Legacy annas-archive/catalog path
       this.gun.get('annas-archive')
         .get('catalog')
         .map()
         .once((relayData: any, relayKey: string) => {
-          if (relayData && relayKey !== this.relayKey) {
-            relays.push({
+          if (relayData && relayKey !== this.relayKey && !relays.has(relayKey)) {
+            loggers.server.debug(`📚 Found relay via legacy path: ${relayKey?.substring(0, 20)}...`);
+            relays.set(relayKey, {
               relayKey,
               ...relayData
             });
           }
         });
 
-      // Give it 2 seconds to collect
+      // Give it 5 seconds to collect from both paths
       setTimeout(() => {
         clearTimeout(timeout);
-        resolve(relays);
-      }, 2000);
+        loggers.server.info(`📚 Network discovery complete. Found ${relays.size} other relays`);
+        resolve(Array.from(relays.values()));
+      }, 5000);
     });
   }
 
