@@ -311,44 +311,54 @@ export class AnnasArchiveManager {
             'udp://tracker.torrent.eu.org:451/announce',
             'udp://opentracker.i2p.rocks:6969/announce'
           ]
-        }, async (torrent) => {
-          loggers.server.info(`📚 Created and seeding torrent: ${torrent.name}`);
-          loggers.server.info(`📚 InfoHash: ${torrent.infoHash}`);
-          loggers.server.info(`📚 Magnet: ${torrent.magnetURI.substring(0, 80)}...`);
+        }, (torrent) => {
+          try {
+            loggers.server.info(`📚 Seed callback fired for: ${torrent.name}`);
+            loggers.server.info(`📚 InfoHash: ${torrent.infoHash}`);
+            loggers.server.info(`📚 Magnet: ${torrent.magnetURI.substring(0, 80)}...`);
 
-          // Log tracker events for debugging
-          torrent.on('warning', (warn: any) => {
-            loggers.server.warn({ warn }, `📚 Torrent warning: ${torrent.name}`);
-          });
+            // Log tracker events for debugging
+            torrent.on('warning', (warn: any) => {
+              loggers.server.warn({ warn }, `📚 Torrent warning: ${torrent.name}`);
+            });
 
-          torrent.on('noPeers', (announceType: string) => {
-            loggers.server.debug(`📚 No peers found via ${announceType} for ${torrent.name}`);
-          });
+            torrent.on('noPeers', (announceType: string) => {
+              loggers.server.debug(`📚 No peers found via ${announceType} for ${torrent.name}`);
+            });
 
-          // Save to torrents.json for persistence
-          const torrentsFile = path.join(this.dataDir, 'torrents.json');
-          let savedTorrents: string[] = [];
-          if (fs.existsSync(torrentsFile)) {
-            savedTorrents = JSON.parse(fs.readFileSync(torrentsFile, 'utf8'));
+            // Save to torrents.json for persistence
+            const torrentsFile = path.join(this.dataDir, 'torrents.json');
+            let savedTorrents: string[] = [];
+            if (fs.existsSync(torrentsFile)) {
+              savedTorrents = JSON.parse(fs.readFileSync(torrentsFile, 'utf8'));
+            }
+            if (!savedTorrents.includes(torrent.magnetURI)) {
+              savedTorrents.push(torrent.magnetURI);
+              fs.writeFileSync(torrentsFile, JSON.stringify(savedTorrents, null, 2));
+            }
+
+            // For seeded torrents - add to catalog (use .then() since this is not async)
+            loggers.server.info(`📚 Adding torrent ${torrent.name} to catalog...`);
+            this.onTorrentComplete(torrent)
+              .then(() => {
+                loggers.server.info(`📚 Catalog updated, now has ${this.catalog.size} entries`);
+              })
+              .catch((err) => {
+                loggers.server.error({ err }, `📚 Failed to add to catalog`);
+              });
+
+            resolve({
+              magnetURI: torrent.magnetURI,
+              infoHash: torrent.infoHash,
+              name: torrent.name
+            });
+          } catch (callbackError: any) {
+            loggers.server.error({ err: callbackError }, `📚 Error in seed callback`);
+            reject(callbackError);
           }
-          if (!savedTorrents.includes(torrent.magnetURI)) {
-            savedTorrents.push(torrent.magnetURI);
-            fs.writeFileSync(torrentsFile, JSON.stringify(savedTorrents, null, 2));
-          }
-
-          // For seeded torrents, 'done' event never fires (already 100% complete)
-          // So we immediately add to catalog
-          loggers.server.info(`📚 About to add torrent ${torrent.name} (${torrent.infoHash}) to catalog...`);
-          await this.onTorrentComplete(torrent);
-          loggers.server.info(`📚 Catalog now has ${this.catalog.size} entries`);
-
-          resolve({
-            magnetURI: torrent.magnetURI,
-            infoHash: torrent.infoHash,
-            name: torrent.name
-          });
         });
       } catch (error) {
+        loggers.server.error({ err: error }, `📚 Error calling seed()`);
         reject(error);
       }
     });
@@ -567,39 +577,50 @@ export class AnnasArchiveManager {
 
    */
   private async onTorrentComplete(torrent: any): Promise<void> {
-    loggers.server.info(`📚 Torrent completed: ${torrent.name}`);
+    try {
+      loggers.server.info(`📚 onTorrentComplete called for: ${torrent.name}`);
+      loggers.server.info(`📚 Torrent has ${torrent.files?.length || 0} files`);
 
-    // Normalize infoHash to lowercase
-    const normalizedHash = torrent.infoHash.toLowerCase();
-    
-    const entry: CatalogEntry = {
-      torrentHash: normalizedHash,
-      torrentName: torrent.name,
-      magnetLink: torrent.magnetURI,
-      completedAt: Date.now(),
-      files: []
-    };
-
-    // Catalog each file (no auto-pin - user can pin manually via dashboard)
-    for (const file of torrent.files) {
-      // Check if file already has IPFS CID from previous pin (use normalized hash)
-      const existingEntry = this.catalog.get(normalizedHash);
-      const existingFile = existingEntry?.files.find(f => f.path === file.path);
+      // Normalize infoHash to lowercase
+      const normalizedHash = torrent.infoHash.toLowerCase();
+      loggers.server.info(`📚 Normalized hash: ${normalizedHash}`);
       
-      entry.files.push({
-        name: file.name,
-        path: file.path,
-        size: file.length,
-        ipfsCid: existingFile?.ipfsCid // Preserve existing CID if any
-      });
+      const entry: CatalogEntry = {
+        torrentHash: normalizedHash,
+        torrentName: torrent.name,
+        magnetLink: torrent.magnetURI,
+        completedAt: Date.now(),
+        files: []
+      };
+
+      // Catalog each file (no auto-pin - user can pin manually via dashboard)
+      if (torrent.files && torrent.files.length > 0) {
+        for (const file of torrent.files) {
+          // Check if file already has IPFS CID from previous pin (use normalized hash)
+          const existingEntry = this.catalog.get(normalizedHash);
+          const existingFile = existingEntry?.files.find(f => f.path === file.path);
+          
+          entry.files.push({
+            name: file.name,
+            path: file.path,
+            size: file.length,
+            ipfsCid: existingFile?.ipfsCid // Preserve existing CID if any
+          });
+        }
+      } else {
+        loggers.server.warn(`📚 Torrent ${torrent.name} has no files! Cannot catalog.`);
+      }
+
+      // Update catalog
+      loggers.server.info(`📚 Saving to catalog: ${normalizedHash} with ${entry.files.length} files`);
+      this.catalog.set(normalizedHash, entry);
+      this.saveCatalog();
+
+      loggers.server.info(`📚 Cataloged ${entry.files.length} files from torrent ${torrent.name}`);
+      loggers.server.info(`📚 Catalog now has ${this.catalog.size} entries`);
+    } catch (error: any) {
+      loggers.server.error({ err: error }, `📚 ERROR in onTorrentComplete: ${error.message}`);
     }
-
-    // Update catalog
-    this.catalog.set(normalizedHash, entry);
-    this.saveCatalog();
-
-    loggers.server.info(`📚 Cataloged ${entry.files.length} files from torrent ${torrent.name}`);
-    loggers.server.info(`📚 Added to catalog with infoHash: ${normalizedHash}`);
   }
 
   /**
