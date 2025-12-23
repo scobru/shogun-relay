@@ -69,12 +69,16 @@ export class AnnasArchiveManager {
         require('gun/lib/radix.js');
         require('gun/lib/radisk.js');
         require('gun/lib/store.js');
-        // Use centralized relay peers config (supports RELAY_PEERS and GUN_PEERS)
-        const { relayConfig } = require('../config/env-config');
+        
+        // Create an isValid function that allows all messages
+        // This is needed because bullet-catcher modifies Gun globally
+        const isValidAllowAll = () => true;
+        
         this.gun = Gun({
           peers: relayConfig.peers,
           localStorage: false,
-          radisk: false
+          radisk: false,
+          isValid: isValidAllowAll // Required by bullet-catcher
         });
         
         // Generate or load relay key
