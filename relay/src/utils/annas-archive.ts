@@ -450,12 +450,13 @@ export class AnnasArchiveManager {
       };
 
       // Convert catalog Map to object
+      // NOTE: GunDB doesn't support arrays natively, so we store fileCount instead of files array
       this.catalog.forEach((entry, hash) => {
         catalogData.torrents[hash] = {
           name: entry.torrentName,
           magnetURI: entry.magnetLink,
           completedAt: entry.completedAt,
-          files: entry.files
+          fileCount: Array.isArray(entry.files) ? entry.files.length : 0
         };
       });
 
