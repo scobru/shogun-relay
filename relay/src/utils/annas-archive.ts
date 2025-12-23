@@ -526,12 +526,15 @@ export class AnnasArchiveManager {
    * Returns the CID if successful
    */
   public async pinFile(infoHash: string, filePath: string): Promise<{ success: boolean; cid?: string; error?: string }> {
-    loggers.server.info(`📚 Pin request: infoHash=${infoHash}, filePath=${filePath}`);
+    // Normalize infoHash to lowercase for consistent lookup
+    const normalizedHash = infoHash.toLowerCase();
+    
+    loggers.server.info(`📚 Pin request: infoHash=${infoHash} (normalized: ${normalizedHash}), filePath=${filePath}`);
     loggers.server.info(`📚 Catalog has ${this.catalog.size} entries: ${Array.from(this.catalog.keys()).join(', ')}`);
     
-    const entry = this.catalog.get(infoHash);
+    const entry = this.catalog.get(normalizedHash);
     if (!entry) {
-      loggers.server.warn(`📚 Torrent ${infoHash} not found in catalog`);
+      loggers.server.warn(`📚 Torrent ${normalizedHash} not found in catalog`);
       return { success: false, error: `Torrent not found in catalog. Available: ${Array.from(this.catalog.keys()).join(', ')}` };
     }
 
@@ -564,8 +567,11 @@ export class AnnasArchiveManager {
   private async onTorrentComplete(torrent: any): Promise<void> {
     loggers.server.info(`📚 Torrent completed: ${torrent.name}`);
 
+    // Normalize infoHash to lowercase
+    const normalizedHash = torrent.infoHash.toLowerCase();
+    
     const entry: CatalogEntry = {
-      torrentHash: torrent.infoHash,
+      torrentHash: normalizedHash,
       torrentName: torrent.name,
       magnetLink: torrent.magnetURI,
       completedAt: Date.now(),
@@ -574,8 +580,8 @@ export class AnnasArchiveManager {
 
     // Catalog each file (no auto-pin - user can pin manually via dashboard)
     for (const file of torrent.files) {
-      // Check if file already has IPFS CID from previous pin
-      const existingEntry = this.catalog.get(torrent.infoHash);
+      // Check if file already has IPFS CID from previous pin (use normalized hash)
+      const existingEntry = this.catalog.get(normalizedHash);
       const existingFile = existingEntry?.files.find(f => f.path === file.path);
       
       entry.files.push({
@@ -587,11 +593,11 @@ export class AnnasArchiveManager {
     }
 
     // Update catalog
-    this.catalog.set(torrent.infoHash, entry);
+    this.catalog.set(normalizedHash, entry);
     this.saveCatalog();
 
     loggers.server.info(`📚 Cataloged ${entry.files.length} files from torrent ${torrent.name}`);
-    loggers.server.info(`📚 Added to catalog with infoHash: ${torrent.infoHash}`);
+    loggers.server.info(`📚 Added to catalog with infoHash: ${normalizedHash}`);
   }
 
   /**
