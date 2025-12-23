@@ -62,6 +62,9 @@ export const config = {
         'https://gundb-relay-mlccl.ondigitalocean.app/gun',
         'https://plankton-app-6qfp3.ondigitalocean.app/gun',
         'https://gun.defucc.me/gun',
+        'https://shogun-relay.scobrudot.dev/gun',
+        'https://shogun-relay-2.scobrudot.dev/gun',
+
       ];
     })(),
   },
