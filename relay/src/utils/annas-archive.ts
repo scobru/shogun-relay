@@ -198,6 +198,7 @@ export class AnnasArchiveManager {
       }
 
       // 2. Fetch dynamic torrents if maxTb is configured
+      loggers.server.info(`📚 maxTb config value: ${annasArchiveConfig.maxTb}`);
       if (annasArchiveConfig.maxTb > 0) {
           try {
               const dynamicTorrents = await this.fetchDynamicTorrents();
