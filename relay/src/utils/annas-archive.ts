@@ -111,7 +111,13 @@ export class AnnasArchiveManager {
        // @ts-ignore - WebTorrent types might be tricky with ESM/CommonJS mix
       this.client = new WebTorrent({
           // @ts-ignore - Disable uTP to avoid segmentation faults on Alpine Linux (utp-native)
-          utp: false
+          utp: false,
+          // Enable DHT for distributed peer discovery (essential for seeding)
+          dht: true,
+          // Enable Local Service Discovery for LAN peers
+          lsd: true,
+          // Enable Peer Exchange
+          webSeeds: true
       });
 
       this.client.on('error', (err) => {
@@ -286,27 +292,35 @@ export class AnnasArchiveManager {
 
     return new Promise((resolve, reject) => {
       try {
-        // Seed the files
+        // Seed the files - prioritize WebSocket trackers for Docker compatibility
         this.client!.seed(filePaths, {
           announce: [
+            // WebSocket trackers work better in Docker/NAT environments
+            'wss://tracker.openwebtorrent.com',
+            'wss://tracker.btorrent.xyz',
+            'wss://tracker.webtorrent.dev',
+            'wss://tracker.files.fm:7073/announce',
+            // UDP trackers as fallback
             'udp://tracker.opentrackr.org:1337/announce',
             'udp://tracker.openbittorrent.com:6969/announce',
             'udp://open.stealth.si:80/announce',
             'udp://exodus.desync.com:6969/announce',
             'udp://tracker.torrent.eu.org:451/announce',
-            'udp://tracker.moeking.me:6969/announce',
-            'udp://opentracker.i2p.rocks:6969/announce',
-            'udp://tracker.internetwarriors.net:1337/announce',
-            'udp://tracker.leechers-paradise.org:6969/announce',
-            'udp://coppersurfer.tk:6969/announce',
-            'udp://tracker.zer0day.to:1337/announce',
-            'wss://tracker.openwebtorrent.com',
-            'wss://tracker.btorrent.xyz',
-            'wss://tracker.webtorrent.dev' 
+            'udp://opentracker.i2p.rocks:6969/announce'
           ]
         }, (torrent) => {
           loggers.server.info(`📚 Created and seeding torrent: ${torrent.name}`);
+          loggers.server.info(`📚 InfoHash: ${torrent.infoHash}`);
           loggers.server.info(`📚 Magnet: ${torrent.magnetURI.substring(0, 80)}...`);
+
+          // Log tracker events for debugging
+          torrent.on('warning', (warn: any) => {
+            loggers.server.warn({ warn }, `📚 Torrent warning: ${torrent.name}`);
+          });
+
+          torrent.on('noPeers', (announceType: string) => {
+            loggers.server.debug(`📚 No peers found via ${announceType} for ${torrent.name}`);
+          });
 
           // Save to torrents.json for persistence
           const torrentsFile = path.join(this.dataDir, 'torrents.json');
