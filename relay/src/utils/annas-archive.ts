@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { createRequire } from 'module';
 import { loggers } from './logger';
-import { annasArchiveConfig } from '../config/env-config';
+import { annasArchiveConfig, relayConfig, ipfsConfig } from '../config/env-config';
 
 // Create require for CJS modules
 const require = createRequire(import.meta.url);
@@ -414,9 +414,6 @@ export class AnnasArchiveManager {
     if (!this.gun) return;
 
     try {
-      // Import centralized config for proper public URLs
-      const { relayConfig, ipfsConfig } = require('../config/env-config');
-      
       // Build public relay URL from endpoint config
       // Strip /gun suffix if present (RELAY_ENDPOINT is for GunDB, not HTTP)
       let relayEndpoint = relayConfig.endpoint || process.env.PUBLIC_URL || 'http://localhost:3000';
