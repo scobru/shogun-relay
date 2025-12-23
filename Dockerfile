@@ -203,7 +203,9 @@ RUN chown -R node:node /app || true \
     && chmod 755 /app/keys || true
 
 # Expose ports
-EXPOSE 8765 5001 8080 4001
+# 8765 = Relay server, 5001 = IPFS API, 8080 = IPFS Gateway, 4001 = IPFS Swarm
+# 6881 = BitTorrent/WebTorrent peer connections (Anna's Archive seeding)
+EXPOSE 8765 5001 8080 4001 6881
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

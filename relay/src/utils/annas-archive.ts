@@ -117,7 +117,10 @@ export class AnnasArchiveManager {
           // Enable Local Service Discovery for LAN peers
           lsd: true,
           // Enable Peer Exchange
-          webSeeds: true
+          webSeeds: true,
+          // Use fixed port for Docker port mapping (must match EXPOSE in Dockerfile)
+          // @ts-ignore
+          torrentPort: 6881
       });
 
       this.client.on('error', (err) => {
