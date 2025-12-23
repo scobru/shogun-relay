@@ -319,10 +319,9 @@ export class AnnasArchiveManager {
             fs.writeFileSync(torrentsFile, JSON.stringify(savedTorrents, null, 2));
           }
 
-          // Trigger catalog update when done
-          torrent.on('done', () => {
-            this.onTorrentComplete(torrent);
-          });
+          // For seeded torrents, 'done' event never fires (already 100% complete)
+          // So we immediately add to catalog
+          this.onTorrentComplete(torrent);
 
           resolve({
             magnetURI: torrent.magnetURI,
