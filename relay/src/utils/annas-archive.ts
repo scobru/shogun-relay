@@ -526,9 +526,13 @@ export class AnnasArchiveManager {
    * Returns the CID if successful
    */
   public async pinFile(infoHash: string, filePath: string): Promise<{ success: boolean; cid?: string; error?: string }> {
+    loggers.server.info(`📚 Pin request: infoHash=${infoHash}, filePath=${filePath}`);
+    loggers.server.info(`📚 Catalog has ${this.catalog.size} entries: ${Array.from(this.catalog.keys()).join(', ')}`);
+    
     const entry = this.catalog.get(infoHash);
     if (!entry) {
-      return { success: false, error: 'Torrent not found in catalog' };
+      loggers.server.warn(`📚 Torrent ${infoHash} not found in catalog`);
+      return { success: false, error: `Torrent not found in catalog. Available: ${Array.from(this.catalog.keys()).join(', ')}` };
     }
 
     const file = entry.files.find(f => f.path === filePath);
@@ -587,6 +591,7 @@ export class AnnasArchiveManager {
     this.saveCatalog();
 
     loggers.server.info(`📚 Cataloged ${entry.files.length} files from torrent ${torrent.name}`);
+    loggers.server.info(`📚 Added to catalog with infoHash: ${torrent.infoHash}`);
   }
 
   /**
