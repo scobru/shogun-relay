@@ -103,11 +103,18 @@ export class AnnasArchiveManager {
   /**
    * Initialize and start the service
    * @param relayPubKey The relay's public key for GunDB catalog publishing
+   * @param gunInstance Optional: main Gun instance from relay for network sync
    */
-  public async start(relayPubKey?: string): Promise<void> {
+  public async start(relayPubKey?: string, gunInstance?: any): Promise<void> {
     if (!this.enabled) {
       loggers.server.info("📚 Anna's Archive integration is DISABLED");
       return;
+    }
+
+    // Use main Gun instance if provided (better network sync)
+    if (gunInstance) {
+      this.gun = gunInstance;
+      loggers.server.info("📚 Using main relay Gun instance for network sync");
     }
 
     // Set relay key from the provided pub key
