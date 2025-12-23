@@ -559,7 +559,29 @@ export class AnnasArchiveManager {
       return { success: true, cid: file.ipfsCid }; // Already pinned
     }
 
-    const fullPath = path.join(this.dataDir, filePath);
+    // Try multiple possible locations for the file
+    const possiblePaths = [
+      path.join(this.dataDir, filePath),                    // Standard WebTorrent path
+      path.join(this.dataDir, 'uploads', filePath),         // User uploads path
+      path.join(this.dataDir, path.basename(filePath)),     // Just the filename in root
+      path.join(this.dataDir, 'uploads', path.basename(filePath))  // Just filename in uploads
+    ];
+    
+    let fullPath: string | null = null;
+    for (const p of possiblePaths) {
+      loggers.server.debug(`📚 Checking path: ${p}`);
+      if (fs.existsSync(p)) {
+        fullPath = p;
+        loggers.server.info(`📚 Found file at: ${p}`);
+        break;
+      }
+    }
+    
+    if (!fullPath) {
+      loggers.server.warn(`📚 File not found in any location. Tried: ${possiblePaths.join(', ')}`);
+      return { success: false, error: `File not found. Searched: ${possiblePaths.map(p => path.basename(p)).join(', ')}` };
+    }
+    
     const cid = await this.addFileToIPFS(fullPath);
     
     if (cid) {
