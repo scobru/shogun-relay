@@ -260,11 +260,22 @@ router.get("/catalog", async (req, res) => {
   try {
     const catalog = annasArchiveManager.getCatalog();
     
+    // Use centralized config for proper public URLs
+    const { relayConfig, ipfsConfig } = require('../config/env-config');
+    
+    // Build public relay URL - strip /gun suffix if present
+    let relayEndpoint = relayConfig.endpoint || process.env.PUBLIC_URL || 'http://localhost:3000';
+    if (relayEndpoint.endsWith('/gun')) {
+      relayEndpoint = relayEndpoint.slice(0, -4);
+    }
+    const relayUrl = relayEndpoint.startsWith('http') ? relayEndpoint : `https://${relayEndpoint}`;
+    const ipfsGateway = ipfsConfig.gatewayUrl || `${relayUrl}/ipfs`;
+    
     res.json({
       success: true,
       relay: {
-        url: process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`,
-        ipfsGateway: process.env.IPFS_GATEWAY || 'http://localhost:8080/ipfs'
+        url: relayUrl,
+        ipfsGateway: ipfsGateway
       },
       catalog: catalog,
       count: catalog.length,
