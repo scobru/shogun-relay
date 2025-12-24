@@ -209,6 +209,20 @@
         </div>
 
         <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
+            <h2 class="md-title-medium md-mb-sm">📚 Refresh Catalog</h2>
+            <p class="md-body-small md-text-secondary md-mb-md">
+                Update and publish the catalog based on active torrents to GunDB network
+            </p>
+            <div class="md-flex md-gap-sm" style="align-items: center;">
+                <button class="md-btn md-btn-tonal" onclick="refreshCatalog()">
+                    🔄 Refresh Catalog
+                </button>
+                <span id="catalogStatus" class="md-body-small md-text-secondary"></span>
+            </div>
+        </div>
+
+
+        <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
             <h2 class="md-title-medium md-mb-sm">📥 Fetch Anna's Archive Torrents</h2>
             <p class="md-body-small md-text-secondary md-mb-md">
                 Fetch torrents from Anna's Archive API based on storage capacity
@@ -368,6 +382,33 @@
                     setTimeout(updateDashboard, 2000);
                 } else {
                     status.textContent = "❌ " + (json.error || "Failed to fetch");
+                    status.style.color = "var(--md-error)";
+                }
+            } catch (err) {
+                status.textContent = "❌ Network error";
+                status.style.color = "var(--md-error)";
+            }
+        }
+
+        async function refreshCatalog() {
+            const status = document.getElementById('catalogStatus');
+
+            status.textContent = "🔄 Refreshing catalog...";
+            status.style.color = "var(--md-text-secondary)";
+
+            try {
+                const response = await fetch('/api/v1/annas-archive/refresh-catalog', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const json = await response.json();
+
+                if (json.success) {
+                    status.textContent = `✅ ${json.message}`;
+                    status.style.color = "var(--md-primary)";
+                } else {
+                    status.textContent = "❌ " + (json.error || "Failed to refresh");
                     status.style.color = "var(--md-error)";
                 }
             } catch (err) {

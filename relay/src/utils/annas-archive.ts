@@ -513,6 +513,20 @@ export class AnnasArchiveManager {
   }
 
   /**
+   * Public method to manually refresh/publish the catalog
+   * Updates the catalog based on active torrents and publishes to GunDB
+   */
+  public refreshCatalog(): { catalogSize: number; published: boolean } {
+    try {
+      this.publishCatalog();
+      return { catalogSize: this.catalog.size, published: true };
+    } catch (error) {
+      loggers.server.error({ err: error }, "Failed to refresh catalog");
+      return { catalogSize: this.catalog.size, published: false };
+    }
+  }
+
+  /**
    * Subscribe to network catalog updates
    */
   private subscribeToNetwork(): void {

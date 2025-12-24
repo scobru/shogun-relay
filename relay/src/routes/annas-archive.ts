@@ -340,4 +340,27 @@ router.post("/refetch", express.json(), async (req, res) => {
   }
 });
 
+/**
+ * POST /refresh-catalog
+ * Manually refresh and publish the catalog based on active torrents
+ */
+router.post("/refresh-catalog", async (req, res) => {
+  try {
+    const result = annasArchiveManager.refreshCatalog();
+    
+    res.json({
+      success: true,
+      message: `Catalog refreshed with ${result.catalogSize} torrents`,
+      catalogSize: result.catalogSize,
+      published: result.published
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to refresh catalog");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
 export default router;
