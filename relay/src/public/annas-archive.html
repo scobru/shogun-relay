@@ -304,6 +304,29 @@
             </div>
         </div>
 
+        <!-- Global Registry Search -->
+        <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
+            <h2 class="md-title-medium md-mb-md">🔎 Global Registry Search</h2>
+            <p class="md-body-small md-text-secondary md-mb-md">
+                Search for torrents across all relays in the decentralized network
+            </p>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                <input type="text" id="registrySearchQuery" placeholder="Search torrents (min 3 chars)..."
+                    class="md-input" style="flex: 1;" onkeyup="if(event.key === 'Enter') searchRegistry()">
+                <button onclick="searchRegistry()" class="md-btn md-btn-filled">
+                    🔍 Search
+                </button>
+                <button onclick="browseRegistry()" class="md-btn md-btn-outlined">
+                    📋 Browse All
+                </button>
+            </div>
+
+            <div id="registryResults" class="md-body-small">
+                Enter a search query or click "Browse All" to see all torrents in the global registry
+            </div>
+        </div>
+
         <h2 class="md-title-large md-mb-md">Active Torrents</h2>
         <div class="torrent-list" id="torrentList">
             <div class="md-padding-lg md-text-center md-text-secondary">
@@ -621,6 +644,108 @@
             }
         }
 
+        // ============================================================================
+        // GLOBAL REGISTRY SEARCH
+        // ============================================================================
+
+        async function searchRegistry() {
+            const query = document.getElementById('registrySearchQuery').value.trim();
+            const resultsDiv = document.getElementById('registryResults');
+
+            if (query.length < 3) {
+                showToast('❌ Search query must be at least 3 characters', true);
+                return;
+            }
+
+            resultsDiv.innerHTML = '<div class="md-text-center">🔍 Searching...</div>';
+
+            try {
+                const response = await fetch(`/api/v1/annas-archive/registry/search?q=${encodeURIComponent(query)}`);
+                const json = await response.json();
+
+                if (json.success && json.results.length > 0) {
+                    renderRegistryResults(json.results, `Found ${json.count} results for "${query}"`);
+                } else {
+                    resultsDiv.innerHTML = `<div class="md-text-center md-text-secondary">No results found for "${query}"</div>`;
+                }
+            } catch (err) {
+                console.error('Failed to search registry', err);
+                resultsDiv.innerHTML = '<div class="md-text-center" style="color: var(--md-error);">❌ Search failed</div>';
+            }
+        }
+
+        async function browseRegistry() {
+            const resultsDiv = document.getElementById('registryResults');
+            resultsDiv.innerHTML = '<div class="md-text-center">📋 Loading registry...</div>';
+
+            try {
+                const response = await fetch('/api/v1/annas-archive/registry/browse?limit=50');
+                const json = await response.json();
+
+                if (json.success && json.results.length > 0) {
+                    renderRegistryResults(json.results, `Showing ${json.count} torrents from global registry`);
+                } else {
+                    resultsDiv.innerHTML = '<div class="md-text-center md-text-secondary">No torrents in global registry yet</div>';
+                }
+            } catch (err) {
+                console.error('Failed to browse registry', err);
+                resultsDiv.innerHTML = '<div class="md-text-center" style="color: var(--md-error);">❌ Failed to load registry</div>';
+            }
+        }
+
+        function renderRegistryResults(results, title) {
+            const resultsDiv = document.getElementById('registryResults');
+            resultsDiv.innerHTML = `
+                <div class="md-body-small md-mb-md" style="color: var(--md-primary);">${title}</div>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    ${results.map(t => `
+                        <div class="md-card md-card-outlined" style="padding: 12px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="font-weight: 500; margin-bottom: 4px;">${t.name || 'Unknown'}</div>
+                                    <div style="font-size: 0.75rem; color: var(--md-on-surface-variant);">
+                                        ${t.files || 0} files • Added by: ${t.addedBy || 'unknown'}
+                                    </div>
+                                    ${t.aacid ? `<div style="font-size: 0.7rem; color: var(--md-tertiary); font-family: monospace; margin-top: 4px;">AACID: ${t.aacid.substring(0, 30)}...</div>` : ''}
+                                    <div style="font-size: 0.65rem; color: var(--md-on-surface-variant); margin-top: 4px; font-family: monospace;">
+                                        ${t.infoHash}
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button onclick="addTorrentFromRegistry('${t.magnetURI}')" class="btn-small md-btn md-btn-filled" style="padding: 6px 12px; font-size: 0.75rem;">
+                                        ➕ Add
+                                    </button>
+                                    <button onclick="navigator.clipboard.writeText('${t.magnetURI}'); showToast('✅ Magnet copied!')" class="btn-small md-btn md-btn-outlined" style="padding: 6px 12px; font-size: 0.75rem;">
+                                        🧲 Copy
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function addTorrentFromRegistry(magnetURI) {
+            try {
+                const response = await fetch('/api/v1/annas-archive/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ magnet: magnetURI })
+                });
+                const json = await response.json();
+
+                if (json.success) {
+                    showToast('✅ Torrent added from registry!');
+                    updateDashboard();
+                } else {
+                    showToast('❌ ' + (json.error || 'Failed to add'), true);
+                }
+            } catch (err) {
+                console.error('Failed to add torrent', err);
+                showToast('❌ Failed to add torrent', true);
+            }
+        }
 
         async function discoverNetwork() {
             const relaysDiv = document.getElementById('networkRelays');

@@ -364,4 +364,89 @@ router.post("/refresh-catalog", async (req, res) => {
   }
 });
 
+// ============================================================================
+// GLOBAL REGISTRY ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /registry/search
+ * Search the global torrent registry by keyword
+ */
+router.get("/registry/search", async (req, res) => {
+  try {
+    const query = req.query.q as string;
+    const limit = parseInt(req.query.limit as string) || 50;
+    
+    if (!query || query.length < 3) {
+      return res.status(400).json({
+        success: false,
+        error: "Query must be at least 3 characters"
+      });
+    }
+    
+    const results = await annasArchiveManager.searchGlobalRegistry(query, limit);
+    
+    res.json({
+      success: true,
+      query,
+      count: results.length,
+      results
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to search registry");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * GET /registry/browse
+ * Browse all torrents in the global registry
+ */
+router.get("/registry/browse", async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    
+    const results = await annasArchiveManager.browseGlobalRegistry(limit);
+    
+    res.json({
+      success: true,
+      count: results.length,
+      results
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to browse registry");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * GET /registry/check/:infoHash
+ * Check if a torrent exists in the global registry
+ */
+router.get("/registry/check/:infoHash", async (req, res) => {
+  try {
+    const { infoHash } = req.params;
+    
+    const result = await annasArchiveManager.checkTorrentInRegistry(infoHash);
+    
+    res.json({
+      success: true,
+      exists: !!result,
+      data: result
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to check registry");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
 export default router;

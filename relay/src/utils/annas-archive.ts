@@ -329,6 +329,31 @@ export class AnnasArchiveManager {
 
       this.client.add(magnetOrPath, { path: this.dataDir }, (torrent) => {
           loggers.server.info(`📚 Manually added torrent: ${torrent.name}`);
+          
+          // Register done event to catalog torrent when complete
+          torrent.on('done', () => {
+              loggers.server.info(`📚 Torrent download complete: ${torrent.name}`);
+              // Add files to catalog
+              this.onTorrentComplete(torrent);
+              
+              // Publish to global registry for network discovery
+              this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
+                size: torrent.length,
+                files: torrent.files?.length || 0
+              });
+          });
+          
+          // If already done (e.g., seeding or instant resume), catalog immediately
+          if (torrent.done) {
+              loggers.server.info(`📚 Torrent already complete, cataloging: ${torrent.name}`);
+              this.onTorrentComplete(torrent);
+              
+              // Publish to global registry
+              this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
+                size: torrent.length,
+                files: torrent.files?.length || 0
+              });
+          }
       });
 
       // Persist to torrents.json
@@ -430,6 +455,13 @@ export class AnnasArchiveManager {
             this.onTorrentComplete(torrent)
               .then(() => {
                 loggers.server.info(`📚 Catalog updated, now has ${this.catalog.size} entries`);
+                
+                // Publish to global registry for network discovery
+                this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
+                  size: torrent.length,
+                  files: torrent.files?.length || 0,
+                  aacMetadata: aacRecords[0] // Include first AAC record
+                });
               })
               .catch((err) => {
                 loggers.server.error({ err }, `📚 Failed to add to catalog`);
@@ -1070,6 +1102,186 @@ export class AnnasArchiveManager {
           magnetURI: t.magnetURI
       }))
     };
+  }
+
+  // ============================================================================
+  // GLOBAL TORRENT REGISTRY ON GUNDB
+  // ============================================================================
+
+  /**
+   * Publish a torrent to the global registry on GunDB
+   * This makes the torrent discoverable by all relays in the network
+   */
+  public async publishToGlobalRegistry(
+    infoHash: string,
+    magnetURI: string,
+    name: string,
+    options: {
+      size?: number;
+      files?: number;
+      aacMetadata?: any;
+    } = {}
+  ): Promise<{ success: boolean; alreadyExists?: boolean }> {
+    if (!this.gun) {
+      loggers.server.warn('📚 GunDB not available, cannot publish to global registry');
+      return { success: false };
+    }
+
+    const normalizedHash = infoHash.toLowerCase();
+    
+    return new Promise((resolve) => {
+      // Check if torrent already exists in registry
+      this.gun.get('shogun').get('torrents').get('registry').get(normalizedHash).once((existing: any) => {
+        if (existing && existing.magnetURI) {
+          loggers.server.info(`📚 Torrent ${normalizedHash} already in global registry`);
+          resolve({ success: true, alreadyExists: true });
+          return;
+        }
+
+        // Build registry entry
+        const entry = {
+          magnetURI,
+          name,
+          size: options.size || 0,
+          files: options.files || 0,
+          addedAt: Date.now(),
+          addedBy: relayConfig.endpoint || 'unknown',
+          aacid: options.aacMetadata?.aacid || null
+        };
+
+        // Publish to registry
+        this.gun.get('shogun').get('torrents').get('registry').get(normalizedHash).put(entry, (ack: any) => {
+          if (ack.err) {
+            loggers.server.error({ err: ack.err }, '📚 Failed to publish to global registry');
+            resolve({ success: false });
+          } else {
+            loggers.server.info(`📚 Published torrent to global registry: ${name} (${normalizedHash})`);
+            
+            // Also add to search index (keywords from name)
+            this.addToSearchIndex(normalizedHash, name);
+            
+            resolve({ success: true, alreadyExists: false });
+          }
+        });
+      });
+    });
+  }
+
+  /**
+   * Add torrent to search index for keyword-based discovery
+   */
+  private addToSearchIndex(infoHash: string, name: string): void {
+    if (!this.gun) return;
+
+    // Extract keywords from name (lowercase, split by non-alphanumeric)
+    const keywords = name.toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(k => k.length >= 3); // Only keywords with 3+ chars
+
+    for (const keyword of keywords) {
+      this.gun.get('shogun').get('torrents').get('search').get(keyword).get(infoHash).put(true);
+    }
+    
+    loggers.server.debug(`📚 Added ${keywords.length} keywords to search index for ${infoHash}`);
+  }
+
+  /**
+   * Check if a torrent exists in the global registry
+   */
+  public async checkTorrentInRegistry(infoHash: string): Promise<any | null> {
+    if (!this.gun) return null;
+
+    const normalizedHash = infoHash.toLowerCase();
+    
+    return new Promise((resolve) => {
+      this.gun.get('shogun').get('torrents').get('registry').get(normalizedHash).once((data: any) => {
+        if (data && data.magnetURI) {
+          resolve(data);
+        } else {
+          resolve(null);
+        }
+      });
+      
+      // Timeout after 5 seconds
+      setTimeout(() => resolve(null), 5000);
+    });
+  }
+
+  /**
+   * Search the global registry by keyword
+   */
+  public async searchGlobalRegistry(query: string, limit: number = 50): Promise<any[]> {
+    if (!this.gun) return [];
+
+    const keywords = query.toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(k => k.length >= 3);
+
+    if (keywords.length === 0) return [];
+
+    const results = new Map<string, any>();
+    
+    return new Promise((resolve) => {
+      let pending = keywords.length;
+      
+      for (const keyword of keywords) {
+        this.gun.get('shogun').get('torrents').get('search').get(keyword).map().once((val: any, hash: string) => {
+          if (val === true && !results.has(hash)) {
+            // Fetch full entry from registry
+            this.gun.get('shogun').get('torrents').get('registry').get(hash).once((entry: any) => {
+              if (entry && entry.magnetURI) {
+                results.set(hash, {
+                  infoHash: hash,
+                  ...entry
+                });
+              }
+            });
+          }
+        });
+        
+        // Decrement pending count after initial scan
+        setTimeout(() => {
+          pending--;
+          if (pending <= 0) {
+            // Wait a bit more for fetches to complete, then resolve
+            setTimeout(() => {
+              const arr = Array.from(results.values()).slice(0, limit);
+              loggers.server.info(`📚 Search "${query}" returned ${arr.length} results`);
+              resolve(arr);
+            }, 500);
+          }
+        }, 1000);
+      }
+      
+      // Fallback timeout
+      setTimeout(() => resolve(Array.from(results.values()).slice(0, limit)), 6000);
+    });
+  }
+
+  /**
+   * Browse all torrents in the global registry
+   */
+  public async browseGlobalRegistry(limit: number = 100): Promise<any[]> {
+    if (!this.gun) return [];
+
+    const results: any[] = [];
+    
+    return new Promise((resolve) => {
+      this.gun.get('shogun').get('torrents').get('registry').map().once((entry: any, hash: string) => {
+        if (entry && entry.magnetURI && results.length < limit) {
+          results.push({
+            infoHash: hash,
+            ...entry
+          });
+        }
+      });
+      
+      // Wait for results then resolve
+      setTimeout(() => {
+        loggers.server.info(`📚 Browse returned ${results.length} torrents from global registry`);
+        resolve(results);
+      }, 3000);
+    });
   }
 }
 
