@@ -514,15 +514,44 @@ export class AnnasArchiveManager {
 
   /**
    * Public method to manually refresh/publish the catalog
-   * Updates the catalog based on active torrents and publishes to GunDB
+   * Syncs the catalog with active torrents in the client and publishes to GunDB
    */
-  public refreshCatalog(): { catalogSize: number; published: boolean } {
+  public refreshCatalog(): { catalogSize: number; published: boolean; removed: number } {
     try {
+      let removedCount = 0;
+
+      // Get active torrent hashes from client
+      if (this.client) {
+        const activeTorrentHashes = new Set(
+          this.client.torrents.map((t: any) => t.infoHash?.toLowerCase())
+        );
+
+        // Remove catalog entries for torrents that are no longer active
+        const entriesToRemove: string[] = [];
+        for (const [hash, entry] of this.catalog) {
+          const normalizedHash = hash.toLowerCase();
+          if (!activeTorrentHashes.has(normalizedHash)) {
+            entriesToRemove.push(hash);
+            loggers.server.info(`📚 Removing inactive torrent from catalog: ${entry.torrentName || hash}`);
+          }
+        }
+
+        for (const hash of entriesToRemove) {
+          this.catalog.delete(hash);
+          removedCount++;
+        }
+
+        if (removedCount > 0) {
+          loggers.server.info(`📚 Removed ${removedCount} inactive torrents from catalog`);
+          this.saveCatalog();
+        }
+      }
+
       this.publishCatalog();
-      return { catalogSize: this.catalog.size, published: true };
+      return { catalogSize: this.catalog.size, published: true, removed: removedCount };
     } catch (error) {
       loggers.server.error({ err: error }, "Failed to refresh catalog");
-      return { catalogSize: this.catalog.size, published: false };
+      return { catalogSize: this.catalog.size, published: false, removed: 0 };
     }
   }
 

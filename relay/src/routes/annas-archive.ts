@@ -350,9 +350,10 @@ router.post("/refresh-catalog", async (req, res) => {
     
     res.json({
       success: true,
-      message: `Catalog refreshed with ${result.catalogSize} torrents`,
+      message: `Catalog refreshed: ${result.catalogSize} active torrents${result.removed > 0 ? `, removed ${result.removed} inactive` : ''}`,
       catalogSize: result.catalogSize,
-      published: result.published
+      published: result.published,
+      removed: result.removed
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to refresh catalog");
