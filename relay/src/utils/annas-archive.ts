@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { createRequire } from 'module';
 import { loggers } from './logger';
-import { annasArchiveConfig, relayConfig, ipfsConfig } from '../config/env-config';
+import { torrentConfig, relayConfig, ipfsConfig } from '../config/env-config';
 
 // Create require for CJS modules
 const require = createRequire(import.meta.url);
@@ -56,8 +56,8 @@ export class AnnasArchiveManager {
   private relayKey: string = '';
 
   constructor() {
-    this.enabled = annasArchiveConfig.enabled;
-    this.dataDir = annasArchiveConfig.dataDir;
+    this.enabled = torrentConfig.enabled;
+    this.dataDir = torrentConfig.dataDir;
     this.catalogFile = path.join(this.dataDir, 'catalog.json');
     
     // Initialize GunDB for decentralized catalog
@@ -93,7 +93,7 @@ export class AnnasArchiveManager {
     }
 
     // Default torrents (Placeholder for MVP)
-    // Ideally this would fetch from annasArchiveConfig.torrentListUrl
+    // Ideally this would fetch from torrentConfig.annasArchiveUrl
     this.torrents = [
         // Example: Anna’s Archive: Sci-Hub torrent (just a placeholder magnet/hash)
         // "magnet:?xt=urn:btih:..." 
@@ -197,19 +197,8 @@ export class AnnasArchiveManager {
            } catch (error) {}
       }
 
-      // 2. Fetch dynamic torrents if maxTb is configured
-      loggers.server.info(`📚 maxTb config value: ${annasArchiveConfig.maxTb}`);
-      if (annasArchiveConfig.maxTb > 0) {
-          try {
-              const dynamicTorrents = await this.fetchDynamicTorrents();
-              if (dynamicTorrents.length > 0) {
-                  loggers.server.info(`📚 Loaded ${dynamicTorrents.length} dynamic torrents from Anna's Archive API`);
-                  allTorrents = [...allTorrents, ...dynamicTorrents];
-              }
-          } catch (error) {
-              loggers.server.error({ err: error }, "📚 Failed to fetch dynamic torrents");
-          }
-      }
+      // Auto-fetch removed - users can manually fetch Anna's Archive torrents via dashboard
+      // This is now just a normal torrent client
 
       // Deduplicate
       allTorrents = [...new Set(allTorrents)];
@@ -238,8 +227,8 @@ export class AnnasArchiveManager {
    * Fetch dynamic torrent list from Anna's Archive
    */
   private async fetchDynamicTorrents(maxTbOverride?: number): Promise<string[]> {
-      const maxTb = maxTbOverride !== undefined ? maxTbOverride : annasArchiveConfig.maxTb;
-      const url = `${annasArchiveConfig.torrentListUrl}?max_tb=${maxTb}&format=json`;
+      const maxTb = maxTbOverride !== undefined ? maxTbOverride : torrentConfig.maxTb;
+      const url = `${torrentConfig.annasArchiveUrl}?max_tb=${maxTb}&format=json`;
       
       loggers.server.info({ url, maxTb }, "📚 Fetching dynamic torrent list...");
 
@@ -275,7 +264,7 @@ export class AnnasArchiveManager {
       throw new Error("Anna's Archive integration is not enabled");
     }
 
-    loggers.server.info(`📚 Refetching torrents from Anna's Archive (maxTb: ${maxTb || annasArchiveConfig.maxTb})...`);
+    loggers.server.info(`📚 Refetching torrents from Anna's Archive (maxTb: ${maxTb || torrentConfig.maxTb})...`);
     
     const magnets = await this.fetchDynamicTorrents(maxTb);
     

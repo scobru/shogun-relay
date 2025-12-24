@@ -75,7 +75,7 @@ import annasArchiveRouter from "./annas-archive";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import { authConfig, ipfsConfig, registryConfig, packageConfig, x402Config, bridgeConfig, dealsConfig, annasArchiveConfig, holsterConfig } from "../config";
+import { authConfig, ipfsConfig, registryConfig, packageConfig, x402Config, bridgeConfig, dealsConfig, torrentConfig, holsterConfig } from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -676,7 +676,7 @@ export default (app: express.Application) => {
   }
 
   // Route per Anna's Archive (conditional)
-  if (annasArchiveConfig.enabled) {
+  if (torrentConfig.enabled) {
     app.use(`${baseRoute}/annas-archive`, annasArchiveRouter);
     loggers.server.info(`✅ Anna's Archive routes registered`);
   } else {
@@ -817,7 +817,7 @@ export default (app: express.Application) => {
           deals: dealsConfig.enabled,
           registry: registryConfig.enabled,
           bridge: bridgeConfig.enabled,
-          annasArchive: annasArchiveConfig.enabled,
+          torrent: torrentConfig.enabled,
         },
       },
     });

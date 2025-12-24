@@ -52,7 +52,7 @@ services:
       - DEALS_ENABLED=${DEALS_ENABLED:-false}
       - DEAL_SYNC_ENABLED=${DEAL_SYNC_ENABLED:-false}
       - WORMHOLE_ENABLED=${WORMHOLE_ENABLED:-false}
-      - ANNAS_ARCHIVE_ENABLED=${ANNAS_ARCHIVE_ENABLED:-true}
+      - TORRENT_ENABLED=${TORRENT_ENABLED:-true}
       # ============================================================================
       # GUNDB/STORAGE
       # ============================================================================
@@ -106,10 +106,10 @@ services:
       - DEALS_NETWORKS=base-sepolia,base
       - DEALS_DEFAULT_NETWORK=base-sepolia
       # ============================================================================
-      # ANNA'S ARCHIVE
+      # TORRENT MANAGER
       # ============================================================================
-      - ANNAS_ARCHIVE_DATA_DIR=/app/relay/data/annas-archive
-      - ANNAS_ARCHIVE_MAX_TB=${ANNAS_ARCHIVE_MAX_TB:-0.05}
+      - TORRENT_DATA_DIR=/app/relay/data/torrents
+      - TORRENT_MAX_TB=${TORRENT_MAX_TB:-0.05}
       # ============================================================================
       # STORAGE LIMITS
       # ============================================================================
