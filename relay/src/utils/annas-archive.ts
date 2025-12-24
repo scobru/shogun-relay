@@ -441,39 +441,38 @@ export class AnnasArchiveManager {
       // Build IPFS gateway URL - use configured gateway or derive from relay URL
       const ipfsGateway = ipfsConfig.gatewayUrl || `${relayUrl}/ipfs`;
       
-      const catalogData: any = {
+      // First, publish the base catalog metadata (without nested torrents object)
+      const catalogMeta = {
         relayUrl: relayUrl,
         ipfsGateway: ipfsGateway,
         lastUpdated: Date.now(),
-        torrentCount: this.catalog.size,
-        torrents: {}
+        torrentCount: this.catalog.size
       };
 
-      // Convert catalog Map to object
-      // NOTE: GunDB doesn't support arrays natively, so we store fileCount instead of files array
+      // Publish metadata to both paths
+      const relaysNode = this.gun.get('relays').get(this.relayKey).get('annasArchive');
+      const legacyNode = this.gun.get('annas-archive').get('catalog').get(this.relayKey);
+      
+      relaysNode.put(catalogMeta);
+      legacyNode.put(catalogMeta);
+
+      // IMPORTANT: GunDB doesn't handle nested objects well in a single put()
+      // We must publish each torrent separately using .get(hash).put(data)
       this.catalog.forEach((entry, hash) => {
-        catalogData.torrents[hash] = {
+        const torrentData = {
           name: entry.torrentName,
           magnetURI: entry.magnetLink,
           completedAt: entry.completedAt,
           fileCount: Array.isArray(entry.files) ? entry.files.length : 0
         };
+        
+        // Publish to both paths - each torrent gets its own node
+        relaysNode.get('torrents').get(hash).put(torrentData);
+        legacyNode.get('torrents').get(hash).put(torrentData);
       });
 
-      // Publish under the same "relays" path that network-stats uses
-      // This makes Anna's Archive catalogs discoverable alongside relay info
-      this.gun.get('relays')
-        .get(this.relayKey)
-        .get('annasArchive')
-        .put(catalogData);
-      
-      // Also publish to the dedicated annas-archive path for backward compatibility
-      this.gun.get('annas-archive')
-        .get('catalog')
-        .get(this.relayKey)
-        .put(catalogData);
-
-      loggers.server.info(`📚 Published ${this.catalog.size} torrents to GunDB (relays/${this.relayKey?.substring(0)}/annasArchive)`);
+      loggers.server.info(`📚 Published ${this.catalog.size} torrents to GunDB (relays/${this.relayKey?.substring(0, 20)}...)`);
+      loggers.server.info(`📚 Each torrent published separately for proper GunDB sync`);
       loggers.server.info(`📚 Relay URL: ${relayUrl}, IPFS Gateway: ${ipfsGateway}`);
     } catch (error) {
       loggers.server.error({ err: error }, "📚 Failed to publish to GunDB");
