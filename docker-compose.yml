@@ -23,76 +23,102 @@ services:
       # Mount logs for debugging (optional, can be removed in production)
       - ./logs:/var/log/supervisor
     environment:
+      # ============================================================================
+      # SERVER/RELAY IDENTITY
+      # ============================================================================
       - NODE_ENV=production
-      - IPFS_PATH=/data/ipfs
-      - DATA_DIR=/app/relay/data
-      - ADMIN_PASSWORD=shogun2025
       - RELAY_HOST=localhost
       - RELAY_PORT=8765
-      - RELAY_STORE=true
-      - RELAY_PATH=public
-      - RELAY_QR=true
       - RELAY_NAME=shogun-relay
-      - RELAY_PEERS=
+      - RELAY_PATH=public
+      - RELAY_STORE=true
+      - RELAY_QR=true
       - RELAY_PROTECTED=false
+      # ============================================================================
+      # AUTHENTICATION
+      # ============================================================================
+      - ADMIN_PASSWORD=shogun2025
+      # Relay GunDB User - REQUIRED: RELAY_SEA_KEYPAIR or RELAY_SEA_KEYPAIR_PATH
+      # Example: RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
+      # Or: RELAY_SEA_KEYPAIR_PATH=/app/keys/relay-keypair.json
+      # ============================================================================
+      # MODULE ENABLED FLAGS (true/false to enable/disable modules)
+      # ============================================================================
+      - IPFS_ENABLED=${IPFS_ENABLED:-true}
+      - HOLSTER_ENABLED=${HOLSTER_ENABLED:-false}
+      - X402_ENABLED=${X402_ENABLED:-false}
+      - REGISTRY_ENABLED=${REGISTRY_ENABLED:-false}
+      - BRIDGE_ENABLED=${BRIDGE_ENABLED:-false}
+      - DEALS_ENABLED=${DEALS_ENABLED:-false}
+      - DEAL_SYNC_ENABLED=${DEAL_SYNC_ENABLED:-false}
+      - WORMHOLE_ENABLED=${WORMHOLE_ENABLED:-false}
+      - ANNAS_ARCHIVE_ENABLED=${ANNAS_ARCHIVE_ENABLED:-true}
+      # ============================================================================
+      # GUNDB/STORAGE
+      # ============================================================================
+      - DATA_DIR=/app/relay/data
+      - DISABLE_RADISK=false
+      - RELAY_PEERS=
+      # ============================================================================
+      # IPFS
+      # ============================================================================
+      - IPFS_PATH=/data/ipfs
       - IPFS_API_URL=http://127.0.0.1:5001
       - IPFS_GATEWAY_URL=http://127.0.0.1:8080
       - IPFS_API_TOKEN=shogun2025
       - IPFS_API_KEY=shogun2025
-      - DISABLE_RADISK=false
-      # Relay GunDB User (owns subscription data) - REQUIRED: RELAY_SEA_KEYPAIR or RELAY_SEA_KEYPAIR_PATH
-      # Example: RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
-      # Or: RELAY_SEA_KEYPAIR_PATH=/app/keys/relay-keypair.json
       # ============================================================================
-      # ANNA'S ARCHIVE
+      # HOLSTER
       # ============================================================================
-      - ANNAS_ARCHIVE_ENABLED=${ANNAS_ARCHIVE_ENABLED:-true}
-      - ANNAS_ARCHIVE_DATA_DIR=/app/relay/data/annas-archive
-      - ANNAS_ARCHIVE_MAX_TB=${ANNAS_ARCHIVE_MAX_TB:-0.05}
-      # ============================================================================
-      # ============================================================================
-      # X402 PAYMENT CONFIGURATION (Multi-Chain)
-      # ============================================================================
-      - X402_PAY_TO_ADDRESS=0xYourWalletAddressHere
-      - X402_NETWORKS=base-sepolia,base
-      - X402_DEFAULT_NETWORK=base-sepolia
-      - X402_SETTLEMENT_MODE=direct
-      # Required for direct settlement
-      - X402_PRIVATE_KEY=your_private_key_here
-      # Optional: Network-specific RPC overrides
-      # - X402_BASE_SEPOLIA_RPC=https://your-rpc-url
-      # - X402_BASE_RPC=https://your-rpc-url
-      # ============================================================================
-      # BRIDGE CONFIGURATION (Multi-Chain)
-      # ============================================================================
-      - BRIDGE_ENABLED=true
-      - BRIDGE_NETWORKS=base-sepolia,base
-      - BRIDGE_DEFAULT_NETWORK=base-sepolia
-      # ============================================================================
-      # DEALS CONFIGURATION (Multi-Chain)
-      # ============================================================================
-      - DEALS_NETWORKS=base-sepolia,base
-      - DEALS_DEFAULT_NETWORK=base-sepolia
-      # ============================================================================
-      # REGISTRY CONFIGURATION (Multi-Chain)
-      # ============================================================================
-      # Private key for on-chain operations (registration, staking, deals)
-      - RELAY_PRIVATE_KEY=0x_your_private_key_here
-      # Alternative: PRIVATE_KEY=0x_your_private_key_here
-      - REGISTRY_NETWORKS=base-sepolia,base
-      - REGISTRY_DEFAULT_NETWORK=base-sepolia
-      # Relay Storage Limits (global IPFS storage limit)
-      - RELAY_MAX_STORAGE_GB=10
-      - RELAY_STORAGE_WARNING_THRESHOLD=80
-      # Holster Relay (WebSocket enhancement)
       - HOLSTER_RELAY_HOST=0.0.0.0
       # - HOLSTER_RELAY_PORT=8766
       - HOLSTER_RELAY_STORAGE=true
       - HOLSTER_RELAY_STORAGE_PATH=/app/relay/holster-data
       - HOLSTER_MAX_CONNECTIONS=100
-      # Network Federation
-      - AUTO_REPLICATION=true
+      # ============================================================================
+      # BLOCKCHAIN/WALLET (shared key for on-chain operations)
+      # ============================================================================
+      - RELAY_PRIVATE_KEY=0x_your_private_key_here
+      # ============================================================================
+      # X402 PAYMENT
+      # ============================================================================
+      - X402_PAY_TO_ADDRESS=0xYourWalletAddressHere
+      - X402_PRIVATE_KEY=your_private_key_here
+      - X402_SETTLEMENT_MODE=direct
+      - X402_NETWORKS=base-sepolia,base
+      - X402_DEFAULT_NETWORK=base-sepolia
+      # Optional RPC overrides:
+      # - X402_BASE_SEPOLIA_RPC=https://your-rpc-url
+      # ============================================================================
+      # REGISTRY
+      # ============================================================================
+      - REGISTRY_NETWORKS=base-sepolia,base
+      - REGISTRY_DEFAULT_NETWORK=base-sepolia
+      # ============================================================================
+      # BRIDGE
+      # ============================================================================
+      - BRIDGE_NETWORKS=base-sepolia,base
+      - BRIDGE_DEFAULT_NETWORK=base-sepolia
       - BRIDGE_VALID_CHAIN_IDS=84532,42161
+      # ============================================================================
+      # DEALS
+      # ============================================================================
+      - DEALS_NETWORKS=base-sepolia,base
+      - DEALS_DEFAULT_NETWORK=base-sepolia
+      # ============================================================================
+      # ANNA'S ARCHIVE
+      # ============================================================================
+      - ANNAS_ARCHIVE_DATA_DIR=/app/relay/data/annas-archive
+      - ANNAS_ARCHIVE_MAX_TB=${ANNAS_ARCHIVE_MAX_TB:-0.05}
+      # ============================================================================
+      # STORAGE LIMITS
+      # ============================================================================
+      - RELAY_MAX_STORAGE_GB=10
+      - RELAY_STORAGE_WARNING_THRESHOLD=80
+      # ============================================================================
+      # NETWORK/SECURITY
+      # ============================================================================
+      - AUTO_REPLICATION=true
       - CORS_ORIGINS=https://shogun-deals.vercel.app,https://shogun-l2.vercel.app
       - CORS_CREDENTIALS=true
     restart: unless-stopped

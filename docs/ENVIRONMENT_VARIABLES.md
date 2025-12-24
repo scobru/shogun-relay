@@ -5,23 +5,99 @@ This document provides a comprehensive reference of all environment variables th
 ## Table of Contents
 
 1. [Required Configuration](#required-configuration)
-2. [Relay Identity](#relay-identity)
-3. [IPFS Configuration](#ipfs-configuration)
-4. [GunDB Configuration](#gundb-configuration)
-5. [On-Chain Registry](#on-chain-registry)
-6. [x402 Payment Configuration](#x402-payment-configuration)
-7. [Pricing Configuration](#pricing-configuration)
+2. [Module Enable Flags](#module-enable-flags)
+3. [Relay Identity](#relay-identity)
+4. [IPFS Configuration](#ipfs-configuration)
+5. [GunDB Configuration](#gundb-configuration)
+6. [On-Chain Registry](#on-chain-registry)
+7. [x402 Payment Configuration](#x402-payment-configuration)
+8. [Pricing Configuration](#pricing-configuration)
    - [Storage Deals Pricing](#storage-deals-pricing)
    - [Subscription Pricing](#subscription-pricing)
-8. [Storage Limits](#storage-limits)
-9. [Network Federation](#network-federation)
-10. [Holster Relay](#holster-relay)
-11. [Advanced Options](#advanced-options)
-12. [Quick Reference Table](#quick-reference-table)
-13. [Environment File Setup](#environment-file-setup)
-14. [Validation](#validation)
-15. [Security Considerations](#security-considerations)
-16. [Related Documentation](#related-documentation)
+9. [Storage Limits](#storage-limits)
+10. [Network Federation](#network-federation)
+11. [Holster Relay](#holster-relay)
+12. [Advanced Options](#advanced-options)
+13. [Quick Reference Table](#quick-reference-table)
+14. [Environment File Setup](#environment-file-setup)
+15. [Validation](#validation)
+16. [Security Considerations](#security-considerations)
+17. [Related Documentation](#related-documentation)
+
+---
+
+## Module Enable Flags
+
+Shogun Relay supports modular configuration. Each module can be independently enabled or disabled via environment variables. When a module is disabled, its routes return `503 Service Unavailable`.
+
+### `IPFS_ENABLED`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: `false`
+- **Description**: Enable IPFS integration (gateway proxy, upload, pin). When disabled, all `/api/v1/ipfs/*` routes return 503.
+- **Example**: `IPFS_ENABLED=true`
+
+### `HOLSTER_ENABLED`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: `false`
+- **Description**: Enable Holster (Nostr NIP-01 relay). When disabled, the WebSocket relay is not started.
+- **Example**: `HOLSTER_ENABLED=true`
+
+### `X402_ENABLED`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: `false`
+- **Description**: Enable x402 payment/subscription system. When disabled, all `/api/v1/x402/*` routes return 503.
+- **Example**: `X402_ENABLED=true`
+
+### `REGISTRY_ENABLED`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: `false`
+- **Description**: Enable on-chain registry functionality (staking, registration). When disabled, all `/api/v1/registry/*` routes return 503.
+- **Example**: `REGISTRY_ENABLED=true`
+
+### `BRIDGE_ENABLED`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: `false`
+- **Description**: Enable L2 Bridge functionality (deposits, withdrawals, batch submission). When disabled, all `/api/v1/bridge/*` routes return 503 and batch scheduler is not started.
+- **Example**: `BRIDGE_ENABLED=true`
+
+### `DEALS_ENABLED`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: `false`
+- **Description**: Enable storage deals. When disabled, all `/api/v1/deals/*` routes return 503.
+- **Example**: `DEALS_ENABLED=true`
+
+### `WORMHOLE_ENABLED`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: `false`
+- **Description**: Enable wormhole P2P file transfer and cleanup scheduler.
+- **Example**: `WORMHOLE_ENABLED=true`
+
+### `ANNAS_ARCHIVE_ENABLED`
+- **Type**: Boolean (String)
+- **Required**: No
+- **Default**: `false`
+- **Description**: Enable Anna's Archive integration (torrent/preservation). When disabled, all `/api/v1/annas-archive/*` routes return 503.
+- **Example**: `ANNAS_ARCHIVE_ENABLED=true`
+
+### Module Dependencies
+
+| Module | Dependencies |
+|--------|-------------|
+| IPFS | None |
+| Holster | None |
+| X402 | Gun (always enabled) |
+| Registry | Gun |
+| Bridge | Gun, IPFS (recommended) |
+| Deals | Gun, IPFS |
+| Wormhole | Gun |
+| Anna's Archive | Gun, IPFS |
 
 ---
 

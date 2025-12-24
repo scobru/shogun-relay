@@ -209,6 +209,32 @@
         </div>
 
         <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
+            <h2 class="md-title-medium md-mb-sm">📥 Fetch Anna's Archive Torrents</h2>
+            <p class="md-body-small md-text-secondary md-mb-md">
+                Fetch torrents from Anna's Archive API based on storage capacity
+            </p>
+            <div class="md-flex md-gap-sm" style="align-items: flex-end;">
+                <div>
+                    <label class="md-label-small">Max TB</label>
+                    <select id="maxTbSelect"
+                        style="padding: 12px; border: 1px solid var(--md-outline); border-radius: 8px; background: var(--md-surface); color: var(--md-on-surface); min-width: 100px;">
+                        <option value="0.1">0.1 TB</option>
+                        <option value="0.5">0.5 TB</option>
+                        <option value="1">1 TB</option>
+                        <option value="2">2 TB</option>
+                        <option value="5">5 TB</option>
+                        <option value="10">10 TB</option>
+                        <option value="20">20 TB</option>
+                    </select>
+                </div>
+                <button class="md-btn md-btn-filled" onclick="refetchTorrents()">
+                    📥 Fetch Torrents
+                </button>
+            </div>
+            <p id="refetchStatus" class="md-body-small md-text-secondary md-mt-sm"></p>
+        </div>
+
+        <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
             <h2 class="md-title-medium md-mb-sm">🔨 Create Torrent</h2>
             <p class="md-body-small md-text-secondary md-mb-md">
                 Select files to create and seed a new torrent
@@ -311,6 +337,37 @@
                     setTimeout(updateDashboard, 1000); // Refresh list
                 } else {
                     status.textContent = "❌ " + (json.error || "Failed to add");
+                    status.style.color = "var(--md-error)";
+                }
+            } catch (err) {
+                status.textContent = "❌ Network error";
+                status.style.color = "var(--md-error)";
+            }
+        }
+
+        async function refetchTorrents() {
+            const select = document.getElementById('maxTbSelect');
+            const status = document.getElementById('refetchStatus');
+            const maxTb = parseFloat(select.value);
+
+            status.textContent = `📥 Fetching torrents for ${maxTb} TB...`;
+            status.style.color = "var(--md-text-secondary)";
+
+            try {
+                const response = await fetch('/api/v1/annas-archive/refetch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ maxTb })
+                });
+
+                const json = await response.json();
+
+                if (json.success) {
+                    status.textContent = `✅ ${json.message} (${json.skipped} duplicates skipped)`;
+                    status.style.color = "var(--md-primary)";
+                    setTimeout(updateDashboard, 2000);
+                } else {
+                    status.textContent = "❌ " + (json.error || "Failed to fetch");
                     status.style.color = "var(--md-error)";
                 }
             } catch (err) {

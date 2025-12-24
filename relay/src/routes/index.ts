@@ -75,7 +75,7 @@ import annasArchiveRouter from "./annas-archive";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import { authConfig, ipfsConfig, registryConfig, packageConfig } from "../config";
+import { authConfig, ipfsConfig, registryConfig, packageConfig, x402Config, bridgeConfig, dealsConfig, annasArchiveConfig } from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -606,38 +606,85 @@ export default (app: express.Application) => {
   // Route per gli upload degli utenti
   app.use(`${baseRoute}/user-uploads`, uploadsRouter);
 
-  // Route per IPFS
-  app.use(`${baseRoute}/ipfs`, ipfsRouter);
+  // Route per IPFS (conditional)
+  if (ipfsConfig.enabled) {
+    app.use(`${baseRoute}/ipfs`, ipfsRouter);
+    loggers.server.info(`✅ IPFS routes registered`);
+  } else {
+    loggers.server.info(`⏭️ IPFS routes disabled (IPFS_ENABLED=false)`);
+    // Return disabled message for any IPFS route request
+    app.use(`${baseRoute}/ipfs/*`, (req, res) => {
+      res.status(503).json({ success: false, error: "IPFS module is disabled" });
+    });
+  }
 
-  // Route di sistema e debug
+  // Route di sistema e debug (always enabled - core functionality)
   app.use(`${baseRoute}/system`, systemRouter);
-
-  // Route di debug
   app.use(`${baseRoute}/debug`, debugRouter);
 
-  // Route per i servizi
+  // Route per i servizi (always enabled)
   app.use(`${baseRoute}/services`, servicesRouter);
 
-  // Route per il grafico visivo
+  // Route per il grafico visivo (always enabled)
   app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
 
-  // Route per x402 payments e subscriptions
-  app.use(`${baseRoute}/x402`, x402Router);
+  // Route per x402 payments e subscriptions (conditional)
+  if (x402Config.enabled) {
+    app.use(`${baseRoute}/x402`, x402Router);
+    loggers.server.info(`✅ X402 routes registered`);
+  } else {
+    loggers.server.info(`⏭️ X402 routes disabled (X402_ENABLED=false)`);
+    app.use(`${baseRoute}/x402/*`, (req, res) => {
+      res.status(503).json({ success: false, error: "X402 module is disabled" });
+    });
+  }
 
-  // Route per network federation, discovery e storage proofs
+  // Route per network federation, discovery e storage proofs (always enabled)
   app.use(`${baseRoute}/network`, networkRouter);
 
-  // Route per storage deals (per-file contracts)
-  app.use(`${baseRoute}/deals`, dealsRouter);
+  // Route per storage deals (conditional)
+  if (dealsConfig.enabled) {
+    app.use(`${baseRoute}/deals`, dealsRouter);
+    loggers.server.info(`✅ Deals routes registered`);
+  } else {
+    loggers.server.info(`⏭️ Deals routes disabled (DEALS_ENABLED=false)`);
+    app.use(`${baseRoute}/deals/*`, (req, res) => {
+      res.status(503).json({ success: false, error: "Deals module is disabled" });
+    });
+  }
 
-  // Route per on-chain registry management (staking, registration)
-  app.use(`${baseRoute}/registry`, registryRouter);
+  // Route per on-chain registry management (conditional)
+  if (registryConfig.enabled) {
+    app.use(`${baseRoute}/registry`, registryRouter);
+    loggers.server.info(`✅ Registry routes registered`);
+  } else {
+    loggers.server.info(`⏭️ Registry routes disabled (REGISTRY_ENABLED=false)`);
+    app.use(`${baseRoute}/registry/*`, (req, res) => {
+      res.status(503).json({ success: false, error: "Registry module is disabled" });
+    });
+  }
 
-  // Route per L2 Bridge (deposits, withdrawals, batch submission)
-  app.use(`${baseRoute}/bridge`, bridgeRouter);
+  // Route per L2 Bridge (conditional)
+  if (bridgeConfig.enabled) {
+    app.use(`${baseRoute}/bridge`, bridgeRouter);
+    loggers.server.info(`✅ Bridge routes registered`);
+  } else {
+    loggers.server.info(`⏭️ Bridge routes disabled (BRIDGE_ENABLED=false)`);
+    app.use(`${baseRoute}/bridge/*`, (req, res) => {
+      res.status(503).json({ success: false, error: "Bridge module is disabled" });
+    });
+  }
 
-  // Route per Anna's Archive (Torrents/Preservation)
-  app.use(`${baseRoute}/annas-archive`, annasArchiveRouter);
+  // Route per Anna's Archive (conditional)
+  if (annasArchiveConfig.enabled) {
+    app.use(`${baseRoute}/annas-archive`, annasArchiveRouter);
+    loggers.server.info(`✅ Anna's Archive routes registered`);
+  } else {
+    loggers.server.info(`⏭️ Anna's Archive routes disabled (ANNAS_ARCHIVE_ENABLED=false)`);
+    app.use(`${baseRoute}/annas-archive/*`, (req, res) => {
+      res.status(503).json({ success: false, error: "Anna's Archive module is disabled" });
+    });
+  }
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
@@ -754,7 +801,7 @@ export default (app: express.Application) => {
 
   // --- FINE ROUTE LEGACY ---
 
-  // Route di health check
+  // Route di health check with module status
   app.get(`${baseRoute}/health`, (req, res) => {
     res.json({
       success: true,
@@ -763,6 +810,14 @@ export default (app: express.Application) => {
         timestamp: new Date().toISOString(),
         version: packageConfig.version || "1.0.0",
         uptime: process.uptime(),
+        modules: {
+          ipfs: ipfsConfig.enabled,
+          x402: x402Config.enabled,
+          deals: dealsConfig.enabled,
+          registry: registryConfig.enabled,
+          bridge: bridgeConfig.enabled,
+          annasArchive: annasArchiveConfig.enabled,
+        },
       },
     });
   });

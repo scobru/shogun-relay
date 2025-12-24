@@ -25,7 +25,7 @@ import {
   ipfsConfig,
   relayConfig,
   serverConfig,
-  holsterConfig as holsterConfigFromEnv,
+  holsterConfig,
   authConfig,
   storageConfig,
   relayKeysConfig,
@@ -33,6 +33,7 @@ import {
   x402Config,
   dealSyncConfig,
   bridgeConfig,
+  wormholeConfig,
   replicationConfig,
   loggingConfig,
   packageConfig,
@@ -77,14 +78,7 @@ host = host.replace(/^https?:\/\//, "").replace(/\/$/, "");
 let port = serverConfig.port;
 let path_public = serverConfig.publicPath;
 
-// --- Holster Configuration ---
-const holsterConfig = {
-  host: holsterConfigFromEnv.host,
-  port: holsterConfigFromEnv.port,
-  storageEnabled: holsterConfigFromEnv.storageEnabled,
-  storagePath: holsterConfigFromEnv.storagePath,
-  maxConnections: holsterConfigFromEnv.maxConnections,
-};
+// Note: holsterConfig is now imported directly from env-config
 
 /**
  * Main server initialization function
@@ -537,23 +531,28 @@ async function initializeServer() {
   const server = await startServer();
 
   // Initialize Holster Relay with built-in WebSocket server and connection management
-  let holster: any;
-  try {
-    holster = Holster({
-      port: holsterConfig.port,
-      secure: true,
-      peers: [], // No peers by default
-      maxConnections: holsterConfig.maxConnections,
-      file: holsterConfig.storageEnabled ? holsterConfig.storagePath : undefined,
-    });
-    loggers.server.info(`✅ Holster Relay initialized on port ${holsterConfig.port}`);
-    loggers.server.info(
-      `📁 Holster storage: ${holsterConfig.storageEnabled ? holsterConfig.storagePath : "disabled"}`
-    );
-    // Store holster instance in app settings for health check
-    app.set("holsterInstance", holster);
-  } catch (error) {
-    loggers.server.error({ err: error }, "❌ Error initializing Holster");
+  let holster: any = null;
+  if (holsterConfig.enabled) {
+    try {
+      holster = Holster({
+        port: holsterConfig.port,
+        secure: true,
+        peers: [], // No peers by default
+        maxConnections: holsterConfig.maxConnections,
+        file: holsterConfig.storageEnabled ? holsterConfig.storagePath : undefined,
+      });
+      loggers.server.info(`✅ Holster Relay initialized on port ${holsterConfig.port}`);
+      loggers.server.info(
+        `📁 Holster storage: ${holsterConfig.storageEnabled ? holsterConfig.storagePath : "disabled"}`
+      );
+      // Store holster instance in app settings for health check
+      app.set("holsterInstance", holster);
+    } catch (error) {
+      loggers.server.error({ err: error }, "❌ Error initializing Holster");
+      app.set("holsterInstance", null);
+    }
+  } else {
+    loggers.server.info(`⏭️ Holster disabled (HOLSTER_ENABLED=false)`);
     app.set("holsterInstance", null);
   }
 
@@ -612,11 +611,21 @@ async function initializeServer() {
 
   const gun = (Gun as any)(gunConfig);
 
-  // Start batch scheduler for automated L2 -> L1 submission
-  startBatchScheduler(gun);
+  // Start batch scheduler for automated L2 -> L1 submission (requires Bridge)
+  if (bridgeConfig.enabled) {
+    startBatchScheduler(gun);
+    loggers.server.info(`✅ Batch scheduler started (Bridge enabled)`);
+  } else {
+    loggers.server.info(`⏭️ Batch scheduler disabled (BRIDGE_ENABLED=false)`);
+  }
 
   // Start wormhole cleanup scheduler for orphaned transfer cleanup
-  startWormholeCleanup(gun);
+  if (wormholeConfig.enabled) {
+    startWormholeCleanup(gun);
+    loggers.server.info(`✅ Wormhole cleanup started`);
+  } else {
+    loggers.server.info(`⏭️ Wormhole cleanup disabled (WORMHOLE_ENABLED=false)`);
+  }
 
   // Note: "Data hash not same as hash!" warnings from GunDB are benign
   // They occur when using content-addressed storage with # namespace

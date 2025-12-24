@@ -237,11 +237,11 @@ export class AnnasArchiveManager {
   /**
    * Fetch dynamic torrent list from Anna's Archive
    */
-  private async fetchDynamicTorrents(): Promise<string[]> {
-      const maxTb = annasArchiveConfig.maxTb;
+  private async fetchDynamicTorrents(maxTbOverride?: number): Promise<string[]> {
+      const maxTb = maxTbOverride !== undefined ? maxTbOverride : annasArchiveConfig.maxTb;
       const url = `${annasArchiveConfig.torrentListUrl}?max_tb=${maxTb}&format=json`;
       
-      loggers.server.info({ url }, "📚 Fetching dynamic torrent list...");
+      loggers.server.info({ url, maxTb }, "📚 Fetching dynamic torrent list...");
 
       try {
           const response = await fetch(url);
@@ -264,6 +264,57 @@ export class AnnasArchiveManager {
           loggers.server.error({ err: error }, "📚 Error fetching dynamic torrents");
           return [];
       }
+  }
+
+  /**
+   * Re-fetch and add dynamic torrents from Anna's Archive
+   * @param maxTb Optional: Override the max TB parameter
+   */
+  public async refetchDynamicTorrents(maxTb?: number): Promise<{ added: number; skipped: number; total: number }> {
+    if (!this.enabled || !this.client) {
+      throw new Error("Anna's Archive integration is not enabled");
+    }
+
+    loggers.server.info(`📚 Refetching torrents from Anna's Archive (maxTb: ${maxTb || annasArchiveConfig.maxTb})...`);
+    
+    const magnets = await this.fetchDynamicTorrents(maxTb);
+    
+    if (magnets.length === 0) {
+      return { added: 0, skipped: 0, total: 0 };
+    }
+
+    // Get existing torrent hashes to avoid duplicates
+    const existingHashes = new Set(this.client.torrents.map(t => t.infoHash.toLowerCase()));
+    
+    let added = 0;
+    let skipped = 0;
+
+    for (const magnet of magnets) {
+      // Extract infoHash from magnet to check for duplicates
+      const hashMatch = magnet.match(/xt=urn:btih:([a-fA-F0-9]+)/i);
+      if (hashMatch) {
+        const hash = hashMatch[1].toLowerCase();
+        if (existingHashes.has(hash)) {
+          skipped++;
+          continue;
+        }
+      }
+      
+      // Add the torrent
+      this.client.add(magnet, { path: this.dataDir }, (torrent) => {
+        loggers.server.info(`📚 Added torrent from refetch: ${torrent.name}`);
+        
+        torrent.on('done', () => {
+          this.onTorrentComplete(torrent);
+        });
+      });
+      
+      added++;
+    }
+
+    loggers.server.info(`📚 Refetch complete: ${added} added, ${skipped} skipped (duplicates), ${magnets.length} total from API`);
+    
+    return { added, skipped, total: magnets.length };
   }
 
   /**
@@ -815,23 +866,31 @@ export class AnnasArchiveManager {
 
     const torrentName = torrent.name;
     
-    // Unpin files from IPFS and remove from catalog
-    const catalogEntry = this.catalog.get(infoHash);
-    if (catalogEntry && catalogEntry.files.length > 0) {
-      for (const file of catalogEntry.files) {
-        if (file.ipfsCid) {
-          try {
-            await this.unpinFromIPFS(file.ipfsCid);
-            loggers.server.info(`📚 Unpinned IPFS: ${file.ipfsCid}`);
-          } catch (error) {
-            loggers.server.error({ err: error }, `📚 Failed to unpin ${file.ipfsCid}`);
+    // Normalize infoHash to lowercase (catalog uses lowercase keys)
+    const normalizedHash = infoHash.toLowerCase();
+    
+    // Unpin files from IPFS if any
+    const catalogEntry = this.catalog.get(normalizedHash);
+    if (catalogEntry) {
+      // Unpin any files that have IPFS CIDs
+      if (catalogEntry.files && catalogEntry.files.length > 0) {
+        for (const file of catalogEntry.files) {
+          if (file.ipfsCid) {
+            try {
+              await this.unpinFromIPFS(file.ipfsCid);
+              loggers.server.info(`📚 Unpinned IPFS: ${file.ipfsCid}`);
+            } catch (error) {
+              loggers.server.error({ err: error }, `📚 Failed to unpin ${file.ipfsCid}`);
+            }
           }
         }
       }
-      // Remove from catalog
-      this.catalog.delete(infoHash);
+      // Always remove from catalog
+      this.catalog.delete(normalizedHash);
       this.saveCatalog();
-      loggers.server.info(`📚 Removed ${infoHash} from catalog`);
+      loggers.server.info(`📚 Removed ${normalizedHash} from catalog`);
+    } else {
+      loggers.server.warn(`📚 Torrent ${normalizedHash} not found in catalog, skipping catalog cleanup`);
     }
     
     // Remove from WebTorrent

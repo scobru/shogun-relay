@@ -74,6 +74,7 @@ export const config = {
   // ============================================================================
 
   ipfs: {
+    enabled: process.env.IPFS_ENABLED === "true" || false,
     apiUrl: process.env.IPFS_API_URL || "http://127.0.0.1:5001",
     apiToken: process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY,
     gatewayUrl: process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080",
@@ -114,6 +115,7 @@ export const config = {
   // ============================================================================
 
   holster: {
+    enabled: process.env.HOLSTER_ENABLED === "true" || false,
     host: process.env.HOLSTER_RELAY_HOST || "0.0.0.0",
     port: (() => {
       const mainPort = parseInt(process.env.RELAY_PORT || process.env.PORT || "8765");
@@ -148,6 +150,7 @@ export const config = {
   // ============================================================================
 
   registry: {
+    enabled: process.env.REGISTRY_ENABLED === "true" || false,
     // Multi-chain configuration
     networks: parseNetworkList(process.env.REGISTRY_NETWORKS, ["base-sepolia"]),
     defaultNetwork: (process.env.REGISTRY_DEFAULT_NETWORK || "base-sepolia") as NetworkId,
@@ -190,6 +193,7 @@ export const config = {
   // ============================================================================
 
   x402: {
+    enabled: process.env.X402_ENABLED === "true" || false,
     // Multi-chain configuration
     networks: parseNetworkList(process.env.X402_NETWORKS, ["base-sepolia"]),
     defaultNetwork: (process.env.X402_DEFAULT_NETWORK || "base-sepolia") as NetworkId,
@@ -236,7 +240,7 @@ export const config = {
   // ============================================================================
 
   bridge: {
-    enabled: process.env.BRIDGE_ENABLED !== "false",
+    enabled: process.env.BRIDGE_ENABLED === "true" || false,
 
     // Multi-chain configuration
     networks: parseNetworkList(process.env.BRIDGE_NETWORKS, ["base-sepolia"]),
@@ -300,6 +304,7 @@ export const config = {
   // ============================================================================
 
   deals: {
+    enabled: process.env.DEALS_ENABLED === "true" || false,
     // Multi-chain configuration
     networks: parseNetworkList(process.env.DEALS_NETWORKS, ["base-sepolia"]),
     defaultNetwork: (process.env.DEALS_DEFAULT_NETWORK || "base-sepolia") as NetworkId,
@@ -339,7 +344,7 @@ export const config = {
   // ============================================================================
 
   dealSync: {
-    enabled: process.env.DEAL_SYNC_ENABLED !== "false",
+    enabled: process.env.DEAL_SYNC_ENABLED === "true" || false,
     intervalMs: parseInt(process.env.DEAL_SYNC_INTERVAL_MS || "300000") || 5 * 60 * 1000,
     fastIntervalMs: parseInt(process.env.DEAL_SYNC_FAST_INTERVAL_MS || "120000") || 2 * 60 * 1000,
     initialDelayMs: parseInt(process.env.DEAL_SYNC_INITIAL_DELAY_MS || "30000") || 30 * 1000,
@@ -350,6 +355,7 @@ export const config = {
   // ============================================================================
 
   wormhole: {
+    enabled: process.env.WORMHOLE_ENABLED === "true" || false,
     cleanupEnabled: process.env.WORMHOLE_CLEANUP_ENABLED !== "false",
     cleanupIntervalMs:
       parseInt(process.env.WORMHOLE_CLEANUP_INTERVAL_MS || "3600000") || 60 * 60 * 1000,

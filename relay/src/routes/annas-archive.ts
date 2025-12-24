@@ -314,4 +314,30 @@ router.get("/network", async (req, res) => {
   }
 });
 
+/**
+ * POST /refetch
+ * Re-fetch and add dynamic torrents from Anna's Archive API
+ */
+router.post("/refetch", express.json(), async (req, res) => {
+  try {
+    const maxTb = req.body.maxTb;
+    
+    const result = await annasArchiveManager.refetchDynamicTorrents(maxTb);
+    
+    res.json({
+      success: true,
+      message: `Fetched ${result.added} new torrents from Anna's Archive`,
+      added: result.added,
+      skipped: result.skipped,
+      total: result.total
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to refetch torrents");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
 export default router;
