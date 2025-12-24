@@ -709,11 +709,22 @@ export class AnnasArchiveManager {
         return null;
       }
 
-      const ipfsHost = process.env.IPFS_HOST || '127.0.0.1';
-      const ipfsPort = process.env.IPFS_API_PORT || '5001';
+      // Use centralized IPFS config
+      const ipfsApiUrl = ipfsConfig.apiUrl || 'http://127.0.0.1:5001';
+      const ipfsApiToken = ipfsConfig.apiToken;
 
-      // Use curl to POST file to IPFS API (more reliable multipart handling)
-      const curlCmd = `curl -s -X POST "http://${ipfsHost}:${ipfsPort}/api/v0/add?pin=true&quiet=true" -F "file=@${filePath}"`;
+      // Build curl command with optional authentication
+      let curlCmd = `curl -s -X POST "${ipfsApiUrl}/api/v0/add?pin=true&quiet=true"`;
+      
+      // Add Authorization header if token is configured
+      if (ipfsApiToken) {
+        curlCmd += ` -H "Authorization: Bearer ${ipfsApiToken}"`;
+      }
+      
+      curlCmd += ` -F "file=@${filePath}"`;
+      
+      loggers.server.debug(`📚 Running IPFS add: ${curlCmd.replace(ipfsApiToken || '', '***')}`);
+      
       const result = execSync(curlCmd, {
         encoding: 'utf8',
         timeout: 120000 // 2 minute timeout
