@@ -4,6 +4,7 @@ import fs from 'fs';
 import { createRequire } from 'module';
 import { loggers } from './logger';
 import { torrentConfig, relayConfig, ipfsConfig } from '../config/env-config';
+import { generateAACID, createAACRecord, generateDataFolderName, AACMetadataRecord } from './aac-utils';
 
 // Create require for CJS modules
 const require = createRequire(import.meta.url);
@@ -349,8 +350,9 @@ export class AnnasArchiveManager {
 
   /**
    * Create a torrent from files and start seeding
+   * Uses AAC (Anna's Archive Container) format for metadata
    */
-  public async createTorrent(filePaths: string[]): Promise<{magnetURI: string, infoHash: string, name: string}> {
+  public async createTorrent(filePaths: string[]): Promise<{magnetURI: string, infoHash: string, name: string, aacMetadata?: AACMetadataRecord[]}> {
     if (!this.enabled || !this.client) {
       throw new Error("Anna's Archive integration is not enabled");
     }
@@ -378,6 +380,29 @@ export class AnnasArchiveManager {
             loggers.server.info(`📚 Seed callback fired for: ${torrent.name}`);
             loggers.server.info(`📚 InfoHash: ${torrent.infoHash}`);
             loggers.server.info(`📚 Magnet: ${torrent.magnetURI.substring(0, 80)}...`);
+
+            // Generate AAC metadata for each file
+            const aacRecords: AACMetadataRecord[] = [];
+            torrent.files.forEach((file: any) => {
+              const record = createAACRecord(file.name, file.length, {
+                source: 'shogun_relay',
+                additionalMetadata: {
+                  torrentHash: torrent.infoHash,
+                  torrentName: torrent.name,
+                  filePath: file.path
+                }
+              });
+              aacRecords.push(record);
+              loggers.server.debug(`📚 Generated AACID for ${file.name}: ${record.aacid}`);
+            });
+
+            // Save AAC metadata to file
+            if (aacRecords.length > 0) {
+              const metadataFile = path.join(this.dataDir, `${torrent.infoHash}_aac_metadata.jsonl`);
+              const jsonlContent = aacRecords.map(r => JSON.stringify(r)).join('\n');
+              fs.writeFileSync(metadataFile, jsonlContent);
+              loggers.server.info(`📚 AAC metadata saved to: ${metadataFile}`);
+            }
 
             // Log tracker events for debugging
             torrent.on('warning', (warn: any) => {
@@ -412,7 +437,8 @@ export class AnnasArchiveManager {
             resolve({
               magnetURI: torrent.magnetURI,
               infoHash: torrent.infoHash,
-              name: torrent.name
+              name: torrent.name,
+              aacMetadata: aacRecords
             });
           } catch (callbackError: any) {
             loggers.server.error({ err: callbackError }, `📚 Error in seed callback`);
