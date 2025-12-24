@@ -441,16 +441,18 @@
         }
 
         async function removeTorrent(infoHash) {
-            if (!confirm('Remove this torrent? Files will be kept on disk.')) return;
+            if (!confirm('Remove this torrent and delete files from disk?')) return;
 
             try {
-                const response = await fetch(`/api/v1/annas-archive/remove/${infoHash}`, { method: 'DELETE' });
+                const response = await fetch(`/api/v1/annas-archive/remove/${infoHash}?deleteFiles=true`, { method: 'DELETE' });
                 const json = await response.json();
                 if (json.success) {
+                    showToast('✅ Torrent and files removed');
                     updateDashboard();
                 }
             } catch (err) {
                 console.error('Failed to remove torrent', err);
+                showToast('❌ Failed to remove torrent', true);
             }
         }
 
@@ -553,12 +555,12 @@
                                     </summary>
                                     <div style="margin-top: 12px; max-height: 300px; overflow-y: auto;">
                                         ${torrentList.map(([hash, torrent]) => {
-                                            // Handle different data formats from GunDB
-                                            const torrentData = (typeof torrent === 'object' && torrent !== null) ? torrent : {};
-                                            const torrentName = torrentData.name || torrentData.torrentName || hash?.substring(0, 12) + '...' || 'Unknown';
-                                            const fileCount = torrentData.fileCount || torrentData.files?.length || 0;
-                                            const magnetURI = torrentData.magnetURI || torrentData.magnetLink || '';
-                                            return `
+                            // Handle different data formats from GunDB
+                            const torrentData = (typeof torrent === 'object' && torrent !== null) ? torrent : {};
+                            const torrentName = torrentData.name || torrentData.torrentName || hash?.substring(0, 12) + '...' || 'Unknown';
+                            const fileCount = torrentData.fileCount || torrentData.files?.length || 0;
+                            const magnetURI = torrentData.magnetURI || torrentData.magnetLink || '';
+                            return `
                                             <div style="padding: 8px; border-bottom: 1px solid var(--md-outline-variant); display: flex; justify-content: space-between; align-items: center;">
                                                 <div style="flex: 1;">
                                                     <div style="font-weight: 500; font-size: 0.875rem;">${torrentName}</div>
