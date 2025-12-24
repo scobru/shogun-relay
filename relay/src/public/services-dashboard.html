@@ -431,6 +431,50 @@
                 </div>
             </div>
 
+            <!-- Module Status -->
+            <div class="service-card">
+                <div class="service-card-header">
+                    <div class="service-name">
+                        <span id="modules-status-indicator" class="md-status-dot md-status-dot-pulse"></span>
+                        Module Status
+                    </div>
+                    <span id="modules-count" class="md-chip">--</span>
+                </div>
+                <div class="service-card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">IPFS</span>
+                        <span class="stat-value" id="module-ipfs">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Holster</span>
+                        <span class="stat-value" id="module-holster">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">X402</span>
+                        <span class="stat-value" id="module-x402">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Registry</span>
+                        <span class="stat-value" id="module-registry">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Bridge</span>
+                        <span class="stat-value" id="module-bridge">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Deals</span>
+                        <span class="stat-value" id="module-deals">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Anna's Archive</span>
+                        <span class="stat-value" id="module-annas">--</span>
+                    </div>
+                </div>
+                <div class="service-card-footer">
+                    <button onclick="refreshModuleStatus()" class="md-btn md-btn-text">Refresh</button>
+                </div>
+            </div>
+
             <!-- Quick Actions -->
             <div class="quick-actions-card">
                 <h3 class="quick-actions-title">Quick Actions</h3>
@@ -711,9 +755,59 @@
 
         async function refreshAllServices() {
             log('Refreshing all services...');
-            await Promise.all([checkGunStatus(), checkIPFSStatus(), checkHolsterStatus(), checkRPCStatus()]);
+            await Promise.all([checkGunStatus(), checkIPFSStatus(), checkHolsterStatus(), checkRPCStatus(), refreshModuleStatus()]);
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
             log('All services refreshed', 'success');
+        }
+
+        async function refreshModuleStatus() {
+            try {
+                const response = await fetch('/api/v1/health');
+                const data = await response.json();
+
+                if (data.success && data.data && data.data.modules) {
+                    const modules = data.data.modules;
+
+                    // Update each module status
+                    const moduleElements = {
+                        'module-ipfs': modules.ipfs,
+                        'module-holster': modules.holster,
+                        'module-x402': modules.x402,
+                        'module-registry': modules.registry,
+                        'module-bridge': modules.bridge,
+                        'module-deals': modules.deals,
+                        'module-annas': modules.annasArchive
+                    };
+
+                    let enabledCount = 0;
+                    let totalCount = 0;
+
+                    for (const [elementId, enabled] of Object.entries(moduleElements)) {
+                        const element = document.getElementById(elementId);
+                        if (element) {
+                            if (enabled === true) {
+                                element.textContent = '✅ Enabled';
+                                element.style.color = 'var(--md-success)';
+                                enabledCount++;
+                            } else if (enabled === false) {
+                                element.textContent = '❌ Disabled';
+                                element.style.color = 'var(--md-error)';
+                            } else {
+                                element.textContent = '--';
+                            }
+                            if (enabled !== undefined) totalCount++;
+                        }
+                    }
+
+                    document.getElementById('modules-count').textContent = `${enabledCount}/${totalCount}`;
+                    updateStatusIndicator('modules', enabledCount > 0 ? 'online' : 'warning');
+                    return true;
+                }
+            } catch (error) {
+                log(`Module status check failed: ${error.message}`, 'error');
+                updateStatusIndicator('modules', 'offline');
+            }
+            return false;
         }
 
         async function healthCheck() {

@@ -75,7 +75,7 @@ import annasArchiveRouter from "./annas-archive";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import { authConfig, ipfsConfig, registryConfig, packageConfig, x402Config, bridgeConfig, dealsConfig, annasArchiveConfig } from "../config";
+import { authConfig, ipfsConfig, registryConfig, packageConfig, x402Config, bridgeConfig, dealsConfig, annasArchiveConfig, holsterConfig } from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -812,6 +812,7 @@ export default (app: express.Application) => {
         uptime: process.uptime(),
         modules: {
           ipfs: ipfsConfig.enabled,
+          holster: holsterConfig.enabled,
           x402: x402Config.enabled,
           deals: dealsConfig.enabled,
           registry: registryConfig.enabled,
