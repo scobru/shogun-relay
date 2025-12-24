@@ -24,6 +24,7 @@ export interface CatalogEntry {
     path: string;
     size: number;
     ipfsCid?: string;
+    aacid?: string;
   }[];
 }
 
@@ -854,11 +855,15 @@ export class AnnasArchiveManager {
           const existingEntry = this.catalog.get(normalizedHash);
           const existingFile = existingEntry?.files.find(f => f.path === file.path);
           
+          // Generate AACID for this file
+          const aacid = generateAACID('files', file.name);
+          
           entry.files.push({
             name: file.name,
             path: file.path,
             size: file.length,
-            ipfsCid: existingFile?.ipfsCid // Preserve existing CID if any
+            ipfsCid: existingFile?.ipfsCid, // Preserve existing CID if any
+            aacid: existingFile?.aacid || aacid // Preserve existing AACID or generate new
           });
         }
       } else {

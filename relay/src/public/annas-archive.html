@@ -711,6 +711,7 @@
                     filesDiv.innerHTML = torrent.files.map(f => {
                         const catalogFile = catalogEntry?.files.find(cf => cf.name === f.name);
                         const ipfsCid = catalogFile?.ipfsCid;
+                        const aacid = catalogFile?.aacid;
 
                         return `
                         <div class="file-item">
@@ -719,6 +720,14 @@
                                 <div style="font-size: 0.75rem; color: var(--md-on-surface-variant); margin-top: 4px;">
                                     Path: ${f.path}
                                 </div>
+                                ${aacid ? `
+                                <div style="font-size: 0.7rem; color: var(--md-tertiary); margin-top: 4px; font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                                    <span title="${aacid}">AACID: ${aacid.substring(0, 40)}...</span>
+                                    <button onclick="navigator.clipboard.writeText('${aacid}')" style="padding: 2px 6px; font-size: 0.65rem; border-radius: 4px; border: 1px solid var(--md-outline); background: transparent; cursor: pointer;" title="Copy AACID">
+                                        📋
+                                    </button>
+                                </div>
+                                ` : ''}
                                 ${ipfsCid ? `
                                 <div style="font-size: 0.75rem; color: var(--md-primary); margin-top: 4px; display: flex; align-items: center; gap: 8px;">
                                     <span>IPFS: ${ipfsCid.substring(0, 12)}...${ipfsCid.substring(ipfsCid.length - 6)}</span>
