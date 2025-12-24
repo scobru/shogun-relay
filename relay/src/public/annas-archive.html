@@ -552,19 +552,25 @@
                                         View Torrents (${torrentList.length})
                                     </summary>
                                     <div style="margin-top: 12px; max-height: 300px; overflow-y: auto;">
-                                        ${torrentList.map(([hash, torrent]) => `
+                                        ${torrentList.map(([hash, torrent]) => {
+                                            // Handle different data formats from GunDB
+                                            const torrentData = (typeof torrent === 'object' && torrent !== null) ? torrent : {};
+                                            const torrentName = torrentData.name || torrentData.torrentName || hash?.substring(0, 12) + '...' || 'Unknown';
+                                            const fileCount = torrentData.fileCount || torrentData.files?.length || 0;
+                                            const magnetURI = torrentData.magnetURI || torrentData.magnetLink || '';
+                                            return `
                                             <div style="padding: 8px; border-bottom: 1px solid var(--md-outline-variant); display: flex; justify-content: space-between; align-items: center;">
                                                 <div style="flex: 1;">
-                                                    <div style="font-weight: 500; font-size: 0.875rem;">${torrent.name}</div>
+                                                    <div style="font-weight: 500; font-size: 0.875rem;">${torrentName}</div>
                                                     <div style="font-size: 0.75rem; color: var(--md-on-surface-variant);">
-                                                        ${torrent.files?.length || 0} files
+                                                        ${fileCount} files
                                                     </div>
                                                 </div>
-                                                <button onclick="addTorrentFromNetwork('${torrent.magnetURI}')" class="btn-small">
+                                                ${magnetURI ? `<button onclick="addTorrentFromNetwork('${magnetURI}')" class="btn-small">
                                                     ➕ Add
-                                                </button>
+                                                </button>` : '<span style="color: var(--md-on-surface-variant); font-size: 0.75rem;">No magnet</span>'}
                                             </div>
-                                        `).join('')}
+                                        `}).join('')}
                                     </div>
                                 </details>
                             </div>

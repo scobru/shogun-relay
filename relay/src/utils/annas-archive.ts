@@ -522,8 +522,32 @@ export class AnnasArchiveManager {
         resolve(Array.from(relays.values()));
       }, 8000);
 
-      // Search in BOTH paths: relays/{host}/annasArchive AND annas-archive/catalog
-      
+      // Helper to fetch torrents for a relay
+      const fetchTorrentsForRelay = (relayKey: string, baseData: any, path: string) => {
+        // Get the torrents object separately (GunDB doesn't inline nested objects)
+        this.gun.get(path.split('/')[0])
+          .get(path.includes('annas-archive') ? 'catalog' : relayKey)
+          .get(path.includes('annas-archive') ? relayKey : 'annasArchive')
+          .get('torrents')
+          .once((torrentsData: any) => {
+            if (torrentsData) {
+              // Clean GunDB metadata from torrents
+              const cleanTorrents: any = {};
+              Object.keys(torrentsData).forEach(key => {
+                if (key !== '_' && key !== '#' && typeof torrentsData[key] === 'object' && torrentsData[key] !== null) {
+                  cleanTorrents[key] = torrentsData[key];
+                }
+              });
+              
+              loggers.server.info(`📚 Fetched torrents for ${relayKey?.substring(0, 12)}...: ${Object.keys(cleanTorrents).length} torrents`);
+              
+              const existingRelay = relays.get(relayKey) || { relayKey, ...baseData };
+              existingRelay.torrents = cleanTorrents;
+              relays.set(relayKey, existingRelay);
+            }
+          });
+      };
+
       // Path 1: Check under relays path (same as network-stats)
       this.gun.get('relays')
         .map()
@@ -537,10 +561,38 @@ export class AnnasArchiveManager {
             .once((annasData: any) => {
               if (annasData && annasData.relayUrl) {
                 loggers.server.debug(`📚 Found relay via relays path: ${host?.substring(0, 20)}...`);
-                relays.set(host, {
-                  relayKey: host,
-                  ...annasData
-                });
+                
+                // Base data without torrents (will be fetched separately)
+                const baseData = {
+                  relayUrl: annasData.relayUrl,
+                  ipfsGateway: annasData.ipfsGateway,
+                  lastUpdated: annasData.lastUpdated,
+                  torrentCount: annasData.torrentCount,
+                  torrents: {}
+                };
+                
+                relays.set(host, { relayKey: host, ...baseData });
+                
+                // Fetch torrents separately
+                this.gun.get('relays')
+                  .get(host)
+                  .get('annasArchive')
+                  .get('torrents')
+                  .once((torrentsData: any) => {
+                    if (torrentsData) {
+                      const cleanTorrents: any = {};
+                      Object.keys(torrentsData).forEach(key => {
+                        if (key !== '_' && key !== '#' && torrentsData[key] && typeof torrentsData[key] === 'object') {
+                          cleanTorrents[key] = torrentsData[key];
+                        }
+                      });
+                      const relay = relays.get(host);
+                      if (relay) {
+                        relay.torrents = cleanTorrents;
+                        loggers.server.info(`📚 Updated ${host?.substring(0, 12)}... with ${Object.keys(cleanTorrents).length} torrents`);
+                      }
+                    }
+                  });
               }
             });
         });
@@ -552,10 +604,37 @@ export class AnnasArchiveManager {
         .once((relayData: any, relayKey: string) => {
           if (relayData && relayKey !== this.relayKey && !relays.has(relayKey)) {
             loggers.server.debug(`📚 Found relay via legacy path: ${relayKey?.substring(0, 20)}...`);
-            relays.set(relayKey, {
-              relayKey,
-              ...relayData
-            });
+            
+            const baseData = {
+              relayUrl: relayData.relayUrl,
+              ipfsGateway: relayData.ipfsGateway,
+              lastUpdated: relayData.lastUpdated,
+              torrentCount: relayData.torrentCount,
+              torrents: {}
+            };
+            
+            relays.set(relayKey, { relayKey, ...baseData });
+            
+            // Fetch torrents separately for legacy path too
+            this.gun.get('annas-archive')
+              .get('catalog')
+              .get(relayKey)
+              .get('torrents')
+              .once((torrentsData: any) => {
+                if (torrentsData) {
+                  const cleanTorrents: any = {};
+                  Object.keys(torrentsData).forEach(key => {
+                    if (key !== '_' && key !== '#' && torrentsData[key] && typeof torrentsData[key] === 'object') {
+                      cleanTorrents[key] = torrentsData[key];
+                    }
+                  });
+                  const relay = relays.get(relayKey);
+                  if (relay) {
+                    relay.torrents = cleanTorrents;
+                    loggers.server.info(`📚 Updated legacy ${relayKey?.substring(0, 12)}... with ${Object.keys(cleanTorrents).length} torrents`);
+                  }
+                }
+              });
           }
         });
 
@@ -563,10 +642,16 @@ export class AnnasArchiveManager {
       setTimeout(() => {
         clearTimeout(timeout);
         loggers.server.info(`📚 Network discovery complete. Found ${relays.size} other relays`);
+        // Log the actual data structure for debugging
+        relays.forEach((relay, key) => {
+          const torrentCount = Object.keys(relay.torrents || {}).length;
+          loggers.server.debug(`📚 Relay ${key?.substring(0, 12)}...: ${torrentCount} torrents, URL: ${relay.relayUrl}`);
+        });
         resolve(Array.from(relays.values()));
       }, 5000);
     });
   }
+
 
   /**
    * Add a file to IPFS and pin it using the IPFS HTTP API
