@@ -136,8 +136,8 @@ export class AnnasArchiveManager {
       // Dynamic import for WebTorrent if needed, or just use the imported one
        // @ts-ignore - WebTorrent types might be tricky with ESM/CommonJS mix
       this.client = new WebTorrent({
-          // @ts-ignore - Disable uTP to avoid segmentation faults on Alpine Linux (utp-native)
-          utp: false,
+          // @ts-ignore - Enable uTP for better compatibility with traditional clients (safe on Debian)
+          utp: true,
           // Enable DHT for distributed peer discovery (essential for seeding)
           dht: true,
           // Enable Local Service Discovery for LAN peers
