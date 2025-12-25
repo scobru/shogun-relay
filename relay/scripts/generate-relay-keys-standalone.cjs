@@ -64,10 +64,8 @@ if (verbose && !outputPath) {
 
 generateRelayKeys(outputPath)
   .then(() => {
-    if (!outputPath) {
-      // If no output path, exit silently (JSON is in stdout)
-      process.exit(0);
-    }
+    // Force exit - GunDB keeps the process alive otherwise
+    process.exit(0);
   })
   .catch((error) => {
     console.error('Fatal error:', error);
