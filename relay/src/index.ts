@@ -697,7 +697,7 @@ async function initializeServer() {
         loggers.server.info(
           `✅ Generated and saved new keypair to ${keypairFilePath}`
         );
-        loggers.server.info({ pub: newKeyPair.pub.substring(0, 30) }, `🔑 Public key`);
+        loggers.server.info({ pub: newKeyPair.pub, pubLength: newKeyPair.pub.length }, `🔑 Public key (generated)`);
         loggers.server.warn(`⚠️ IMPORTANT: Save this keypair file securely!`);
       } else {
         // File exists, load it
@@ -760,7 +760,7 @@ async function initializeServer() {
         relayKeyPair = newKeyPair;
 
         loggers.server.info(`✅ Generated new keypair at ${keyPairPath}`);
-        loggers.server.info({ pub: newKeyPair.pub.substring(0, 30) }, `🔑 Public key`);
+        loggers.server.info({ pub: newKeyPair.pub, pubLength: newKeyPair.pub.length }, `🔑 Public key (auto-generated)`);
         loggers.server.warn(
           `⚠️ IMPORTANT: Save this keypair file securely or set RELAY_SEA_KEYPAIR_PATH!`
         );
@@ -802,7 +802,7 @@ See docs/RELAY_KEYS.md for more information.
     app.set("relayUserPub", relayPub);
     app.set("relayKeyPair", relayKeyPair);
     loggers.server.info(`✅ Relay GunDB user initialized with SEA keypair`);
-    loggers.server.info({ pub: relayPub?.substring(0, 30) }, `🔑 Relay public key`);
+    loggers.server.info({ pub: relayPub, pubLength: relayPub?.length }, `🔑 Relay public key`);
   } catch (error: any) {
     loggers.server.error({ err: error }, "❌ Failed to initialize relay with keypair");
     throw new Error(`Failed to initialize relay user: ${error.message}`);
@@ -1135,6 +1135,7 @@ See docs/RELAY_KEYS.md for more information.
         },
         relay: {
           pub: relayPub || null,
+          pubLength: relayPub?.length || 0,
           name: relayConfig.name,
           host,
           port,

@@ -97,7 +97,7 @@ async function initRelayUserWithKeyPair(
       relayKeyPair = keyPair;
       isInitialized = true;
 
-      log.debug({ pub: relayPub?.substring(0, 30) }, "Relay user authenticated with keypair");
+      log.debug({ pub: relayPub, pubLength: relayPub?.length }, "Relay user authenticated with keypair");
       resolve({ user: relayUser, pub: relayPub!, keyPair: relayKeyPair });
     });
   });
