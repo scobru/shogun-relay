@@ -976,11 +976,169 @@
             }
         }
 
+        // Chain ID to name mapping
+        const chainNames = {
+            1: 'Ethereum',
+            5: 'Goerli',
+            10: 'Optimism',
+            56: 'BSC',
+            137: 'Polygon',
+            8453: 'Base',
+            42161: 'Arbitrum',
+            11155111: 'Sepolia',
+            84532: 'Base Sepolia'
+        };
+
+        function getChainName(chainId) {
+            return chainNames[chainId] || `Chain ${chainId}`;
+        }
+
+        // x402 Status
+        async function refreshX402Status() {
+            try {
+                // Check if module is enabled first
+                const healthResponse = await fetch('/api/v1/health');
+                const healthData = await healthResponse.json();
+                const isEnabled = healthData.success && healthData.data?.modules?.x402;
+
+                if (!isEnabled) {
+                    document.getElementById('x402-status').textContent = 'Disabled';
+                    updateStatusIndicator('x402', 'offline');
+                    return;
+                }
+
+                // Load config
+                const configResponse = await fetch('/api/v1/x402/config');
+                if (configResponse.ok) {
+                    const configData = await configResponse.json();
+                    if (configData.success && configData.config) {
+                        const config = configData.config;
+                        document.getElementById('x402-status').textContent = 'Active';
+                        document.getElementById('x402-chain').textContent = getChainName(config.chainId);
+                        document.getElementById('x402-chain-badge').textContent = getChainName(config.chainId);
+                        document.getElementById('x402-token').textContent = config.paymentTokenSymbol || 'USDC';
+                        document.getElementById('x402-facilitator').textContent = config.facilitatorUrl || '--';
+                        updateStatusIndicator('x402', 'online');
+                    }
+                }
+
+                // Load tiers
+                const tiersResponse = await fetch('/api/v1/x402/tiers');
+                if (tiersResponse.ok) {
+                    const tiersData = await tiersResponse.json();
+                    if (tiersData.success && tiersData.tiers) {
+                        const tiersContainer = document.getElementById('x402-tiers');
+                        tiersContainer.innerHTML = tiersData.tiers.map(tier =>
+                            `<span class="md-chip" style="font-size: 11px; padding: 2px 8px;">${tier.name}</span>`
+                        ).join('');
+                    }
+                }
+                log('x402 status refreshed', 'success');
+            } catch (error) {
+                document.getElementById('x402-status').textContent = 'Error';
+                updateStatusIndicator('x402', 'offline');
+                log(`x402 check failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Deals Status
+        async function refreshDealsStatus() {
+            try {
+                // Check if module is enabled first
+                const healthResponse = await fetch('/api/v1/health');
+                const healthData = await healthResponse.json();
+                const isEnabled = healthData.success && healthData.data?.modules?.deals;
+
+                if (!isEnabled) {
+                    document.getElementById('deals-status').textContent = 'Disabled';
+                    updateStatusIndicator('deals', 'offline');
+                    return;
+                }
+
+                const response = await fetch('/api/v1/deals/stats');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.stats) {
+                        const stats = data.stats;
+                        document.getElementById('deals-status').textContent = 'Active';
+                        document.getElementById('deals-active').textContent = stats.active || 0;
+                        document.getElementById('deals-completed').textContent = stats.completed || 0;
+                        document.getElementById('deals-total').textContent = stats.total || 0;
+                        document.getElementById('deals-summary').textContent = `${stats.active || 0} active`;
+
+                        const totalValue = stats.totalValue || 0;
+                        document.getElementById('deals-value').textContent =
+                            totalValue > 0 ? `${(totalValue / 1e18).toFixed(4)} ETH` : '0 ETH';
+
+                        const storageBytes = stats.totalStorage || 0;
+                        document.getElementById('deals-storage').textContent = formatBytes(storageBytes);
+
+                        updateStatusIndicator('deals', stats.active > 0 ? 'online' : 'warning');
+                    }
+                } else {
+                    document.getElementById('deals-status').textContent = 'Active (no stats)';
+                    updateStatusIndicator('deals', 'warning');
+                }
+                log('Deals status refreshed', 'success');
+            } catch (error) {
+                document.getElementById('deals-status').textContent = 'Error';
+                updateStatusIndicator('deals', 'offline');
+                log(`Deals check failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Bridge Status
+        async function refreshBridgeStatus() {
+            try {
+                // Check if module is enabled first
+                const healthResponse = await fetch('/api/v1/health');
+                const healthData = await healthResponse.json();
+                const isEnabled = healthData.success && healthData.data?.modules?.bridge;
+
+                if (!isEnabled) {
+                    document.getElementById('bridge-status').textContent = 'Disabled';
+                    updateStatusIndicator('bridge', 'offline');
+                    return;
+                }
+
+                const response = await fetch('/api/v1/bridge/state');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.state) {
+                        const state = data.state;
+                        document.getElementById('bridge-status').textContent = 'Active';
+                        document.getElementById('bridge-chain').textContent = getChainName(state.chainId);
+                        document.getElementById('bridge-chain-badge').textContent = getChainName(state.chainId);
+                        document.getElementById('bridge-users').textContent = state.totalUsers || 0;
+                        document.getElementById('bridge-deposits').textContent = state.totalDeposits || 0;
+                        document.getElementById('bridge-withdrawals').textContent = state.totalWithdrawals || 0;
+                        document.getElementById('bridge-pending').textContent = state.pendingWithdrawals || 0;
+                        updateStatusIndicator('bridge', 'online');
+                    }
+                } else {
+                    document.getElementById('bridge-status').textContent = 'Active';
+                    updateStatusIndicator('bridge', 'warning');
+                }
+                log('Bridge status refreshed', 'success');
+            } catch (error) {
+                document.getElementById('bridge-status').textContent = 'Error';
+                updateStatusIndicator('bridge', 'offline');
+                log(`Bridge check failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Refresh all blockchain services
+        async function refreshBlockchainServices() {
+            await Promise.all([refreshX402Status(), refreshDealsStatus(), refreshBridgeStatus()]);
+        }
+
         // Initialize
         window.addEventListener('DOMContentLoaded', async () => {
             ShogunAdmin.init();
             await refreshAllServices();
+            await refreshBlockchainServices();
             updateInterval = setInterval(refreshAllServices, 30000);
+            setInterval(refreshBlockchainServices, 60000); // Refresh blockchain services every minute
         });
     </script>
 </body>
