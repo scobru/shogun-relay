@@ -48,7 +48,7 @@ import {
   createProductionErrorHandler,
 } from "./utils/security";
 import { startPeriodicPeerSync } from "./utils/peer-discovery";
-import { annasArchiveManager } from "./utils/annas-archive";
+import { torrentManager } from "./utils/torrent";
 
 dotenv.config();
 
@@ -2193,11 +2193,11 @@ See docs/RELAY_KEYS.md for more information.
 
   loggers.server.info({ host, port }, `🚀 Shogun Relay Server running`);
 
-  // Initialize Anna's Archive integration
+  // Initialize Torrent integration
   try {
-    await annasArchiveManager.start(relayPub, gun);
+    await torrentManager.start(relayPub, gun);
   } catch (error) {
-    loggers.server.error({ err: error }, "❌ Failed to initialize Anna's Archive integration");
+    loggers.server.error({ err: error }, "❌ Failed to initialize Torrent integration");
   }
 
   return {

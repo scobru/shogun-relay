@@ -651,7 +651,7 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
           },
         },
       },
-      "/api/v1/annas-archive/status": {
+      "/api/v1/torrent/status": {
         get: {
           tags: ["Anna's Archive"],
           summary: "Get integration status",
@@ -683,7 +683,7 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
           },
         },
       },
-      "/api/v1/annas-archive/add": {
+      "/api/v1/torrent/add": {
         post: {
           tags: ["Anna's Archive"],
           summary: "Add manual torrent",
@@ -4278,3 +4278,4 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
     },
   };
 }
+

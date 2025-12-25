@@ -284,7 +284,7 @@
                 </div>
                 <div class="stat-card" style="flex: 1; padding: 16px;">
                     <div class="stat-label">Catalog Endpoint</div>
-                    <a href="/api/v1/annas-archive/catalog" target="_blank" class="md-body-small"
+                    <a href="/api/v1/torrent/catalog" target="_blank" class="md-body-small"
                         style="color: var(--md-primary);">
                         View JSON →
                     </a>
@@ -360,7 +360,7 @@
             status.style.color = "var(--md-text-secondary)";
 
             try {
-                const response = await fetch('/api/v1/annas-archive/add', {
+                const response = await fetch('/api/v1/torrent/add', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ magnet })
@@ -392,7 +392,7 @@
             status.style.color = "var(--md-text-secondary)";
 
             try {
-                const response = await fetch('/api/v1/annas-archive/refetch', {
+                const response = await fetch('/api/v1/torrent/refetch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ maxTb })
@@ -421,7 +421,7 @@
             status.style.color = "var(--md-text-secondary)";
 
             try {
-                const response = await fetch('/api/v1/annas-archive/refresh-catalog', {
+                const response = await fetch('/api/v1/torrent/refresh-catalog', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -443,7 +443,7 @@
 
         async function updateDashboard() {
             try {
-                const response = await fetch('/api/v1/annas-archive/status');
+                const response = await fetch('/api/v1/torrent/status');
                 const json = await response.json();
 
                 if (!json.success) return;
@@ -526,7 +526,7 @@
 
         async function updateCatalog() {
             try {
-                const response = await fetch('/api/v1/annas-archive/catalog');
+                const response = await fetch('/api/v1/torrent/catalog');
                 const json = await response.json();
 
                 if (json.success) {
@@ -540,7 +540,7 @@
 
         async function pauseTorrent(infoHash) {
             try {
-                const response = await fetch(`/api/v1/annas-archive/pause/${infoHash}`, { method: 'POST' });
+                const response = await fetch(`/api/v1/torrent/pause/${infoHash}`, { method: 'POST' });
                 const json = await response.json();
                 if (json.success) {
                     updateDashboard();
@@ -552,7 +552,7 @@
 
         async function resumeTorrent(infoHash) {
             try {
-                const response = await fetch(`/api/v1/annas-archive/resume/${infoHash}`, { method: 'POST' });
+                const response = await fetch(`/api/v1/torrent/resume/${infoHash}`, { method: 'POST' });
                 const json = await response.json();
                 if (json.success) {
                     updateDashboard();
@@ -566,7 +566,7 @@
             if (!confirm('Remove this torrent and delete files from disk?')) return;
 
             try {
-                const response = await fetch(`/api/v1/annas-archive/remove/${infoHash}?deleteFiles=true`, { method: 'DELETE' });
+                const response = await fetch(`/api/v1/torrent/remove/${infoHash}?deleteFiles=true`, { method: 'DELETE' });
                 const json = await response.json();
                 if (json.success) {
                     showToast('✅ Torrent and files removed');
@@ -620,7 +620,7 @@
             btn.disabled = true;
 
             try {
-                const response = await fetch('/api/v1/annas-archive/pin', {
+                const response = await fetch('/api/v1/torrent/pin', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ infoHash, filePath })
@@ -660,7 +660,7 @@
             resultsDiv.innerHTML = '<div class="md-text-center">🔍 Searching...</div>';
 
             try {
-                const response = await fetch(`/api/v1/annas-archive/registry/search?q=${encodeURIComponent(query)}`);
+                const response = await fetch(`/api/v1/torrent/registry/search?q=${encodeURIComponent(query)}`);
                 const json = await response.json();
 
                 if (json.success && json.results.length > 0) {
@@ -679,7 +679,7 @@
             resultsDiv.innerHTML = '<div class="md-text-center">📋 Loading registry...</div>';
 
             try {
-                const response = await fetch('/api/v1/annas-archive/registry/browse?limit=50');
+                const response = await fetch('/api/v1/torrent/registry/browse?limit=50');
                 const json = await response.json();
 
                 if (json.success && json.results.length > 0) {
@@ -728,7 +728,7 @@
 
         async function addTorrentFromRegistry(magnetURI) {
             try {
-                const response = await fetch('/api/v1/annas-archive/add', {
+                const response = await fetch('/api/v1/torrent/add', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ magnet: magnetURI })
@@ -752,7 +752,7 @@
             relaysDiv.innerHTML = '<div class="md-text-center">🔍 Discovering network...</div>';
 
             try {
-                const response = await fetch('/api/v1/annas-archive/network');
+                const response = await fetch('/api/v1/torrent/network');
                 const json = await response.json();
 
                 if (json.success && json.network.length > 0) {
@@ -821,14 +821,14 @@
             if (!filesDiv) return;
 
             try {
-                const response = await fetch(`/api/v1/annas-archive/files/${infoHash}`);
+                const response = await fetch(`/api/v1/torrent/files/${infoHash}`);
                 const json = await response.json();
 
                 if (json.success && json.data.torrents.length > 0) {
                     const torrent = json.data.torrents[0];
 
                     // Also fetch catalog to get IPFS CIDs
-                    const catalogResponse = await fetch('/api/v1/annas-archive/catalog');
+                    const catalogResponse = await fetch('/api/v1/torrent/catalog');
                     const catalogJson = await catalogResponse.json();
                     const catalogEntry = catalogJson.success ?
                         catalogJson.catalog.find(e => e.torrentHash === infoHash) : null;
@@ -931,7 +931,7 @@
                 statusText.textContent = 'Creating torrent on server...';
 
                 // Upload to server and create torrent
-                const response = await fetch('/api/v1/annas-archive/create', {
+                const response = await fetch('/api/v1/torrent/create', {
                     method: 'POST',
                     body: formData
                 });

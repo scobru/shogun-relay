@@ -29,7 +29,7 @@ export interface CatalogEntry {
 }
 
 // Define a simple interface for the status
-export interface AnnasArchiveStatus {
+export interface TorrentStatus {
   enabled: boolean;
   activeTorrents: number;
   downloadSpeed: number;
@@ -47,7 +47,7 @@ export interface AnnasArchiveStatus {
   }[];
 }
 
-export class AnnasArchiveManager {
+export class TorrentManager {
   private client: WebTorrent.Instance | null = null;
   private enabled: boolean;
   private dataDir: string;
@@ -109,7 +109,7 @@ export class AnnasArchiveManager {
    */
   public async start(relayPubKey?: string, gunInstance?: any): Promise<void> {
     if (!this.enabled) {
-      loggers.server.info("📚 Anna's Archive integration is DISABLED");
+      loggers.server.info("📚 Torrent integration is DISABLED");
       return;
     }
 
@@ -125,7 +125,7 @@ export class AnnasArchiveManager {
       loggers.server.info(`📚 Using relay public key: ${relayPubKey.substring(0, 20)}...`);
     }
 
-    loggers.server.info("📚 Initializing Anna's Archive Manager...");
+    loggers.server.info("📚 Initializing Torrent Manager...");
     
     // Ensure data directory exists
     if (!fs.existsSync(this.dataDir)) {
@@ -150,10 +150,10 @@ export class AnnasArchiveManager {
       });
 
       this.client.on('error', (err) => {
-          loggers.server.error({ err }, "📚 Anna's Archive WebTorrent Error");
+          loggers.server.error({ err }, "📚 Torrent WebTorrent Error");
       });
 
-      loggers.server.info(`📚 Anna's Archive Manager started. Data dir: ${this.dataDir}`);
+      loggers.server.info(`📚 Torrent Manager started. Data dir: ${this.dataDir}`);
       // Load existing catalog
       this.loadCatalog();
       
@@ -167,7 +167,7 @@ export class AnnasArchiveManager {
       await this.loadTorrents();
 
     } catch (error) {
-      loggers.server.error({ err: error }, "📚 Failed to start Anna's Archive Manager");
+      loggers.server.error({ err: error }, "📚 Failed to start Torrent Manager");
     }
   }
 
@@ -206,7 +206,7 @@ export class AnnasArchiveManager {
       allTorrents = [...new Set(allTorrents)];
 
       if (allTorrents.length === 0) {
-          loggers.server.info("📚 No torrents configured for Anna's Archive yet.");
+          loggers.server.info("📚 No torrents configured yet.");
           return;
       }
 
@@ -263,7 +263,7 @@ export class AnnasArchiveManager {
    */
   public async refetchDynamicTorrents(maxTb?: number): Promise<{ added: number; skipped: number; total: number }> {
     if (!this.enabled || !this.client) {
-      throw new Error("Anna's Archive integration is not enabled");
+      throw new Error("Torrent integration is not enabled");
     }
 
     loggers.server.info(`📚 Refetching torrents from Anna's Archive (maxTb: ${maxTb || torrentConfig.maxTb})...`);
@@ -315,7 +315,7 @@ export class AnnasArchiveManager {
     if (this.client) {
       this.client.destroy();
       this.client = null;
-      loggers.server.info("📚 Anna's Archive Manager stopped");
+      loggers.server.info("📚 Torrent Manager stopped");
     }
   }
 
@@ -324,7 +324,7 @@ export class AnnasArchiveManager {
    */
   public addTorrent(magnetOrPath: string): void {
       if (!this.enabled || !this.client) {
-          throw new Error("Anna's Archive integration is not enabled");
+          throw new Error("Torrent integration is not enabled");
       }
 
       this.client.add(magnetOrPath, { path: this.dataDir }, (torrent) => {
@@ -380,7 +380,7 @@ export class AnnasArchiveManager {
    */
   public async createTorrent(filePaths: string[]): Promise<{magnetURI: string, infoHash: string, name: string, aacMetadata?: AACMetadataRecord[]}> {
     if (!this.enabled || !this.client) {
-      throw new Error("Anna's Archive integration is not enabled");
+      throw new Error("Torrent integration is not enabled");
     }
 
     return new Promise((resolve, reject) => {
@@ -696,7 +696,7 @@ export class AnnasArchiveManager {
         if (ownUrl.endsWith('/gun')) ownUrl = ownUrl.slice(0, -4);
         if (relayUrl === ownUrl) continue;
 
-        const catalogUrl = `${relayUrl}/api/v1/annas-archive/catalog`;
+        const catalogUrl = `${relayUrl}/api/v1/torrent/catalog`;
         loggers.server.info(`📚 Fetching catalog from ${catalogUrl}`);
         
         const response = await fetch(catalogUrl, {
@@ -1072,7 +1072,7 @@ export class AnnasArchiveManager {
   /**
    * Get current status
    */
-  public getStatus(): AnnasArchiveStatus {
+  public getStatus(): TorrentStatus {
     if (!this.client || !this.enabled) {
       return {
         enabled: this.enabled,
@@ -1286,4 +1286,4 @@ export class AnnasArchiveManager {
 }
 
 // Export singleton instance
-export const annasArchiveManager = new AnnasArchiveManager();
+export const torrentManager = new TorrentManager();

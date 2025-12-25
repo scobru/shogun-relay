@@ -2,7 +2,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { annasArchiveManager } from "../utils/annas-archive";
+import { torrentManager } from "../utils/torrent";
 import { loggers } from "../utils/logger";
 import { relayConfig, ipfsConfig } from "../config/env-config";
 
@@ -11,7 +11,7 @@ const router = express.Router();
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(process.cwd(), 'data', 'annas-archive', 'uploads');
+    const uploadDir = path.join(process.cwd(), 'data', 'torrents', 'uploads');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -26,17 +26,17 @@ const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } }); // 
 
 /**
  * GET /status
- * Get the current status of Anna's Archive integration/service
+ * Get the current status of the Torrent service
  */
 router.get("/status", async (req, res) => {
   try {
-    const status = annasArchiveManager.getStatus();
+    const status = torrentManager.getStatus();
     res.json({
       success: true,
       data: status,
     });
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to get Anna's Archive status");
+    loggers.server.error({ err: error }, "Failed to get Torrent status");
     res.status(500).json({
       success: false,
       error: error.message || "Internal Server Error",
@@ -59,7 +59,7 @@ router.post("/add", express.json(), async (req, res) => {
         });
     }
 
-    annasArchiveManager.addTorrent(magnet);
+    torrentManager.addTorrent(magnet);
     
     res.json({
       success: true,
@@ -96,7 +96,7 @@ router.post("/create", upload.array('files', 20), async (req, res) => {
     const filePaths = files.map(f => f.path);
     
     // Start torrent creation in background (don't await)
-    annasArchiveManager.createTorrent(filePaths)
+    torrentManager.createTorrent(filePaths)
       .then(result => {
         loggers.server.info(`📚 Torrent created: ${result.name} - ${result.magnetURI.substring(0, 60)}...`);
       })
@@ -128,7 +128,7 @@ router.post("/pause/:infoHash", async (req, res) => {
   try {
     const { infoHash } = req.params;
     
-    annasArchiveManager.pauseTorrent(infoHash);
+    torrentManager.pauseTorrent(infoHash);
     
     res.json({
       success: true,
@@ -151,7 +151,7 @@ router.post("/resume/:infoHash", async (req, res) => {
   try {
     const { infoHash } = req.params;
     
-    annasArchiveManager.resumeTorrent(infoHash);
+    torrentManager.resumeTorrent(infoHash);
     
     res.json({
       success: true,
@@ -175,7 +175,7 @@ router.delete("/remove/:infoHash", async (req, res) => {
     const { infoHash } = req.params;
     const deleteFiles = req.query.deleteFiles === 'true';
     
-    await annasArchiveManager.removeTorrent(infoHash, deleteFiles);
+    await torrentManager.removeTorrent(infoHash, deleteFiles);
     
     res.json({
       success: true,
@@ -205,7 +205,7 @@ router.post("/pin", async (req, res) => {
       });
     }
     
-    const result = await annasArchiveManager.pinFile(infoHash, filePath);
+    const result = await torrentManager.pinFile(infoHash, filePath);
     
     if (result.success) {
       res.json({
@@ -237,7 +237,7 @@ router.get("/files/:infoHash?", async (req, res) => {
   try {
     const { infoHash } = req.params;
     
-    const files = annasArchiveManager.getFiles(infoHash);
+    const files = torrentManager.getFiles(infoHash);
     
     res.json({
       success: true,
@@ -259,7 +259,7 @@ router.get("/files/:infoHash?", async (req, res) => {
  */
 router.get("/catalog", async (req, res) => {
   try {
-    const catalog = annasArchiveManager.getCatalog();
+    const catalog = torrentManager.getCatalog();
     
     // Build public relay URL - strip /gun suffix if present
     let relayEndpoint = relayConfig.endpoint || process.env.PUBLIC_URL || 'http://localhost:3000';
@@ -295,7 +295,7 @@ router.get("/catalog", async (req, res) => {
  */
 router.get("/network", async (req, res) => {
   try {
-    const networkCatalog = await annasArchiveManager.getNetworkCatalog();
+    const networkCatalog = await torrentManager.getNetworkCatalog();
     
     res.json({
       success: true,
@@ -322,7 +322,7 @@ router.post("/refetch", express.json(), async (req, res) => {
   try {
     const maxTb = req.body.maxTb;
     
-    const result = await annasArchiveManager.refetchDynamicTorrents(maxTb);
+    const result = await torrentManager.refetchDynamicTorrents(maxTb);
     
     res.json({
       success: true,
@@ -346,7 +346,7 @@ router.post("/refetch", express.json(), async (req, res) => {
  */
 router.post("/refresh-catalog", async (req, res) => {
   try {
-    const result = annasArchiveManager.refreshCatalog();
+    const result = torrentManager.refreshCatalog();
     
     res.json({
       success: true,
@@ -384,7 +384,7 @@ router.get("/registry/search", async (req, res) => {
       });
     }
     
-    const results = await annasArchiveManager.searchGlobalRegistry(query, limit);
+    const results = await torrentManager.searchGlobalRegistry(query, limit);
     
     res.json({
       success: true,
@@ -409,7 +409,7 @@ router.get("/registry/browse", async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 100;
     
-    const results = await annasArchiveManager.browseGlobalRegistry(limit);
+    const results = await torrentManager.browseGlobalRegistry(limit);
     
     res.json({
       success: true,
@@ -433,7 +433,7 @@ router.get("/registry/check/:infoHash", async (req, res) => {
   try {
     const { infoHash } = req.params;
     
-    const result = await annasArchiveManager.checkTorrentInRegistry(infoHash);
+    const result = await torrentManager.checkTorrentInRegistry(infoHash);
     
     res.json({
       success: true,
@@ -450,3 +450,4 @@ router.get("/registry/check/:infoHash", async (req, res) => {
 });
 
 export default router;
+

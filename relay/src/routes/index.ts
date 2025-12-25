@@ -71,7 +71,7 @@ import networkRouter from "./network";
 import dealsRouter from "./deals";
 import registryRouter from "./registry";
 import bridgeRouter from "./bridge";
-import annasArchiveRouter from "./annas-archive";
+import torrentRouter from "./torrent";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
@@ -540,9 +540,9 @@ export default (app: express.Application) => {
     res.sendFile(path.resolve(publicPath, "endpoints.html"));
   });
 
-  app.get("/annas-archive.html", (req, res) => {
+  app.get("/torrent.html", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "annas-archive.html"));
+    res.sendFile(path.resolve(publicPath, "torrent.html"));
   });
 
   // Route per servire i file JavaScript dalla directory lib
@@ -675,14 +675,14 @@ export default (app: express.Application) => {
     });
   }
 
-  // Route per Anna's Archive (conditional)
+  // Route per Torrent (conditional)
   if (torrentConfig.enabled) {
-    app.use(`${baseRoute}/annas-archive`, annasArchiveRouter);
-    loggers.server.info(`✅ Anna's Archive routes registered`);
+    app.use(`${baseRoute}/torrent`, torrentRouter);
+    loggers.server.info(`✅ Torrent routes registered`);
   } else {
-    loggers.server.info(`⏭️ Anna's Archive routes disabled (ANNAS_ARCHIVE_ENABLED=false)`);
-    app.use(`${baseRoute}/annas-archive/*`, (req, res) => {
-      res.status(503).json({ success: false, error: "Anna's Archive module is disabled" });
+    loggers.server.info(`⏭️ Torrent routes disabled (TORRENT_ENABLED=false)`);
+    app.use(`${baseRoute}/torrent/*`, (req, res) => {
+      res.status(503).json({ success: false, error: "Torrent module is disabled" });
     });
   }
 
