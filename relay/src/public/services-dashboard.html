@@ -503,6 +503,127 @@
             </div>
         </div>
 
+        <!-- Blockchain Services Section -->
+        <h3 class="md-title-large md-mb-md" style="margin-top: 32px;">Blockchain Services Details</h3>
+        <div class="service-grid">
+            <!-- x402 Payments Card -->
+            <div class="service-card">
+                <div class="service-card-header">
+                    <div class="service-name">
+                        <span id="x402-status-indicator" class="md-status-dot md-status-dot-pulse"></span>
+                        x402 Payments
+                    </div>
+                    <span id="x402-chain-badge" class="md-chip">--</span>
+                </div>
+                <div class="service-card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="x402-status">Checking...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Chain</span>
+                        <span class="stat-value" id="x402-chain">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Payment Token</span>
+                        <span class="stat-value" id="x402-token">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Facilitator</span>
+                        <span class="stat-value" id="x402-facilitator"
+                            style="font-size: 11px; word-break: break-all;">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Tiers</span>
+                        <div id="x402-tiers" style="display: flex; gap: 4px; flex-wrap: wrap;">--</div>
+                    </div>
+                </div>
+                <div class="service-card-footer">
+                    <button onclick="refreshX402Status()" class="md-btn md-btn-text">Refresh</button>
+                </div>
+            </div>
+
+            <!-- Storage Deals Card -->
+            <div class="service-card">
+                <div class="service-card-header">
+                    <div class="service-name">
+                        <span id="deals-status-indicator" class="md-status-dot md-status-dot-pulse"></span>
+                        Storage Deals
+                    </div>
+                    <span id="deals-summary" class="md-chip">--</span>
+                </div>
+                <div class="service-card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="deals-status">Checking...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Active Deals</span>
+                        <span class="stat-value" id="deals-active">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Completed Deals</span>
+                        <span class="stat-value" id="deals-completed">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Deals</span>
+                        <span class="stat-value" id="deals-total">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Value</span>
+                        <span class="stat-value" id="deals-value">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Storage Used</span>
+                        <span class="stat-value" id="deals-storage">--</span>
+                    </div>
+                </div>
+                <div class="service-card-footer">
+                    <button onclick="refreshDealsStatus()" class="md-btn md-btn-text">Refresh</button>
+                </div>
+            </div>
+
+            <!-- Token Bridge Card -->
+            <div class="service-card">
+                <div class="service-card-header">
+                    <div class="service-name">
+                        <span id="bridge-status-indicator" class="md-status-dot md-status-dot-pulse"></span>
+                        Token Bridge
+                    </div>
+                    <span id="bridge-chain-badge" class="md-chip">--</span>
+                </div>
+                <div class="service-card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="bridge-status">Checking...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Chain</span>
+                        <span class="stat-value" id="bridge-chain">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Users</span>
+                        <span class="stat-value" id="bridge-users">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Deposits</span>
+                        <span class="stat-value" id="bridge-deposits">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Withdrawals</span>
+                        <span class="stat-value" id="bridge-withdrawals">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Pending Withdrawals</span>
+                        <span class="stat-value" id="bridge-pending">--</span>
+                    </div>
+                </div>
+                <div class="service-card-footer">
+                    <button onclick="refreshBridgeStatus()" class="md-btn md-btn-text">Refresh</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Service Logs -->
         <div class="logs-card">
             <div class="logs-header">
