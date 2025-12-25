@@ -1135,6 +1135,7 @@ See docs/RELAY_KEYS.md for more information.
         },
         relay: {
           pub: relayPub || null,
+          epub: (app.get("relayKeyPair") as any)?.epub || null,
           pubLength: relayPub?.length || 0,
           name: relayConfig.name,
           host,

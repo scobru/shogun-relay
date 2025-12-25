@@ -319,10 +319,19 @@
         <h2>Server Relay Key</h2>
         <div id="serverKeySection">
           <div class="info-row">
-            <span class="info-label">Relay Public Key</span>
-            <span class="info-value address" id="serverRelayPubKey">Loading...</span>
+            <span class="info-label">Signing Key (pub)</span>
+            <span class="info-value address" id="serverRelayPubKey"
+              style="word-break: break-all; font-size: 0.7rem;">Loading...</span>
           </div>
-          <button onclick="useServerKey()" class="md-btn md-btn-outlined" style="width: 100%; margin-top: 16px;">
+          <div class="info-row">
+            <span class="info-label">Encryption Key (epub)</span>
+            <span class="info-value address" id="serverRelayEpubKey"
+              style="word-break: break-all; font-size: 0.7rem;">Loading...</span>
+          </div>
+          <button onclick="copyKeypair()" class="md-btn md-btn-outlined" style="width: 100%; margin-top: 12px;">
+            📋 Copy Full Keypair (JSON)
+          </button>
+          <button onclick="useServerKey()" class="md-btn md-btn-outlined" style="width: 100%; margin-top: 8px;">
             Use Server Relay Key
           </button>
         </div>
@@ -485,19 +494,43 @@
       try {
         const res = await fetch('/health');
         const data = await res.json();
-        const keyDisplay = document.getElementById('serverRelayPubKey');
+        const pubDisplay = document.getElementById('serverRelayPubKey');
+        const epubDisplay = document.getElementById('serverRelayEpubKey');
+
         if (data.relay?.pub) {
-          keyDisplay.textContent = data.relay.pub;
-          keyDisplay.dataset.fullKey = data.relay.pub;
+          pubDisplay.textContent = data.relay.pub;
+          pubDisplay.dataset.fullKey = data.relay.pub;
+          if (data.relay.epub) {
+            epubDisplay.textContent = data.relay.epub;
+            epubDisplay.dataset.fullKey = data.relay.epub;
+          } else {
+            epubDisplay.textContent = 'Not available';
+          }
         } else if (data.relayPub) {
-          keyDisplay.textContent = data.relayPub;
-          keyDisplay.dataset.fullKey = data.relayPub;
+          pubDisplay.textContent = data.relayPub;
+          pubDisplay.dataset.fullKey = data.relayPub;
+          epubDisplay.textContent = 'Not available';
         } else {
-          keyDisplay.textContent = 'Not configured';
+          pubDisplay.textContent = 'Not configured';
+          epubDisplay.textContent = 'Not configured';
         }
       } catch (e) {
         document.getElementById('serverRelayPubKey').textContent = 'Failed to load';
+        document.getElementById('serverRelayEpubKey').textContent = 'Failed to load';
       }
+    }
+
+    function copyKeypair() {
+      const pub = document.getElementById('serverRelayPubKey').dataset.fullKey;
+      const epub = document.getElementById('serverRelayEpubKey').dataset.fullKey;
+      if (!pub || pub === 'Not configured') {
+        showAlert('error', 'Server relay key not available');
+        return;
+      }
+      const keypair = { pub, epub: epub || 'N/A' };
+      navigator.clipboard.writeText(JSON.stringify(keypair, null, 2))
+        .then(() => showAlert('success', 'Public keypair copied to clipboard!'))
+        .catch(() => showAlert('error', 'Failed to copy'));
     }
 
     function useServerKey() {
