@@ -60,6 +60,38 @@ mkdir -p "$KEYS_DIR"
 chown -R node:node "$KEYS_DIR" || true
 chmod 755 "$KEYS_DIR" || true
 
+# Auto-generate SEA keypair if not configured and keypair file doesn't exist
+KEYPAIR_FILE="${RELAY_SEA_KEYPAIR_PATH:-/app/keys/relay-keypair.json}"
+if [ -z "$RELAY_SEA_KEYPAIR" ] && [ ! -f "$KEYPAIR_FILE" ]; then
+    echo "🔑 No SEA keypair found, generating new one at ${KEYPAIR_FILE}..."
+    # Use the standalone script to generate keypair
+    if [ -f "/app/relay/scripts/generate-relay-keys-standalone.cjs" ]; then
+        node /app/relay/scripts/generate-relay-keys-standalone.cjs "$KEYPAIR_FILE" && \
+        echo "✅ SEA keypair generated successfully!" && \
+        chown node:node "$KEYPAIR_FILE" && \
+        chmod 600 "$KEYPAIR_FILE"
+    else
+        # Fallback: generate inline with Node.js
+        echo "⚠️  Standalone script not found, using inline generation..."
+        node -e "
+            const Gun = require('gun');
+            require('gun/sea');
+            Gun.SEA.pair().then(pair => {
+                require('fs').writeFileSync('$KEYPAIR_FILE', JSON.stringify(pair, null, 2));
+                console.log('✅ SEA keypair generated at $KEYPAIR_FILE');
+            });
+        " && chown node:node "$KEYPAIR_FILE" && chmod 600 "$KEYPAIR_FILE"
+    fi
+    # Set the environment variable for this session
+    export RELAY_SEA_KEYPAIR_PATH="$KEYPAIR_FILE"
+else
+    if [ -n "$RELAY_SEA_KEYPAIR" ]; then
+        echo "✅ Using SEA keypair from RELAY_SEA_KEYPAIR environment variable"
+    elif [ -f "$KEYPAIR_FILE" ]; then
+        echo "✅ Using existing SEA keypair from ${KEYPAIR_FILE}"
+    fi
+fi
+
 # Holster data directory
 HOLSTER_DIR="${HOLSTER_RELAY_STORAGE_PATH:-/app/relay/holster-data}"
 echo "🔐 Setting permissions for Holster data volume at ${HOLSTER_DIR}..."
