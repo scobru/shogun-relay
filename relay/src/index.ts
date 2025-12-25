@@ -215,15 +215,9 @@ async function initializeServer() {
   // Fix per rate limiting con proxy
   app.set("trust proxy", 1);
 
-  // ===== ROOT HEALTH CHECK ENDPOINT (for load balancers, k8s probes) =====
-  app.get("/health", (req, res) => {
-    res.status(200).json({
-      status: "healthy",
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      version: packageConfig.version || "1.0.0",
-    });
-  });
+  // ===== ROOT HEALTH CHECK ENDPOINTS (for load balancers, k8s probes) =====
+  // Note: /health endpoint with full details is registered later after initialization
+  // Use /healthz for minimal health checks during startup
 
   // Liveness probe (minimal check)
   app.get("/healthz", (req, res) => {
