@@ -490,7 +490,7 @@
     let relayStatus = null;
     let config = null;
 
-    async function loadServerRelayKey() {
+    async function loadServerRelayKey(retryCount = 0) {
       try {
         const res = await fetch('/health');
         const data = await res.json();
@@ -511,12 +511,26 @@
           pubDisplay.dataset.fullKey = data.relayPub;
           epubDisplay.textContent = 'Not available';
         } else {
+          // If keys are not available yet and we haven't retried too many times, retry
+          if (retryCount < 5) {
+            setTimeout(() => loadServerRelayKey(retryCount + 1), 2000);
+            pubDisplay.textContent = 'Loading...';
+            epubDisplay.textContent = 'Loading...';
+            return;
+          }
           pubDisplay.textContent = 'Not configured';
           epubDisplay.textContent = 'Not configured';
         }
       } catch (e) {
-        document.getElementById('serverRelayPubKey').textContent = 'Failed to load';
-        document.getElementById('serverRelayEpubKey').textContent = 'Failed to load';
+        console.error('Failed to load server relay key:', e);
+        if (retryCount < 5) {
+          setTimeout(() => loadServerRelayKey(retryCount + 1), 2000);
+          document.getElementById('serverRelayPubKey').textContent = 'Retrying...';
+          document.getElementById('serverRelayEpubKey').textContent = 'Retrying...';
+        } else {
+          document.getElementById('serverRelayPubKey').textContent = 'Failed to load';
+          document.getElementById('serverRelayEpubKey').textContent = 'Failed to load';
+        }
       }
     }
 

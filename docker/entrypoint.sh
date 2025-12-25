@@ -62,8 +62,26 @@ chmod 755 "$KEYS_DIR" || true
 
 # Auto-generate SEA keypair if not configured and keypair file doesn't exist
 KEYPAIR_FILE="${RELAY_SEA_KEYPAIR_PATH:-/app/keys/relay-keypair.json}"
+
+# If RELAY_SEA_KEYPAIR_PATH points to a directory, append default filename
+if [ -n "$RELAY_SEA_KEYPAIR_PATH" ] && [ -d "$RELAY_SEA_KEYPAIR_PATH" ]; then
+    echo "📁 RELAY_SEA_KEYPAIR_PATH is a directory, using default filename"
+    KEYPAIR_FILE="${RELAY_SEA_KEYPAIR_PATH}/relay-keypair.json"
+elif [ -n "$RELAY_SEA_KEYPAIR_PATH" ] && [ "${RELAY_SEA_KEYPAIR_PATH: -1}" = "/" ]; then
+    # Handle case where path ends with / (directory notation)
+    KEYPAIR_FILE="${RELAY_SEA_KEYPAIR_PATH}relay-keypair.json"
+fi
+
 if [ -z "$RELAY_SEA_KEYPAIR" ] && [ ! -f "$KEYPAIR_FILE" ]; then
     echo "🔑 No SEA keypair found, generating new one at ${KEYPAIR_FILE}..."
+    # Ensure directory exists
+    KEYPAIR_DIR=$(dirname "$KEYPAIR_FILE")
+    if [ "$KEYPAIR_DIR" != "." ] && [ "$KEYPAIR_DIR" != "/" ]; then
+        mkdir -p "$KEYPAIR_DIR"
+        chown node:node "$KEYPAIR_DIR" || true
+        chmod 755 "$KEYPAIR_DIR" || true
+    fi
+    
     # Use the standalone script to generate keypair
     if [ -f "/app/relay/scripts/generate-relay-keys-standalone.cjs" ]; then
         node /app/relay/scripts/generate-relay-keys-standalone.cjs "$KEYPAIR_FILE" && \
