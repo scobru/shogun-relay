@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import { ethers } from "ethers";
 import { log, getBridgeClient } from "./utils";
+import { bridgeConfig } from "../../config";
 import {
   getUserBalance,
   getLatestBatch,
@@ -247,6 +248,7 @@ router.get("/state", async (req, res) => {
     res.json({
       success: true,
       state: {
+        chainId: bridgeConfig.chainId,
         currentStateRoot: stateRoot,
         currentBatchId: batchId.toString(),
         sequencer,

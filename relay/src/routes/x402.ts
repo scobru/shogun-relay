@@ -542,9 +542,18 @@ router.get("/config", (req, res) => {
     const payToAddress = x402Config.payToAddress;
     const network = x402Config.defaultNetwork || "base-sepolia";
     const configured = !!payToAddress;
+    const chainId = x402Config.chainId;
+    const facilitatorUrl = x402Config.facilitatorUrl;
 
     res.json({
       success: true,
+      config: {
+        chainId,
+        paymentTokenSymbol: "USDC",
+        facilitatorUrl: facilitatorUrl || null,
+        network,
+        payToAddress: payToAddress || null,
+      },
       configured,
       network,
       payToAddress: payToAddress || null,
