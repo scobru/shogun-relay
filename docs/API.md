@@ -1,6 +1,7 @@
 # Shogun Relay API Documentation
 
 ## Base URL
+
 ```
 http://localhost:8765
 ```
@@ -9,22 +10,63 @@ http://localhost:8765
 
 Most endpoints require authentication via one of these methods:
 
+### Admin Authentication
+
 1. **Bearer Token**: `Authorization: Bearer <ADMIN_PASSWORD>`
 2. **Custom Header**: `token: <ADMIN_PASSWORD>`
 3. **Session Token**: `X-Session-Token: <session_id>` (after initial auth)
 
+Admin authentication allows full access to all endpoints without additional requirements.
+
+### User Authentication (Wallet Signature)
+
+For user-based operations (uploads, deals, subscriptions), you need:
+
+1. **Wallet Address**: `X-User-Address: <ethereum_address>`
+2. **Wallet Signature**: `X-Wallet-Signature: <signature>`
+
+The signature must be a valid EIP-191 signature of the message `"I Love Shogun"` signed by the wallet address.
+
+**Example:**
+
+```javascript
+// Using ethers.js
+const message = "I Love Shogun";
+const signature = await signer.signMessage(message);
+
+// Include in request headers
+headers: {
+  'X-User-Address': walletAddress,
+  'X-Wallet-Signature': signature
+}
+```
+
+### Deal Upload Authentication
+
+For storage deal uploads (paid on-chain), you need:
+
+- `X-User-Address: <address>`
+- `X-Wallet-Signature: <signature>`
+- `X-Deal-Upload: true` (or `?deal=true` query parameter)
+
+No subscription required for deal uploads.
+
 ### Rate Limiting
+
 - Max 5 failed authentication attempts per IP per 15 minutes
 - Sessions expire after 24 hours
+- Upload endpoints: 100 requests per hour per IP
 
 ## Endpoints
 
 ### Health & Status
 
 #### GET `/health`
+
 Health check endpoint with detailed system status.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -60,9 +102,11 @@ Health check endpoint with detailed system status.
 ```
 
 #### GET `/metrics`
+
 Detailed metrics for monitoring (requires authentication).
 
 **Response:**
+
 ```json
 {
   "timestamp": 1704067200000,
@@ -91,17 +135,41 @@ Detailed metrics for monitoring (requires authentication).
 ### IPFS Operations
 
 #### POST `/api/v1/ipfs/upload`
+
 Upload a single file to IPFS.
 
+**Authentication Options:**
+
+1. **Admin Upload** (no signature required):
+
+   - `Authorization: Bearer <ADMIN_PASSWORD>`
+   - Optional: `X-User-Address: <address>` (for tracking)
+
+2. **User Upload with Subscription** (requires signature):
+
+   - `X-User-Address: <ethereum_address>`
+   - `X-Wallet-Signature: <signature>` (EIP-191 signature of "I Love Shogun")
+   - Requires active x402 subscription
+
+3. **Deal Upload** (requires signature, no subscription):
+   - `X-User-Address: <ethereum_address>`
+   - `X-Wallet-Signature: <signature>` (EIP-191 signature of "I Love Shogun")
+   - `X-Deal-Upload: true` (or `?deal=true` query parameter)
+
 **Headers:**
+
 - `Content-Type: multipart/form-data`
-- `Authorization: Bearer <token>` (admin) OR `X-User-Address: <address>` (user with subscription)
-- `X-Deal-Upload: true` (optional, for storage deals)
+- Authentication headers (see above)
 
 **Body:**
+
 - `file`: File to upload
+- `encrypted`: `"true"` or `"false"` (optional, for encrypted files)
+- `encryptionMethod`: `"SEA"` (optional, if encrypted)
+- `encryptionToken`: Signature token (optional, for encrypted files)
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -111,22 +179,45 @@ Upload a single file to IPFS.
     "size": 1024,
     "mimetype": "text/plain"
   },
-  "cid": "Qm..."
+  "cid": "Qm...",
+  "authType": "admin" | "user",
+  "mbUsage": {
+    "actualSizeMB": 0.001,
+    "sizeMB": 1,
+    "verified": true
+  },
+  "subscription": {
+    "storageUsedMB": 45.2,
+    "storageRemainingMB": 54.8
+  }
 }
 ```
 
+**Error Responses:**
+
+- `401 Unauthorized`: Missing or invalid authentication
+  - `"Wallet signature required"`: Missing `X-Wallet-Signature` header
+  - `"Invalid wallet signature"`: Signature doesn't match address
+- `402 Payment Required`: No active subscription (for user uploads without deal flag)
+
 #### POST `/api/v1/ipfs/upload-directory`
+
 Upload multiple files as a directory to IPFS. Maintains directory structure using relative paths.
 
+**Authentication:** Same as `/api/v1/ipfs/upload` (see above)
+
 **Headers:**
+
 - `Content-Type: multipart/form-data`
-- `Authorization: Bearer <token>` (admin) OR `X-User-Address: <address>` (user with subscription)
+- Authentication headers (admin token OR wallet signature)
 - `X-Deal-Upload: true` (optional, for storage deals)
 
 **Body:**
+
 - `files`: Multiple files with relative paths (e.g., `index.html`, `css/style.css`, `js/app.js`)
 
 **Example:**
+
 ```bash
 curl -X POST http://localhost:8765/api/v1/ipfs/upload-directory \
   -H "Authorization: Bearer <token>" \
@@ -136,6 +227,7 @@ curl -X POST http://localhost:8765/api/v1/ipfs/upload-directory \
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -168,20 +260,52 @@ curl -X POST http://localhost:8765/api/v1/ipfs/upload-directory \
 ```
 
 **Notes:**
+
 - Files are uploaded to IPFS with `wrap-with-directory=true` to maintain directory structure
 - The returned `directoryCid` can be used to access files via `/ipfs/{directoryCid}/path/to/file`
 - For user uploads with x402 subscriptions, storage limits are checked against total size
 
 #### GET `/api/v1/ipfs/cat/:cid`
+
 Retrieve file content from IPFS by CID.
 
+**Query Parameters:**
+
+- `json=true` (optional): Return content as JSON instead of binary
+
 **Response:**
+
 - Binary file content or JSON if `?json=true`
 
+#### GET `/api/v1/ipfs/cat/:cid/decrypt`
+
+Decrypt and retrieve encrypted file content from IPFS.
+
+**Query Parameters:**
+
+- `token`: Encryption token (wallet signature used for encryption)
+
+**Headers:**
+
+- `X-User-Address`: (optional) User address for signature verification
+
+**Response:**
+
+- Decrypted binary file content
+
+**Example:**
+
+```bash
+curl "http://localhost:8765/api/v1/ipfs/cat/Qm.../decrypt?token=0xYourSignature" \
+  -H "X-User-Address: 0xYourWalletAddress"
+```
+
 #### POST `/api/v1/ipfs/pin/add`
+
 Pin a CID to IPFS.
 
 **Body:**
+
 ```json
 {
   "cid": "Qm..."
@@ -193,12 +317,15 @@ Pin a CID to IPFS.
 These endpoints are used by drive applications to manage file metadata in the GunDB systemhash node.
 
 #### GET `/api/v1/user-uploads/system-hashes-map`
+
 Get the complete system hashes map with metadata for all files.
 
 **Headers:**
+
 - `Authorization: Bearer <token>` (admin token required)
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -239,13 +366,16 @@ Get the complete system hashes map with metadata for all files.
 ```
 
 #### POST `/api/v1/user-uploads/save-system-hash`
+
 Save file or directory metadata to the system hash map.
 
 **Headers:**
+
 - `Authorization: Bearer <token>` (admin token required)
 - `Content-Type: application/json`
 
 **Body:**
+
 ```json
 {
   "hash": "QmHash...",
@@ -266,10 +396,12 @@ Save file or directory metadata to the system hash map.
 ```
 
 **Required fields:**
+
 - `hash`: IPFS CID
 - `userAddress`: User identifier
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -281,16 +413,20 @@ Save file or directory metadata to the system hash map.
 ```
 
 #### DELETE `/api/v1/user-uploads/remove-system-hash/:cid`
+
 Remove file metadata from the system hash map.
 
 **Headers:**
+
 - `Authorization: Bearer <token>` (admin token required)
 - `Content-Type: application/json`
 
 **Parameters:**
+
 - `cid`: IPFS CID to remove (path parameter)
 
 **Body (optional):**
+
 ```json
 {
   "userAddress": "drive-user"
@@ -298,6 +434,7 @@ Remove file metadata from the system hash map.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -309,6 +446,7 @@ Remove file metadata from the system hash map.
 ```
 
 **Notes:**
+
 - These endpoints are primarily used by drive applications built on top of the relay
 - Metadata is stored in GunDB's `shogun.systemhash` node
 - The system hash map enables applications to track file metadata, directory structures, and file relationships
@@ -317,9 +455,11 @@ Remove file metadata from the system hash map.
 ### x402 Subscriptions
 
 #### GET `/api/v1/x402/tiers`
+
 List available subscription tiers.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -342,9 +482,11 @@ List available subscription tiers.
 ```
 
 #### GET `/api/v1/x402/subscription/:userAddress`
+
 Get subscription status for a user.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -360,9 +502,11 @@ Get subscription status for a user.
 ```
 
 #### POST `/api/v1/x402/subscribe`
+
 Purchase or renew a subscription.
 
 **Body:**
+
 ```json
 {
   "userAddress": "0x...",
@@ -386,9 +530,11 @@ Purchase or renew a subscription.
 ### Storage Deals
 
 #### POST `/api/v1/deals/create`
+
 Create a new storage deal.
 
 **Body:**
+
 ```json
 {
   "cid": "Qm...",
@@ -401,6 +547,7 @@ Create a new storage deal.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -417,9 +564,11 @@ Create a new storage deal.
 ```
 
 #### POST `/api/v1/deals/:dealId/activate`
+
 Activate a deal on-chain.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -431,9 +580,11 @@ Activate a deal on-chain.
 ### Network & Discovery
 
 #### GET `/api/v1/network/relays`
+
 Get list of active relays in the network.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -449,9 +600,11 @@ Get list of active relays in the network.
 ```
 
 #### GET `/api/v1/network/reputation/:host`
+
 Get reputation score for a relay.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -497,11 +650,13 @@ All endpoints return errors in this format:
 ## WebSocket Endpoints
 
 ### GunDB WebSocket
+
 ```
 ws://localhost:8765/gun
 ```
 
 ### Holster WebSocket
+
 ```
 ws://localhost:8766
 ```
@@ -509,11 +664,13 @@ ws://localhost:8766
 ## IPFS Gateway
 
 ### Public Gateway
+
 ```
 http://localhost:8765/ipfs/:cid
 ```
 
 ### IPNS Support
+
 ```
 http://localhost:8765/ipns/:name
 ```
@@ -523,18 +680,41 @@ http://localhost:8765/ipns/:name
 ### cURL Examples
 
 #### Health Check
+
 ```bash
 curl http://localhost:8765/health
 ```
 
-#### Upload File
+#### Upload File (Admin)
+
 ```bash
 curl -X POST http://localhost:8765/api/v1/ipfs/upload \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+  -F "file=@example.txt"
+```
+
+#### Upload File (User with Wallet Signature)
+
+```bash
+# First, sign the message "I Love Shogun" with your wallet
+# Then use the signature in the request:
+curl -X POST http://localhost:8765/api/v1/ipfs/upload \
+  -H "X-User-Address: 0xYourWalletAddress" \
+  -H "X-Wallet-Signature: 0xYourSignature" \
+  -F "file=@example.txt"
+```
+
+#### Upload File (Deal Upload - No Subscription Required)
+
+```bash
+curl -X POST "http://localhost:8765/api/v1/ipfs/upload?deal=true" \
+  -H "X-User-Address: 0xYourWalletAddress" \
+  -H "X-Wallet-Signature: 0xYourSignature" \
   -F "file=@example.txt"
 ```
 
 #### Create Subscription
+
 ```bash
 curl -X POST http://localhost:8765/api/v1/x402/subscribe \
   -H "Authorization: Bearer YOUR_TOKEN" \
@@ -548,9 +728,17 @@ curl -X POST http://localhost:8765/api/v1/x402/subscribe \
 
 ## Changelog
 
+### v1.1.0 (2025-12-25)
+
+- **Added Wallet Signature Authentication**: User uploads now require EIP-191 signature of "I Love Shogun" message
+- **Admin Upload Enhancement**: Admin uploads no longer require wallet signature or user address
+- **Deal Upload Support**: Added `X-Deal-Upload` header for storage deal uploads (no subscription required)
+- **Enhanced Upload Response**: Added `authType`, `mbUsage`, and `subscription` fields to upload responses
+- **Improved Error Messages**: Better error hints for authentication failures
+
 ### v1.0.0
+
 - Initial API documentation
 - Added session-based authentication
 - Enhanced health checks
 - Metrics endpoint
-

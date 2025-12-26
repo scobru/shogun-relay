@@ -13,6 +13,9 @@ import { AnnasArchiveModule } from "./modules/annas-archive";
 export * from "./types";
 export * from "./modules/annas-archive";
 
+// Export wallet utilities
+export * from "./utils/wallet";
+
 export class ShogunRelaySDK {
   private client: ApiClient;
 

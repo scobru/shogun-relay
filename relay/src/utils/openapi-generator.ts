@@ -55,6 +55,18 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
           name: "X-Session-Token",
           description: "Session token after initial authentication",
         },
+        walletSignature: {
+          type: "apiKey",
+          in: "header",
+          name: "X-Wallet-Signature",
+          description: "EIP-191 signature of 'I Love Shogun' message for wallet authentication",
+        },
+        userAddress: {
+          type: "apiKey",
+          in: "header",
+          name: "X-User-Address",
+          description: "Ethereum wallet address for user authentication",
+        },
       },
       schemas: {
         Error: {
@@ -244,9 +256,38 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
           type: "object",
           properties: {
             success: { type: "boolean" },
-            cid: { type: "string" },
-            size: { type: "number" },
-            path: { type: "string" },
+            cid: { type: "string", description: "IPFS CID of uploaded file" },
+            file: {
+              type: "object",
+              properties: {
+                hash: { type: "string", description: "IPFS hash (same as cid)" },
+                name: { type: "string", description: "Original filename" },
+                size: { type: "number", description: "File size in bytes" },
+                mimetype: { type: "string", description: "MIME type" },
+              },
+            },
+            authType: {
+              type: "string",
+              enum: ["admin", "user"],
+              description: "Authentication type used",
+            },
+            mbUsage: {
+              type: "object",
+              properties: {
+                actualSizeMB: { type: "number" },
+                sizeMB: { type: "number" },
+                verified: { type: "boolean" },
+              },
+              description: "Storage usage information (for user uploads)",
+            },
+            subscription: {
+              type: "object",
+              properties: {
+                storageUsedMB: { type: "number" },
+                storageRemainingMB: { type: "number" },
+              },
+              description: "Subscription storage info (for user uploads with x402)",
+            },
           },
         },
         IPFSDirectoryUploadResponse: {
@@ -1137,9 +1178,27 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
         post: {
           tags: ["IPFS"],
           summary: "Upload file to IPFS",
-          description: "Upload a single file to IPFS",
+          description: `Upload a single file to IPFS. Supports three authentication methods:
+1. **Admin Upload**: Use \`Authorization: Bearer <ADMIN_PASSWORD>\` (no signature required)
+2. **User Upload with Subscription**: Use \`X-User-Address\` + \`X-Wallet-Signature\` (requires active x402 subscription)
+3. **Deal Upload**: Use \`X-User-Address\` + \`X-Wallet-Signature\` + \`X-Deal-Upload: true\` (no subscription required, paid on-chain)
+
+The wallet signature must be a valid EIP-191 signature of the message "I Love Shogun" signed by the wallet address.`,
           operationId: "uploadToIPFS",
-          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          security: [
+            { bearerAuth: [] },
+            { tokenHeader: [] },
+            { userAddress: [], walletSignature: [] },
+          ],
+          parameters: [
+            {
+              name: "deal",
+              in: "query",
+              description: "Mark as deal upload (no subscription required)",
+              required: false,
+              schema: { type: "boolean" },
+            },
+          ],
           requestBody: {
             required: true,
             content: {
@@ -1151,6 +1210,19 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
                       type: "string",
                       format: "binary",
                       description: "File to upload",
+                    },
+                    encrypted: {
+                      type: "string",
+                      description: "Set to 'true' if file is encrypted",
+                      enum: ["true", "false"],
+                    },
+                    encryptionMethod: {
+                      type: "string",
+                      description: "Encryption method (e.g., 'SEA')",
+                    },
+                    encryptionToken: {
+                      type: "string",
+                      description: "Encryption token (signature) for encrypted files",
                     },
                   },
                   required: ["file"],
@@ -1168,15 +1240,28 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
               },
             },
             "401": {
-              description: "Unauthorized",
+              description: "Unauthorized - Missing or invalid authentication",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" },
+                  schema: {
+                    allOf: [
+                      { $ref: "#/components/schemas/Error" },
+                      {
+                        type: "object",
+                        properties: {
+                          hint: {
+                            type: "string",
+                            example: "Sign 'I Love Shogun' with your wallet and provide X-Wallet-Signature header",
+                          },
+                        },
+                      },
+                    ],
+                  },
                 },
               },
             },
             "402": {
-              description: "Payment required (x402 subscription)",
+              description: "Payment required (x402 subscription) or storage limit exceeded",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/Error" },

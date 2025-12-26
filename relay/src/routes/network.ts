@@ -198,8 +198,10 @@ router.get("/stats", async (req, res) => {
 
     const relaysFound: Array<{ host: any; hasPulse: boolean }> = [];
     const fiveMinutesAgo = Date.now() - 300000;
+    const currentRelayHost = relayConfig.endpoint?.replace(/^https?:\/\//, "").replace(/\/$/, "") || relayConfig.name;
 
     // STEP 1: Collect stats from pulse data (real-time relay status)
+    // Increased timeout to 15 seconds to allow GunDB more time to sync pulse data from peers
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
         loggers.server.info(
@@ -207,14 +209,55 @@ router.get("/stats", async (req, res) => {
           `📊 Network stats collection timeout. Found ${relaysFound.length} relays`
         );
         resolve();
-      }, 5000);
+      }, 15000); // Increased from 5s to 15s
 
       let processedCount = 0;
+      const processedHosts = new Set<string>(); // Track processed hosts to avoid duplicates
+
+      // Also try to include current relay's own pulse directly
+      const includeCurrentRelay = () => {
+        if (processedHosts.has(currentRelayHost)) return;
+        
+        gun.get("relays").get(currentRelayHost).once((data: { pulse: any } | undefined) => {
+          if (data && data.pulse && typeof data.pulse === "object") {
+            const pulse = data.pulse;
+            if (pulse.timestamp && pulse.timestamp > fiveMinutesAgo) {
+              if (!processedHosts.has(currentRelayHost)) {
+                processedHosts.add(currentRelayHost);
+                stats.totalRelays++;
+                stats.activeRelays++;
+                const activeConnections = pulse.connections?.active || 0;
+                stats.totalConnections += activeConnections;
+                relaysFound.push({ host: currentRelayHost, hasPulse: true });
+                
+                if (pulse.ipfs && typeof pulse.ipfs === "object") {
+                  const repoSize = pulse.ipfs.repoSize || 0;
+                  const numPins = pulse.ipfs.numPins || 0;
+                  stats.totalStorageBytes += repoSize;
+                  stats.totalPins += numPins;
+                }
+                
+                loggers.server.debug(
+                  { host: currentRelayHost },
+                  `   📡 Current relay included: ${currentRelayHost}`
+                );
+              }
+            }
+          }
+        });
+      };
+      
+      // Try to include current relay immediately
+      includeCurrentRelay();
 
       gun
         .get("relays")
         .map()
         .once((data: { pulse: any }, host: any) => {
+          if (processedHosts.has(host)) {
+            return; // Skip duplicates
+          }
+          processedHosts.add(host);
           processedCount++;
           loggers.server.debug(
             { processedCount, host },
@@ -280,7 +323,7 @@ router.get("/stats", async (req, res) => {
           `📊 Network stats collection complete. Total relays: ${stats.totalRelays}, Active: ${stats.activeRelays}`
         );
         resolve(undefined);
-      }, 4500);
+      }, 12000); // Increased from 4.5s to 12s
     });
 
     // STEP 2: Retroactive sync from GunDB deals (persistent across restarts)

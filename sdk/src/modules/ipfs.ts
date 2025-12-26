@@ -16,7 +16,13 @@ export class IpfsModule {
     fileBuffer: Buffer,
     filename: string,
     contentType: string,
-    userAddress?: string
+    options?: {
+      userAddress?: string;
+      walletSignature?: string;
+      isDealUpload?: boolean;
+      encrypted?: boolean;
+      encryptionToken?: string;
+    }
   ): Promise<any> {
     const form = new FormData();
     form.append("file", fileBuffer, {
@@ -25,11 +31,30 @@ export class IpfsModule {
     });
 
     const headers: any = form.getHeaders();
-    if (userAddress) {
-      headers["x-user-address"] = userAddress;
+    
+    if (options?.userAddress) {
+      headers["x-user-address"] = options.userAddress;
+    }
+    
+    if (options?.walletSignature) {
+      headers["x-wallet-signature"] = options.walletSignature;
+    }
+    
+    if (options?.isDealUpload) {
+      headers["x-deal-upload"] = "true";
+    }
+    
+    if (options?.encrypted) {
+      form.append("encrypted", "true");
+      form.append("encryptionMethod", "SEA");
+      if (options.encryptionToken) {
+        form.append("encryptionToken", options.encryptionToken);
+      }
     }
 
-    return this.client.post("/api/v1/ipfs/upload", form, {
+    const queryParams = options?.isDealUpload ? "?deal=true" : "";
+
+    return this.client.post(`/api/v1/ipfs/upload${queryParams}`, form, {
       headers: headers,
     });
   }
@@ -49,7 +74,11 @@ export class IpfsModule {
       path: string; // Relative path within directory (e.g., "css/style.css" or "index.html")
       contentType?: string;
     }>,
-    userAddress?: string
+    options?: {
+      userAddress?: string;
+      walletSignature?: string;
+      isDealUpload?: boolean;
+    }
   ): Promise<any> {
     if (!files || files.length === 0) {
       throw new Error("At least one file is required for directory upload");
@@ -66,8 +95,17 @@ export class IpfsModule {
     });
 
     const headers: any = form.getHeaders();
-    if (userAddress) {
-      headers["x-user-address"] = userAddress;
+    
+    if (options?.userAddress) {
+      headers["x-user-address"] = options.userAddress;
+    }
+    
+    if (options?.walletSignature) {
+      headers["x-wallet-signature"] = options.walletSignature;
+    }
+    
+    if (options?.isDealUpload) {
+      headers["x-deal-upload"] = "true";
     }
 
     return this.client.post("/api/v1/ipfs/upload-directory", form, {
@@ -161,20 +199,48 @@ export class IpfsModule {
   /**
    * Upload a file using browser FormData (for browser environments)
    * @param file File object from browser File API
-   * @param userAddress Optional user address for authentication
+   * @param options Upload options including authentication
    * @returns Promise with upload result
    */
-  public async uploadFileBrowser(file: File, userAddress?: string): Promise<any> {
+  public async uploadFileBrowser(
+    file: File,
+    options?: {
+      userAddress?: string;
+      walletSignature?: string;
+      isDealUpload?: boolean;
+      encrypted?: boolean;
+      encryptionToken?: string;
+    }
+  ): Promise<any> {
     const formData = new FormData();
     formData.append("file", file, file.name);
 
     const headers: any = {};
-    if (userAddress) {
-      headers["x-user-address"] = userAddress;
+    
+    if (options?.userAddress) {
+      headers["x-user-address"] = options.userAddress;
+    }
+    
+    if (options?.walletSignature) {
+      headers["x-wallet-signature"] = options.walletSignature;
+    }
+    
+    if (options?.isDealUpload) {
+      headers["x-deal-upload"] = "true";
+    }
+    
+    if (options?.encrypted) {
+      formData.append("encrypted", "true");
+      formData.append("encryptionMethod", "SEA");
+      if (options.encryptionToken) {
+        formData.append("encryptionToken", options.encryptionToken);
+      }
     }
 
+    const queryParams = options?.isDealUpload ? "?deal=true" : "";
+
     // Explicitly don't set Content-Type - let browser set it with boundary for FormData
-    return this.client.post("/api/v1/ipfs/upload", formData, {
+    return this.client.post(`/api/v1/ipfs/upload${queryParams}`, formData, {
       headers: headers,
       // Ensure axios doesn't serialize FormData as JSON
       transformRequest: [(data) => {
@@ -192,10 +258,17 @@ export class IpfsModule {
    * Maintains directory structure using relative paths from File.webkitRelativePath or file.name
    *
    * @param files Array of File objects from browser File API
-   * @param userAddress Optional user address for authentication
+   * @param options Upload options including authentication
    * @returns Promise with directory CID and file information
    */
-  public async uploadDirectoryBrowser(files: File[], userAddress?: string): Promise<any> {
+  public async uploadDirectoryBrowser(
+    files: File[],
+    options?: {
+      userAddress?: string;
+      walletSignature?: string;
+      isDealUpload?: boolean;
+    }
+  ): Promise<any> {
     if (!files || files.length === 0) {
       throw new Error("At least one file is required for directory upload");
     }
@@ -210,8 +283,17 @@ export class IpfsModule {
     });
 
     const headers: any = {};
-    if (userAddress) {
-      headers["x-user-address"] = userAddress;
+    
+    if (options?.userAddress) {
+      headers["x-user-address"] = options.userAddress;
+    }
+    
+    if (options?.walletSignature) {
+      headers["x-wallet-signature"] = options.walletSignature;
+    }
+    
+    if (options?.isDealUpload) {
+      headers["x-deal-upload"] = "true";
     }
 
     // Explicitly don't set Content-Type - let browser set it with boundary for FormData

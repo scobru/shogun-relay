@@ -21,7 +21,8 @@ export class DealsModule {
     fileBuffer: Buffer,
     filename: string,
     contentType: string,
-    walletAddress: string
+    walletAddress: string,
+    walletSignature: string
   ): Promise<any> {
     const form = new FormData();
     form.append("file", fileBuffer, {
@@ -32,7 +33,9 @@ export class DealsModule {
     return this.client.post("/api/v1/deals/upload", form, {
       headers: {
         ...form.getHeaders(),
-        "x-wallet-address": walletAddress,
+        "x-user-address": walletAddress,
+        "x-wallet-signature": walletSignature,
+        "x-deal-upload": "true",
       },
     });
   }
