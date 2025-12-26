@@ -37,11 +37,15 @@ router.post(
     const signatureRaw = req.headers["x-wallet-signature"];
     const signature = Array.isArray(signatureRaw) ? signatureRaw[0] : signatureRaw;
 
-    // Admin with userAddress
-    if (isAdmin && userAddress && typeof userAddress === "string") {
+    // Admin authentication (with or without userAddress)
+    if (isAdmin) {
       req.authType = "admin";
-      req.userAddress = userAddress;
-      loggers.server.info({ userAddress }, `Admin upload - accessing own files only`);
+      if (userAddress && typeof userAddress === "string") {
+        req.userAddress = userAddress;
+        loggers.server.info({ userAddress }, `Admin upload - accessing own files only`);
+      } else {
+        loggers.server.info(`Admin upload - no user address specified`);
+      }
       next();
     } else if (userAddress && typeof userAddress === "string") {
       // User-based upload - verify wallet signature first
