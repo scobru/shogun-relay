@@ -8,6 +8,7 @@ import {
   getProcessedDepositsForUser,
   getBatch,
   refreshTrustedRelaysCache,
+  getPendingWithdrawals,
 } from "../../utils/bridge-state";
 import { PendingWithdrawal, Batch } from "../../utils/bridge-state";
 import { WithdrawalLeaf, generateProof } from "../../utils/merkle-tree";
@@ -230,12 +231,124 @@ router.get("/balance-info/:user", async (req, res) => {
 });
 
 /**
+ * Get bridge statistics from GunDB
+ */
+async function getBridgeStats(gun: any): Promise<{
+  totalUsers: number;
+  totalDeposits: number;
+  totalWithdrawals: number;
+  pendingWithdrawals: number;
+}> {
+  const stats = {
+    totalUsers: 0,
+    totalDeposits: 0,
+    totalWithdrawals: 0,
+    pendingWithdrawals: 0,
+  };
+
+  try {
+    // Get pending withdrawals
+    const pending = await getPendingWithdrawals(gun);
+    stats.pendingWithdrawals = pending.length;
+
+    // Get all processed deposits
+    const depositsPromise = new Promise<number>((resolve) => {
+      const deposits: Set<string> = new Set();
+      const timeout = setTimeout(() => resolve(deposits.size), 5000);
+
+      gun
+        .get("bridge")
+        .get("processed-deposits")
+        .map()
+        .once((deposit: any, key?: string) => {
+          if (deposit && key) {
+            deposits.add(key);
+          }
+        });
+
+      setTimeout(() => {
+        clearTimeout(timeout);
+        resolve(deposits.size);
+      }, 4000);
+    });
+
+    // Get all batches and count withdrawals
+    const batchesPromise = new Promise<number>((resolve) => {
+      let totalWithdrawals = 0;
+      const timeout = setTimeout(() => resolve(totalWithdrawals), 5000);
+
+      gun
+        .get("bridge")
+        .get("batches")
+        .map()
+        .once(async (batch: any, key: string) => {
+          if (batch && key && batch.batchId) {
+            // Try to get full batch to count withdrawals
+            try {
+              const fullBatch = await getBatch(gun, batch.batchId);
+              if (fullBatch && fullBatch.withdrawals) {
+                totalWithdrawals += fullBatch.withdrawals.length;
+              } else if (batch.withdrawalsCount) {
+                // Fallback to withdrawalsCount if available
+                totalWithdrawals += batch.withdrawalsCount;
+              }
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+        });
+
+      setTimeout(() => {
+        clearTimeout(timeout);
+        resolve(totalWithdrawals);
+      }, 4000);
+    });
+
+    // Get all unique users (from balance indices)
+    const usersPromise = new Promise<number>((resolve) => {
+      const users: Set<string> = new Set();
+      const timeout = setTimeout(() => resolve(users.size), 5000);
+
+      gun
+        .get("bridge")
+        .get("balances-index")
+        .map()
+        .once((index: any, key?: string) => {
+          if (index && key && key !== "_") {
+            users.add(key.toLowerCase());
+          }
+        });
+
+      setTimeout(() => {
+        clearTimeout(timeout);
+        resolve(users.size);
+      }, 4000);
+    });
+
+    const [totalDeposits, totalWithdrawals, totalUsers] = await Promise.all([
+      depositsPromise,
+      batchesPromise,
+      usersPromise,
+    ]);
+
+    stats.totalDeposits = totalDeposits;
+    stats.totalWithdrawals = totalWithdrawals;
+    stats.totalUsers = totalUsers;
+  } catch (error) {
+    log.error({ error }, "Error calculating bridge stats");
+  }
+
+  return stats;
+}
+
+/**
  * GET /api/v1/bridge/state
  *
  * Get current bridge state (root, batchId, contract balance, etc.)
  */
 router.get("/state", async (req, res) => {
   try {
+    const gun = req.app.get("gunInstance");
     const client = getBridgeClient();
 
     const [stateRoot, batchId, sequencer, balance] = await Promise.all([
@@ -244,6 +357,14 @@ router.get("/state", async (req, res) => {
       client.getSequencer(),
       client.getBalance(),
     ]);
+
+    // Get bridge statistics from GunDB
+    const bridgeStats = gun ? await getBridgeStats(gun) : {
+      totalUsers: 0,
+      totalDeposits: 0,
+      totalWithdrawals: 0,
+      pendingWithdrawals: 0,
+    };
 
     res.json({
       success: true,
@@ -254,6 +375,10 @@ router.get("/state", async (req, res) => {
         sequencer,
         contractBalance: balance.toString(),
         contractBalanceEth: ethers.formatEther(balance),
+        totalUsers: bridgeStats.totalUsers,
+        totalDeposits: bridgeStats.totalDeposits,
+        totalWithdrawals: bridgeStats.totalWithdrawals,
+        pendingWithdrawals: bridgeStats.pendingWithdrawals,
       },
     });
   } catch (error: unknown) {

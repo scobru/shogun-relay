@@ -500,11 +500,12 @@
                 document.getElementById('peersCount').textContent = data.peers?.count || 0;
                 document.getElementById('memoryUsage').textContent = Math.round((data.memory?.heapUsed || 0) / 1024 / 1024);
                 document.getElementById('requestRate').textContent = data.dam?.in?.rate || 0;
-                document.getElementById('uptime').textContent = Math.round((data.uptime || 0) / 3600);
+                const uptimeMs = data.up?.time || 0;
+                document.getElementById('uptime').textContent = Math.round(uptimeMs / 1000 / 3600);
 
                 // Detailed stats
                 document.getElementById('statVersion').textContent = data.version || '-';
-                document.getElementById('statUptime').textContent = `${Math.round((data.uptime || 0) / 60)} min`;
+                document.getElementById('statUptime').textContent = `${Math.round(uptimeMs / 1000 / 60)} min`;
                 document.getElementById('statTimestamp').textContent = new Date(data.timestamp || Date.now()).toLocaleString();
 
                 document.getElementById('statHeapUsed').textContent = `${Math.round((data.memory?.heapUsed || 0) / 1024 / 1024)} MB`;

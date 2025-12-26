@@ -7,7 +7,7 @@ Essential guide to run a Shogun Relay node and earn revenue.
 - **Server**: Public IP/domain, 24/7 uptime recommended
 - **Hardware**: 2+ CPU cores, 4GB+ RAM, 100GB+ SSD storage
 - **Software**: Node.js 18+, Docker (recommended), or manual IPFS setup
-- **Blockchain**: 100+ USDC for staking, 0.01+ ETH for gas (Base Sepolia testnet or Base mainnet)
+- **Blockchain**: 0.01 USDC for staking, 0.01+ ETH for gas (Base Sepolia testnet or Base mainnet)
 
 ## Quick Start
 
@@ -213,7 +213,7 @@ fi
 
 ### Staking
 
-- **Minimum**: 100 USDC
+- **Minimum**: 0.01 USDC
 - **Unstaking delay**: 7 days
 - **Slashing**: 1-10% for violations (missed proofs, data loss)
 

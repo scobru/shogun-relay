@@ -215,6 +215,8 @@ router.get("/stats", async (req, res) => {
       const processedHosts = new Set<string>(); // Track processed hosts to avoid duplicates
 
       // Also try to include current relay's own pulse directly
+      // If pulse is not found in GunDB, use local app data as fallback
+      let currentRelayIncluded = false;
       const includeCurrentRelay = () => {
         if (processedHosts.has(currentRelayHost)) return;
         
@@ -224,6 +226,7 @@ router.get("/stats", async (req, res) => {
             if (pulse.timestamp && pulse.timestamp > fiveMinutesAgo) {
               if (!processedHosts.has(currentRelayHost)) {
                 processedHosts.add(currentRelayHost);
+                currentRelayIncluded = true;
                 stats.totalRelays++;
                 stats.activeRelays++;
                 const activeConnections = pulse.connections?.active || 0;
@@ -239,7 +242,7 @@ router.get("/stats", async (req, res) => {
                 
                 loggers.server.debug(
                   { host: currentRelayHost },
-                  `   📡 Current relay included: ${currentRelayHost}`
+                  `   📡 Current relay included from GunDB pulse: ${currentRelayHost}`
                 );
               }
             }
@@ -318,6 +321,23 @@ router.get("/stats", async (req, res) => {
 
       setTimeout(() => {
         clearTimeout(timer);
+        
+        // Fallback: if current relay not included, use local app data
+        if (!currentRelayIncluded && !processedHosts.has(currentRelayHost)) {
+          processedHosts.add(currentRelayHost);
+          stats.totalRelays++;
+          stats.activeRelays++;
+          // Get connections from app locals (set by index.ts)
+          const activeWires = req.app.get("activeWires") || 0;
+          stats.totalConnections += activeWires;
+          relaysFound.push({ host: currentRelayHost, hasPulse: false });
+          
+          loggers.server.debug(
+            { host: currentRelayHost, activeWires },
+            `   📡 Current relay included from local data (fallback): ${currentRelayHost}, connections: ${activeWires}`
+          );
+        }
+        
         loggers.server.info(
           { totalRelays: stats.totalRelays, activeRelays: stats.activeRelays },
           `📊 Network stats collection complete. Total relays: ${stats.totalRelays}, Active: ${stats.activeRelays}`
