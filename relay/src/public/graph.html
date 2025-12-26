@@ -478,12 +478,10 @@
   </div>
 
   <script type="module">
-    import "https://cdn.jsdelivr.net/npm/gun-authd/dist/gun-authd.min.js";
-
     const DEFAULT_PEERS = [window.location.origin + "/gun"];
 
     const gun = Gun({
-      peers: ['https://shogun-relay.scobrudot.dev/gun'],
+      peers: DEFAULT_PEERS,
       localStorage: false,
       radisk: false
     });
