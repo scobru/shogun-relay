@@ -299,6 +299,7 @@ async function initializeServer() {
     "/upload",
     "/pin-manager",
     "/drive",
+    "/api-keys",
   ];
 
   app.use((req, res, next) => {
