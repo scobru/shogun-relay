@@ -1070,6 +1070,104 @@ export class TorrentManager {
   }
 
   /**
+   * Calculate total storage used by torrents
+   * Returns size in bytes from catalog (fast) and optionally from disk (accurate)
+   */
+  public getStorageStats(): {
+    totalBytes: number;
+    totalMB: number;
+    totalGB: number;
+    fileCount: number;
+    torrentCount: number;
+    catalogBytes: number;
+    diskBytes?: number;
+  } {
+    if (!this.enabled) {
+      return {
+        totalBytes: 0,
+        totalMB: 0,
+        totalGB: 0,
+        fileCount: 0,
+        torrentCount: 0,
+        catalogBytes: 0,
+      };
+    }
+
+    // Calculate from catalog (fast)
+    let catalogBytes = 0;
+    let fileCount = 0;
+    const catalog = this.getCatalog();
+    
+    for (const entry of catalog) {
+      for (const file of entry.files) {
+        catalogBytes += file.size || 0;
+        fileCount++;
+      }
+    }
+
+    // Try to calculate from disk (more accurate but slower)
+    let diskBytes: number | undefined;
+    try {
+      if (fs.existsSync(this.dataDir)) {
+        diskBytes = this.calculateDirectorySize(this.dataDir);
+      }
+    } catch (error) {
+      // Ignore errors calculating disk size
+      loggers.server.debug({ err: error }, "Failed to calculate torrent directory size");
+    }
+
+    // Use disk size if available, otherwise use catalog size
+    const totalBytes = diskBytes !== undefined ? diskBytes : catalogBytes;
+    const totalMB = totalBytes / (1024 * 1024);
+    const totalGB = totalBytes / (1024 * 1024 * 1024);
+
+    return {
+      totalBytes,
+      totalMB,
+      totalGB,
+      fileCount,
+      torrentCount: catalog.length,
+      catalogBytes,
+      diskBytes,
+    };
+  }
+
+  /**
+   * Calculate directory size recursively
+   */
+  private calculateDirectorySize(dirPath: string): number {
+    let totalSize = 0;
+    
+    try {
+      const items = fs.readdirSync(dirPath, { withFileTypes: true });
+      
+      for (const item of items) {
+        const fullPath = path.join(dirPath, item.name);
+        
+        // Skip catalog.json and other metadata files
+        if (item.name === 'catalog.json' || item.name === 'torrents.json' || item.name === 'uploads') {
+          continue;
+        }
+        
+        if (item.isDirectory()) {
+          totalSize += this.calculateDirectorySize(fullPath);
+        } else if (item.isFile()) {
+          try {
+            const stats = fs.statSync(fullPath);
+            totalSize += stats.size;
+          } catch (error) {
+            // Ignore errors reading individual files
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore errors reading directory
+    }
+    
+    return totalSize;
+  }
+
+  /**
    * Get current status
    */
   public getStatus(): TorrentStatus {

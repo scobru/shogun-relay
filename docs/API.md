@@ -726,7 +726,226 @@ curl -X POST http://localhost:8765/api/v1/x402/subscribe \
   }'
 ```
 
+## Admin Drive
+
+Admin-only file storage system for managing files and folders on the relay server. All endpoints require admin authentication.
+
+### Base Path
+
+```
+/api/v1/drive
+```
+
+### List Directory
+
+**GET** `/api/v1/drive/list` or `/api/v1/drive/list/{path}`
+
+List files and folders in the specified directory. Omit path for root directory.
+
+**Parameters:**
+- `path` (path, optional): Directory path (omit for root)
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8765/api/v1/drive/list" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "items": [
+    {
+      "name": "document.pdf",
+      "path": "document.pdf",
+      "type": "file",
+      "size": 1024,
+      "modified": 1699123456000
+    },
+    {
+      "name": "folder1",
+      "path": "folder1",
+      "type": "directory",
+      "size": 0,
+      "modified": 1699123456000
+    }
+  ],
+  "path": ""
+}
+```
+
+### Upload Files
+
+**POST** `/api/v1/drive/upload/{path}`
+
+Upload one or multiple files. Use `file` field for single file, `files` field for multiple files. Omit path for root directory.
+
+**Parameters:**
+- `path` (path, optional): Directory path (omit for root)
+
+**Example (single file):**
+
+```bash
+curl -X POST "http://localhost:8765/api/v1/drive/upload" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -F "file=@example.txt"
+```
+
+**Example (multiple files):**
+
+```bash
+curl -X POST "http://localhost:8765/api/v1/drive/upload" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -F "files=@file1.txt" \
+  -F "files=@file2.txt"
+```
+
+### Download File
+
+**GET** `/api/v1/drive/download/{path}`
+
+Download a file from the drive.
+
+**Parameters:**
+- `path` (path, required): File path to download
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8765/api/v1/drive/download/document.pdf" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -o downloaded_file.pdf
+```
+
+### Delete Item
+
+**DELETE** `/api/v1/drive/delete/{path}`
+
+Delete a file or directory (recursive for directories).
+
+**Parameters:**
+- `path` (path, required): Item path to delete
+
+**Example:**
+
+```bash
+curl -X DELETE "http://localhost:8765/api/v1/drive/delete/document.pdf" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"
+```
+
+### Create Directory
+
+**POST** `/api/v1/drive/mkdir` or `/api/v1/drive/mkdir/{path}`
+
+Create a new directory. Omit path for root directory.
+
+**Parameters:**
+- `path` (path, optional): Parent directory path (omit for root)
+
+**Request Body:**
+
+```json
+{
+  "name": "new-folder"
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST "http://localhost:8765/api/v1/drive/mkdir" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "new-folder"}'
+```
+
+### Rename Item
+
+**POST** `/api/v1/drive/rename`
+
+Rename a file or directory.
+
+**Request Body:**
+
+```json
+{
+  "oldPath": "old-name.txt",
+  "newName": "new-name.txt"
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST "http://localhost:8765/api/v1/drive/rename" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"oldPath": "old-name.txt", "newName": "new-name.txt"}'
+```
+
+### Move Item
+
+**POST** `/api/v1/drive/move`
+
+Move a file or directory to a new location.
+
+**Request Body:**
+
+```json
+{
+  "sourcePath": "file.txt",
+  "destPath": "folder1/file.txt"
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST "http://localhost:8765/api/v1/drive/move" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"sourcePath": "file.txt", "destPath": "folder1/file.txt"}'
+```
+
+### Get Storage Statistics
+
+**GET** `/api/v1/drive/stats`
+
+Get storage usage statistics.
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8765/api/v1/drive/stats" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "stats": {
+    "totalBytes": 1048576,
+    "totalSizeMB": "1.00",
+    "totalSizeGB": "0.0010",
+    "fileCount": 10,
+    "dirCount": 3
+  }
+}
+```
+
 ## Changelog
+
+### v1.2.0 (2025-01-XX)
+
+- **Added Admin Drive**: New admin-only file storage system with full CRUD operations
+- **File Management**: Upload, download, delete, rename, move files and folders
+- **Storage Statistics**: Track total storage usage, file count, and directory count
+- **Path Validation**: Security measures to prevent path traversal attacks
 
 ### v1.1.0 (2025-12-25)
 

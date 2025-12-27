@@ -100,6 +100,17 @@ export interface PackageConfig {
   version: string;
 }
 
+export interface TorrentConfig {
+  enabled: boolean;
+  annasArchiveUrl: string;
+  dataDir: string;
+  maxTb: number;
+}
+
+export interface DriveConfig {
+  dataDir: string;
+}
+
 export interface EnvConfig {
   server: ServerConfig;
   relay: RelayConfig;
@@ -115,6 +126,8 @@ export interface EnvConfig {
   logging: LoggingConfig;
   pricing: PricingConfig;
   package: PackageConfig;
+  torrent: TorrentConfig;
+  drive: DriveConfig;
 }
 
 declare const config: EnvConfig;
@@ -133,5 +146,7 @@ export const replicationConfig: ReplicationConfig;
 export const loggingConfig: LoggingConfig;
 export const pricingConfig: PricingConfig;
 export const packageConfig: PackageConfig;
+export const torrentConfig: TorrentConfig;
+export const driveConfig: DriveConfig;
 
 export default config;

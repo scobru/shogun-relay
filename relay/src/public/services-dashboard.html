@@ -431,6 +431,47 @@
                 </div>
             </div>
 
+            <!-- Torrent Service -->
+            <div class="service-card">
+                <div class="service-card-header">
+                    <div class="service-name">
+                        <span id="torrent-status-indicator" class="md-status-dot md-status-dot-pulse"></span>
+                        Torrent Manager
+                    </div>
+                    <span id="torrent-summary" class="md-chip">--</span>
+                </div>
+                <div class="service-card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="torrent-status">Checking...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Active Torrents</span>
+                        <span class="stat-value" id="torrent-active">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Storage Used</span>
+                        <span class="stat-value" id="torrent-storage">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Files</span>
+                        <span class="stat-value" id="torrent-files">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Download Speed</span>
+                        <span class="stat-value" id="torrent-download">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Upload Speed</span>
+                        <span class="stat-value" id="torrent-upload">--</span>
+                    </div>
+                </div>
+                <div class="service-card-footer">
+                    <button onclick="refreshService('torrent')" class="md-btn md-btn-text">Refresh</button>
+                    <a href="/torrent" class="md-btn md-btn-tonal">Manage</a>
+                </div>
+            </div>
+
             <!-- Module Status -->
             <div class="service-card">
                 <div class="service-card-header">
@@ -765,13 +806,14 @@
                             if (statsResponse.ok) {
                                 const statsData = await statsResponse.json();
                                 if (statsData.success && statsData.stats) {
-                                    const usedMB = statsData.stats.repoSizeMB || 0;
+                                    // Use totalSizeMB (or repoSizeMB for backward compatibility)
+                                    const usedMB = statsData.stats.totalSizeMB || statsData.stats.repoSizeMB || 0;
                                     const maxMB = statsData.stats.storageMaxMB || 0;
                                     const usagePercent = maxMB > 0 ? Math.round((usedMB / maxMB) * 100) : 0;
-                                    document.getElementById('ipfs-storage').textContent = `${usedMB} MB`;
-                                    document.getElementById('ipfs-storage-max').textContent = `${maxMB} MB`;
-                                    document.getElementById('ipfs-usage-percent').textContent = `${usagePercent}%`;
-                                    document.getElementById('ipfs-objects').textContent = statsData.stats.numObjects;
+                                    document.getElementById('ipfs-storage').textContent = `${usedMB.toFixed(2)} MB`;
+                                    document.getElementById('ipfs-storage-max').textContent = maxMB > 0 ? `${maxMB.toFixed(2)} MB` : 'Unlimited';
+                                    document.getElementById('ipfs-usage-percent').textContent = maxMB > 0 ? `${usagePercent}%` : '--';
+                                    document.getElementById('ipfs-objects').textContent = statsData.stats.numObjects || 0;
                                 }
                             }
                         } catch (e) { /* ignore */ }
@@ -863,6 +905,52 @@
             return false;
         }
 
+        async function checkTorrentStatus() {
+            try {
+                const response = await fetch('/api/v1/torrent/stats');
+                const data = await response.json();
+
+                if (data.success && data.stats) {
+                    const stats = data.stats;
+                    const isEnabled = stats.enabled;
+                    
+                    document.getElementById('torrent-status').textContent = isEnabled ? 'Online' : 'Disabled';
+                    document.getElementById('torrent-active').textContent = stats.activeTorrents || 0;
+                    document.getElementById('torrent-files').textContent = stats.fileCount || 0;
+                    document.getElementById('torrent-summary').textContent = `${stats.activeTorrents || 0} active`;
+
+                    // Format storage
+                    const storageMB = stats.totalMB || 0;
+                    const storageGB = stats.totalGB || 0;
+                    if (storageGB >= 1) {
+                        document.getElementById('torrent-storage').textContent = `${storageGB.toFixed(2)} GB`;
+                    } else {
+                        document.getElementById('torrent-storage').textContent = `${storageMB.toFixed(2)} MB`;
+                    }
+
+                    // Format speeds
+                    const downloadMBps = (stats.downloadSpeed || 0) / (1024 * 1024);
+                    const uploadMBps = (stats.uploadSpeed || 0) / (1024 * 1024);
+                    document.getElementById('torrent-download').textContent = downloadMBps > 0 ? 
+                        `${downloadMBps.toFixed(2)} MB/s` : '0 MB/s';
+                    document.getElementById('torrent-upload').textContent = uploadMBps > 0 ? 
+                        `${uploadMBps.toFixed(2)} MB/s` : '0 MB/s';
+
+                    updateStatusIndicator('torrent', isEnabled ? 'online' : 'offline');
+                    return true;
+                } else {
+                    document.getElementById('torrent-status').textContent = 'Disabled';
+                    updateStatusIndicator('torrent', 'offline');
+                    return false;
+                }
+            } catch (error) {
+                document.getElementById('torrent-status').textContent = 'Error';
+                updateStatusIndicator('torrent', 'offline');
+                log(`Torrent check failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
         async function refreshService(service) {
             log(`Refreshing ${service} service...`);
             switch (service) {
@@ -870,13 +958,14 @@
                 case 'ipfs': await checkIPFSStatus(); break;
                 case 'holster': await checkHolsterStatus(); break;
                 case 'rpc': await checkRPCStatus(); break;
+                case 'torrent': await checkTorrentStatus(); break;
             }
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
         }
 
         async function refreshAllServices() {
             log('Refreshing all services...');
-            await Promise.all([checkGunStatus(), checkIPFSStatus(), checkHolsterStatus(), checkRPCStatus(), refreshModuleStatus()]);
+            await Promise.all([checkGunStatus(), checkIPFSStatus(), checkHolsterStatus(), checkRPCStatus(), checkTorrentStatus(), refreshModuleStatus()]);
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
             log('All services refreshed', 'success');
         }

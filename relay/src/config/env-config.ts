@@ -427,6 +427,16 @@ export const config = {
     maxTb: parseFloat(process.env.TORRENT_MAX_TB || "0"),
   },
 
+  // ============================================================================
+  // ADMIN DRIVE CONFIGURATION
+  // ============================================================================
+
+  drive: {
+    dataDir:
+      process.env.DRIVE_DATA_DIR ||
+      path.join(process.cwd(), "data", "drive"),
+  },
+
   package: {
     version: process.env.npm_package_version || "1.0.0",
   },
@@ -454,6 +464,7 @@ export const loggingConfig = config.logging;
 export const pricingConfig = config.pricing;
 export const packageConfig = config.package;
 export const torrentConfig = config.torrent;
+export const driveConfig = config.drive;
 
 // ============================================================================
 // EXPORT DEFAULT

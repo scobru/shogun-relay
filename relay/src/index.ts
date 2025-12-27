@@ -298,6 +298,7 @@ async function initializeServer() {
     "/charts",
     "/upload",
     "/pin-manager",
+    "/drive",
   ];
 
   app.use((req, res, next) => {

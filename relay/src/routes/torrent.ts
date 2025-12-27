@@ -45,6 +45,35 @@ router.get("/status", async (req, res) => {
 });
 
 /**
+ * GET /stats
+ * Get statistics about torrent storage and usage
+ */
+router.get("/stats", async (req, res) => {
+  try {
+    const status = torrentManager.getStatus();
+    const storageStats = torrentManager.getStorageStats();
+    
+    res.json({
+      success: true,
+      stats: {
+        ...storageStats,
+        enabled: status.enabled,
+        activeTorrents: status.activeTorrents,
+        downloadSpeed: status.downloadSpeed,
+        uploadSpeed: status.uploadSpeed,
+        ratio: status.ratio,
+      },
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to get Torrent stats");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
  * POST /add
  * Add a new torrent (magnet link or URL)
  */

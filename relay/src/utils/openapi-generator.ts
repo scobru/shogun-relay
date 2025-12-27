@@ -4360,6 +4360,667 @@ The wallet signature must be a valid EIP-191 signature of the message "I Love Sh
           },
         },
       },
+      "/api/v1/drive/list": {
+        get: {
+          tags: ["Admin Drive"],
+          summary: "List directory contents (root)",
+          description: "List files and folders in the root directory",
+          operationId: "listDriveDirectoryRoot",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          responses: {
+            "200": {
+              description: "Directory listing",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      items: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            name: { type: "string" },
+                            path: { type: "string" },
+                            type: { type: "string", enum: ["file", "directory"] },
+                            size: { type: "number" },
+                            modified: { type: "number" },
+                          },
+                        },
+                      },
+                      path: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/list/{path}": {
+        get: {
+          tags: ["Admin Drive"],
+          summary: "List directory contents",
+          description: "List files and folders in the specified directory path",
+          operationId: "listDriveDirectory",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          parameters: [
+            {
+              name: "path",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Directory path",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Directory listing",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      items: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            name: { type: "string" },
+                            path: { type: "string" },
+                            type: { type: "string", enum: ["file", "directory"] },
+                            size: { type: "number" },
+                            modified: { type: "number" },
+                          },
+                        },
+                      },
+                      path: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/upload": {
+        post: {
+          tags: ["Admin Drive"],
+          summary: "Upload file(s) to root",
+          description: "Upload one or multiple files to the root directory. Use 'file' field for single file, 'files' field for multiple files.",
+          operationId: "uploadDriveFilesRoot",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    file: { type: "string", format: "binary", description: "Single file upload" },
+                    files: {
+                      type: "array",
+                      items: { type: "string", format: "binary" },
+                      description: "Multiple files upload",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Files uploaded successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                      files: {
+                        type: "array",
+                        items: { type: "string" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Bad request - no files provided",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/download/{path}": {
+        get: {
+          tags: ["Admin Drive"],
+          summary: "Download file",
+          description: "Download a file from the drive",
+          operationId: "downloadDriveFile",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          parameters: [
+            {
+              name: "path",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "File path",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "File content",
+              content: {
+                "application/octet-stream": {
+                  schema: { type: "string", format: "binary" },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "404": {
+              description: "File not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/delete/{path}": {
+        delete: {
+          tags: ["Admin Drive"],
+          summary: "Delete file or directory",
+          description: "Delete a file or directory (recursive for directories)",
+          operationId: "deleteDriveItem",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          parameters: [
+            {
+              name: "path",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Item path to delete",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Item deleted successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "404": {
+              description: "Item not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/mkdir": {
+        post: {
+          tags: ["Admin Drive"],
+          summary: "Create directory in root",
+          description: "Create a new directory in the root directory",
+          operationId: "createDriveDirectoryRoot",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", description: "Directory name" },
+                  },
+                  required: ["name"],
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Directory created successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                      path: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Bad request - directory name required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "409": {
+              description: "Directory already exists",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/mkdir/{path}": {
+        post: {
+          tags: ["Admin Drive"],
+          summary: "Create directory in path",
+          description: "Create a new directory in the specified parent directory",
+          operationId: "createDriveDirectory",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          parameters: [
+            {
+              name: "path",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Parent directory path",
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", description: "Directory name" },
+                  },
+                  required: ["name"],
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Directory created successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                      path: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Bad request - directory name required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "409": {
+              description: "Directory already exists",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/rename": {
+        post: {
+          tags: ["Admin Drive"],
+          summary: "Rename file or directory",
+          description: "Rename a file or directory",
+          operationId: "renameDriveItem",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    oldPath: { type: "string", description: "Current path of the item" },
+                    newName: { type: "string", description: "New name for the item" },
+                  },
+                  required: ["oldPath", "newName"],
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Item renamed successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Bad request - invalid parameters",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "404": {
+              description: "Item not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "409": {
+              description: "Target name already exists",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/move": {
+        post: {
+          tags: ["Admin Drive"],
+          summary: "Move file or directory",
+          description: "Move a file or directory to a new location",
+          operationId: "moveDriveItem",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    sourcePath: { type: "string", description: "Current path of the item" },
+                    destPath: { type: "string", description: "Destination path" },
+                  },
+                  required: ["sourcePath", "destPath"],
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Item moved successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Bad request - invalid parameters",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "404": {
+              description: "Source item not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "409": {
+              description: "Destination already exists",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/stats": {
+        get: {
+          tags: ["Admin Drive"],
+          summary: "Get storage statistics",
+          description: "Get storage usage statistics for the drive",
+          operationId: "getDriveStats",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          responses: {
+            "200": {
+              description: "Storage statistics",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      stats: {
+                        type: "object",
+                        properties: {
+                          totalBytes: { type: "number" },
+                          totalSizeMB: { type: "string" },
+                          totalSizeGB: { type: "string" },
+                          fileCount: { type: "number" },
+                          dirCount: { type: "number" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   };
 }

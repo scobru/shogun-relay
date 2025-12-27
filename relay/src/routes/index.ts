@@ -72,6 +72,7 @@ import dealsRouter from "./deals";
 import registryRouter from "./registry";
 import bridgeRouter from "./bridge";
 import torrentRouter from "./torrent";
+import driveRouter from "./drive";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
@@ -685,6 +686,10 @@ export default (app: express.Application) => {
       res.status(503).json({ success: false, error: "Torrent module is disabled" });
     });
   }
+
+  // Route per Drive (always enabled, admin-only)
+  app.use(`${baseRoute}/drive`, driveRouter);
+  loggers.server.info(`✅ Drive routes registered`);
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {

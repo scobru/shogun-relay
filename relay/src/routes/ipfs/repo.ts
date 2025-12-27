@@ -468,13 +468,23 @@ router.get("/repo/stat", adminAuthMiddleware, async (req, res) => {
       totalSize = parseInt(totalSize, 10) || 0;
     }
 
+    // Get storage max (if available)
+    let storageMax = storageDataObj.StorageMax || storageDataObj.storageMax || 0;
+    if (typeof storageMax === "string") {
+      storageMax = parseInt(storageMax, 10) || 0;
+    }
+
     res.json({
       success: true,
       stats: {
         pinnedCount,
         totalSizeBytes: totalSize,
-        totalSizeMB: (totalSize / (1024 * 1024)).toFixed(2),
-        totalSizeGB: (totalSize / (1024 * 1024 * 1024)).toFixed(4),
+        totalSizeMB: parseFloat((totalSize / (1024 * 1024)).toFixed(2)),
+        totalSizeGB: parseFloat((totalSize / (1024 * 1024 * 1024)).toFixed(4)),
+        storageMaxBytes: storageMax,
+        storageMaxMB: storageMax > 0 ? parseFloat((storageMax / (1024 * 1024)).toFixed(2)) : 0,
+        storageMaxGB: storageMax > 0 ? parseFloat((storageMax / (1024 * 1024 * 1024)).toFixed(4)) : 0,
+        repoSizeMB: parseFloat((totalSize / (1024 * 1024)).toFixed(2)), // Alias for backward compatibility
         numObjects: storageDataObj.NumObjects || 0,
         repoPath: storageDataObj.RepoPath || "unknown",
         version: versionDataObj.Version || "unknown",
