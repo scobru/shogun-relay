@@ -693,7 +693,35 @@ export default (app: express.Application) => {
   }
 
   // Route per Drive (always enabled, admin-only)
+  // Initialize API keys manager lazily on first request
+  app.use(`${baseRoute}/drive`, async (req: Request, res: Response, next: NextFunction) => {
+    const { ensureApiKeysInitialized } = await import("./drive");
+    ensureApiKeysInitialized(req, res, next);
+  });
+  
   app.use(`${baseRoute}/drive`, driveRouter);
+  
+  // Initialize Drive API Keys Manager after routes are set up
+  // This will be called when GunDB and relay user are initialized in index.ts
+  app.use(`${baseRoute}/drive`, async (req: Request, res: Response, next: NextFunction) => {
+    // Try to initialize if not already done
+    const gun = req.app.get("gunInstance");
+    const relayPub = req.app.get("relayUserPub");
+    if (gun && relayPub) {
+      try {
+        const { initDriveApiKeys } = await import("./drive");
+        const { getRelayUser } = await import("../utils/relay-user");
+        const relayUser = getRelayUser();
+        if (relayUser) {
+          initDriveApiKeys(gun, relayPub, relayUser);
+        }
+      } catch (error) {
+        // Ignore if already initialized or not ready
+      }
+    }
+    next();
+  });
+  
   loggers.server.info(`✅ Drive routes registered`);
 
   // Route di test per verificare se le route sono registrate correttamente

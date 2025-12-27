@@ -1,11 +1,37 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import multer from "multer";
 import path from "path";
 import { driveManager } from "../utils/drive";
 import { loggers } from "../utils/logger";
 import { adminAuthMiddleware } from "../middleware/admin-auth";
+import { driveAuthMiddleware, initDriveApiKeysManager, getDriveApiKeysManager } from "../middleware/drive-auth";
 
 const router = express.Router();
+
+// Initialize API keys manager when router is set up (will be called from routes/index.ts)
+let apiKeysInitialized = false;
+
+export function initDriveApiKeys(gun: any, relayPub: string, relayUser: any): void {
+  if (!apiKeysInitialized && gun && relayPub && relayUser) {
+    initDriveApiKeysManager(gun, relayPub, relayUser);
+    apiKeysInitialized = true;
+    loggers.server.info({ relayPub }, "Drive API Keys Manager initialized");
+  }
+}
+
+// Middleware to initialize API keys manager on first request
+export function ensureApiKeysInitialized(req: Request, res: Response, next: NextFunction): void {
+  const gun = req.app.get("gunInstance");
+  const relayPub = req.app.get("relayUserPub");
+  const { getRelayUser } = require("../utils/relay-user");
+  const relayUser = getRelayUser();
+  
+  if (gun && relayPub && relayUser && !apiKeysInitialized) {
+    initDriveApiKeys(gun, relayPub, relayUser);
+  }
+  
+  next();
+}
 
 // Configure multer for file uploads (memory storage for flexibility)
 const upload = multer({
@@ -17,7 +43,7 @@ const upload = multer({
  * GET /list/:path?
  * List directory contents
  */
-router.get("/list/:path(*)?", adminAuthMiddleware, async (req: Request, res: Response) => {
+router.get("/list/:path(*)?", driveAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const relativePath = req.params.path || "";
     const items = driveManager.listDirectory(relativePath);
@@ -42,7 +68,7 @@ router.get("/list/:path(*)?", adminAuthMiddleware, async (req: Request, res: Res
  */
 router.post(
   "/upload/:path(*)?",
-  adminAuthMiddleware,
+  driveAuthMiddleware,
   upload.fields([{ name: "file", maxCount: 1 }, { name: "files", maxCount: 100 }]),
   async (req: Request, res: Response) => {
     try {
@@ -92,7 +118,7 @@ router.post(
  * GET /download/:path(*)
  * Download a file
  */
-router.get("/download/:path(*)", adminAuthMiddleware, async (req: Request, res: Response) => {
+router.get("/download/:path(*)", driveAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const relativePath = req.params.path;
 
@@ -153,7 +179,7 @@ router.get("/download/:path(*)", adminAuthMiddleware, async (req: Request, res: 
  * DELETE /delete/:path(*)
  * Delete a file or directory
  */
-router.delete("/delete/:path(*)", adminAuthMiddleware, async (req: Request, res: Response) => {
+router.delete("/delete/:path(*)", driveAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const relativePath = req.params.path;
 
@@ -191,7 +217,7 @@ router.delete("/delete/:path(*)", adminAuthMiddleware, async (req: Request, res:
  * POST /mkdir/:path(*)?
  * Create a directory
  */
-router.post("/mkdir/:path(*)?", adminAuthMiddleware, express.json(), async (req: Request, res: Response) => {
+router.post("/mkdir/:path(*)?", driveAuthMiddleware, express.json(), async (req: Request, res: Response) => {
   try {
     const parentPath = req.params.path || "";
     const { name } = req.body;
@@ -240,7 +266,7 @@ router.post("/mkdir/:path(*)?", adminAuthMiddleware, express.json(), async (req:
  * POST /rename
  * Rename a file or directory
  */
-router.post("/rename", adminAuthMiddleware, express.json(), async (req: Request, res: Response) => {
+router.post("/rename", driveAuthMiddleware, express.json(), async (req: Request, res: Response) => {
   try {
     const { oldPath, newName } = req.body;
 
@@ -298,7 +324,7 @@ router.post("/rename", adminAuthMiddleware, express.json(), async (req: Request,
  * POST /move
  * Move a file or directory
  */
-router.post("/move", adminAuthMiddleware, express.json(), async (req: Request, res: Response) => {
+router.post("/move", driveAuthMiddleware, express.json(), async (req: Request, res: Response) => {
   try {
     const { sourcePath, destPath } = req.body;
 
@@ -348,7 +374,7 @@ router.post("/move", adminAuthMiddleware, express.json(), async (req: Request, r
  * GET /stats
  * Get storage statistics
  */
-router.get("/stats", adminAuthMiddleware, async (req: Request, res: Response) => {
+router.get("/stats", driveAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const stats = driveManager.getStorageStats();
 
@@ -364,6 +390,129 @@ router.get("/stats", adminAuthMiddleware, async (req: Request, res: Response) =>
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to get storage stats");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * API Keys Management Routes (Admin only)
+ */
+
+/**
+ * GET /keys
+ * List all API keys
+ */
+router.get("/keys", adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const manager = getDriveApiKeysManager();
+    if (!manager) {
+      return res.status(503).json({
+        success: false,
+        error: "API keys manager not initialized",
+      });
+    }
+
+    const keys = await manager.listApiKeys();
+    res.json({
+      success: true,
+      keys,
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to list API keys");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * POST /keys
+ * Create a new API key
+ */
+router.post("/keys", adminAuthMiddleware, express.json(), async (req: Request, res: Response) => {
+  try {
+    const { name, expiresInDays } = req.body;
+
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Key name is required",
+      });
+    }
+
+    const manager = getDriveApiKeysManager();
+    if (!manager) {
+      return res.status(503).json({
+        success: false,
+        error: "API keys manager not initialized",
+      });
+    }
+
+    const expiresDays = expiresInDays && typeof expiresInDays === "number" && expiresInDays > 0 
+      ? expiresInDays 
+      : undefined;
+
+    const keyData = await manager.createApiKey(name.trim(), expiresDays);
+
+    res.status(201).json({
+      success: true,
+      keyId: keyData.keyId,
+      token: keyData.token, // Only shown once!
+      name: keyData.name,
+      createdAt: keyData.createdAt,
+      expiresAt: keyData.expiresAt,
+      message: "Save this token securely. It will not be shown again.",
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to create API key");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * DELETE /keys/:keyId
+ * Revoke an API key
+ */
+router.delete("/keys/:keyId", adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { keyId } = req.params;
+
+    if (!keyId) {
+      return res.status(400).json({
+        success: false,
+        error: "Key ID is required",
+      });
+    }
+
+    const manager = getDriveApiKeysManager();
+    if (!manager) {
+      return res.status(503).json({
+        success: false,
+        error: "API keys manager not initialized",
+      });
+    }
+
+    const revoked = await manager.revokeApiKey(keyId);
+    if (revoked) {
+      res.json({
+        success: true,
+        message: "API key revoked successfully",
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        error: "API key not found",
+      });
+    }
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to revoke API key");
     res.status(500).json({
       success: false,
       error: error.message || "Internal Server Error",
