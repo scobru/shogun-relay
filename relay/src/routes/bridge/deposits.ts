@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { ethers } from "ethers";
 import { log, getBridgeClient } from "./utils";
 import {
@@ -393,4 +393,3 @@ router.post(
 );
 
 export default router;
-import express from "express";

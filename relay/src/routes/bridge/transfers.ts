@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { ethers } from "ethers";
 import { log, getBridgeClient, strictLimiter } from "./utils";
 import { transferBalance, reconcileUserBalance } from "../../utils/bridge-state";
@@ -197,4 +197,3 @@ router.post("/reconcile-balance", express.json(), async (req, res) => {
 });
 
 export default router;
-import express from "express";
