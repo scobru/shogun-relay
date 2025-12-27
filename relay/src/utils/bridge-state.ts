@@ -2590,6 +2590,132 @@ export async function getLatestBatch(gun: IGunInstance): Promise<Batch | null> {
 }
 
 /**
+ * Get all batches from GunDB
+ */
+export async function getAllBatches(gun: IGunInstance): Promise<Batch[]> {
+  return new Promise((resolve) => {
+    const batchesPath = "bridge/batches";
+    const timeout = setTimeout(() => {
+      log.warn({ batchesPath }, "Timeout waiting for GunDB response in getAllBatches");
+      resolve([]);
+    }, 15000); // 15 second timeout
+
+    const batchIdsMap = new Map<string, string>(); // key -> batchId
+    const collectedKeys = new Set<string>();
+    let resolved = false;
+    let lastUpdateTime = Date.now();
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      resolved = true;
+    };
+
+    log.debug({ batchesPath }, "Starting to read all batches from GunDB");
+
+    const parentNode = gun.get(batchesPath);
+
+    // Use map().on() to collect batch IDs
+    parentNode.map().on((batch: any, key: string) => {
+      if (resolved) return;
+
+      // Skip metadata keys
+      if (key === "_" || key.startsWith("_") || !key) {
+        return;
+      }
+
+      lastUpdateTime = Date.now();
+
+      if (
+        batch &&
+        typeof batch === "object" &&
+        typeof batch.batchId === "string" &&
+        typeof batch.root === "string"
+      ) {
+        if (!collectedKeys.has(key)) {
+          collectedKeys.add(key);
+          batchIdsMap.set(key, batch.batchId);
+          log.debug(
+            { key, batchId: batch.batchId, totalFound: batchIdsMap.size },
+            "Found batch ID in GunDB"
+          );
+        }
+      }
+    });
+
+    // Also try reading the parent node directly to get immediate data
+    parentNode.once((parentData: any) => {
+      if (resolved) return;
+
+      if (parentData && typeof parentData === "object") {
+        Object.keys(parentData).forEach((key) => {
+          if (key === "_" || key.startsWith("_")) return;
+
+          const batch = parentData[key];
+          if (
+            batch &&
+            typeof batch === "object" &&
+            typeof batch.batchId === "string" &&
+            typeof batch.root === "string"
+          ) {
+            if (!collectedKeys.has(key)) {
+              collectedKeys.add(key);
+              batchIdsMap.set(key, batch.batchId);
+            }
+          }
+        });
+      }
+    });
+
+    // Wait for data to accumulate, with multiple checkpoints
+    const checkAndResolve = async () => {
+      if (resolved) return;
+
+      const timeSinceLastUpdate = Date.now() - lastUpdateTime;
+      const batchIds = Array.from(batchIdsMap.values());
+
+      log.debug(
+        { batchesPath, batchIdsCount: batchIds.length, timeSinceLastUpdate },
+        "Checking batches collection status"
+      );
+
+      // Wait a bit for data to accumulate
+      if (timeSinceLastUpdate < 2000) {
+        return;
+      }
+
+      // Data collection seems complete
+      cleanup();
+      parentNode.off(); // Unsubscribe from all events
+
+      log.debug(
+        { batchesPath, batchIdsCount: batchIds.length },
+        "Finished collecting batch IDs, fetching full batch data"
+      );
+
+      // Fetch all batches using getBatch
+      const batchPromises = batchIds.map((id) => getBatch(gun, id));
+      const batches = await Promise.all(batchPromises);
+      const validBatches = batches.filter((b): b is Batch => b !== null);
+
+      log.debug(
+        { batchesPath, requestedCount: batchIds.length, validCount: validBatches.length },
+        "Fetched all batches from GunDB"
+      );
+
+      resolve(validBatches);
+    };
+
+    // Check at multiple intervals
+    setTimeout(checkAndResolve, 1000);
+    setTimeout(checkAndResolve, 2000);
+    setTimeout(checkAndResolve, 4000);
+    setTimeout(checkAndResolve, 6000);
+    setTimeout(checkAndResolve, 8000);
+    setTimeout(checkAndResolve, 10000);
+  });
+}
+
+/**
  * Check if a deposit has already been processed (idempotency)
  * @param depositKey Unique key: "txHash:user:amount"
  */
@@ -2764,20 +2890,31 @@ export async function reconcileUserBalance(
       "Starting balance reconciliation"
     );
 
-    // Calculate correct balance from on-chain deposits and withdrawals
-    // Query all deposits for this user
-    const deposits = await bridgeClient.queryDeposits(0, "latest", normalizedAddress);
-    const totalDeposits: bigint = deposits.reduce(
-      (sum: bigint, d: any) => sum + BigInt(d.amount),
+    // Calculate correct balance from processed deposits and withdrawals
+    // Use processed deposits (not all on-chain deposits) to avoid double-counting
+    const processedDeposits = await getProcessedDepositsForUser(gun, normalizedAddress);
+    const totalDeposits: bigint = processedDeposits.reduce(
+      (sum: bigint, d: ProcessedDeposit) => sum + BigInt(d.amount || "0"),
       0n
     );
 
-    // Query all processed withdrawals for this user
-    const withdrawals = await bridgeClient.queryWithdrawals(0, "latest", normalizedAddress);
-    const totalWithdrawals: bigint = withdrawals.reduce(
-      (sum: bigint, w: any) => sum + BigInt(w.amount),
-      0n
-    );
+    // Get processed withdrawals from batches (on-chain withdrawals that have been processed)
+    // We can't use queryWithdrawals because it returns all withdrawals, not just processed ones
+    // Instead, we'll calculate from batches
+    const allBatches = await getAllBatches(gun);
+    let totalWithdrawals: bigint = 0n;
+    
+    // Sum withdrawals from all batches for this user
+    for (const batch of allBatches) {
+      if (batch.withdrawals) {
+        for (const withdrawal of batch.withdrawals) {
+          const withdrawalUser = (withdrawal.user || "").toLowerCase();
+          if (withdrawalUser === normalizedAddress) {
+            totalWithdrawals = totalWithdrawals + BigInt(withdrawal.amount || "0");
+          }
+        }
+      }
+    }
 
     // Calculate base balance from deposits - withdrawals
     let calculatedBalance: bigint = totalDeposits - totalWithdrawals;
@@ -2846,8 +2983,34 @@ export async function reconcileUserBalance(
       );
 
       if (difference > 0n) {
-        // Current balance is too low - credit the difference
-        await creditBalance(gun, normalizedAddress, difference, relayKeyPair);
+        // Current balance is too low - set directly to target balance
+        // Using creditBalance would add to existing balance, causing double-counting
+        const balanceData: any = {
+          balance: targetBalance.toString(),
+          user: normalizedAddress,
+          ethereumAddress: normalizedAddress,
+          updatedAt: Date.now(),
+          type: "bridge-balance",
+          corrected: true,
+          reconciliation: true,
+        };
+
+        await FrozenData.createFrozenEntry(
+          gun,
+          balanceData,
+          relayKeyPair,
+          "bridge-balances",
+          normalizedAddress
+        );
+
+        log.debug(
+          {
+            user: normalizedAddress,
+            previousBalance: currentBalance.toString(),
+            newBalance: targetBalance.toString(),
+          },
+          "Balance corrected via direct frozen entry (reconciliation - too low)"
+        );
       } else if (difference < 0n) {
         // Current balance is too high - need to reduce it
         // If target balance is 0 and current balance is positive, set directly to 0
