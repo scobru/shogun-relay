@@ -198,7 +198,8 @@ router.get("/stats", async (req, res) => {
 
     const relaysFound: Array<{ host: any; hasPulse: boolean }> = [];
     const fiveMinutesAgo = Date.now() - 300000;
-    const currentRelayHost = relayConfig.endpoint?.replace(/^https?:\/\//, "").replace(/\/$/, "") || relayConfig.name;
+    const currentRelayHost =
+      relayConfig.endpoint?.replace(/^https?:\/\//, "").replace(/\/$/, "") || relayConfig.name;
 
     // STEP 1: Collect stats from pulse data (real-time relay status)
     // Increased timeout to 15 seconds to allow GunDB more time to sync pulse data from peers
@@ -219,37 +220,40 @@ router.get("/stats", async (req, res) => {
       let currentRelayIncluded = false;
       const includeCurrentRelay = () => {
         if (processedHosts.has(currentRelayHost)) return;
-        
-        gun.get("relays").get(currentRelayHost).once((data: { pulse: any } | undefined) => {
-          if (data && data.pulse && typeof data.pulse === "object") {
-            const pulse = data.pulse;
-            if (pulse.timestamp && pulse.timestamp > fiveMinutesAgo) {
-              if (!processedHosts.has(currentRelayHost)) {
-                processedHosts.add(currentRelayHost);
-                currentRelayIncluded = true;
-                stats.totalRelays++;
-                stats.activeRelays++;
-                const activeConnections = pulse.connections?.active || 0;
-                stats.totalConnections += activeConnections;
-                relaysFound.push({ host: currentRelayHost, hasPulse: true });
-                
-                if (pulse.ipfs && typeof pulse.ipfs === "object") {
-                  const repoSize = pulse.ipfs.repoSize || 0;
-                  const numPins = pulse.ipfs.numPins || 0;
-                  stats.totalStorageBytes += repoSize;
-                  stats.totalPins += numPins;
+
+        gun
+          .get("relays")
+          .get(currentRelayHost)
+          .once((data: { pulse: any } | undefined) => {
+            if (data && data.pulse && typeof data.pulse === "object") {
+              const pulse = data.pulse;
+              if (pulse.timestamp && pulse.timestamp > fiveMinutesAgo) {
+                if (!processedHosts.has(currentRelayHost)) {
+                  processedHosts.add(currentRelayHost);
+                  currentRelayIncluded = true;
+                  stats.totalRelays++;
+                  stats.activeRelays++;
+                  const activeConnections = pulse.connections?.active || 0;
+                  stats.totalConnections += activeConnections;
+                  relaysFound.push({ host: currentRelayHost, hasPulse: true });
+
+                  if (pulse.ipfs && typeof pulse.ipfs === "object") {
+                    const repoSize = pulse.ipfs.repoSize || 0;
+                    const numPins = pulse.ipfs.numPins || 0;
+                    stats.totalStorageBytes += repoSize;
+                    stats.totalPins += numPins;
+                  }
+
+                  loggers.server.debug(
+                    { host: currentRelayHost },
+                    `   📡 Current relay included from GunDB pulse: ${currentRelayHost}`
+                  );
                 }
-                
-                loggers.server.debug(
-                  { host: currentRelayHost },
-                  `   📡 Current relay included from GunDB pulse: ${currentRelayHost}`
-                );
               }
             }
-          }
-        });
+          });
       };
-      
+
       // Try to include current relay immediately
       includeCurrentRelay();
 
@@ -319,9 +323,9 @@ router.get("/stats", async (req, res) => {
           }
         });
 
-      setTimeout(() => {
+      setTimeout(async () => {
         clearTimeout(timer);
-        
+
         // Fallback: if current relay not included, use local app data
         if (!currentRelayIncluded && !processedHosts.has(currentRelayHost)) {
           processedHosts.add(currentRelayHost);
@@ -331,13 +335,107 @@ router.get("/stats", async (req, res) => {
           const activeWires = req.app.get("activeWires") || 0;
           stats.totalConnections += activeWires;
           relaysFound.push({ host: currentRelayHost, hasPulse: false });
-          
+
+          // Try to get IPFS stats from local node as fallback
+          try {
+            const repoStats = await ipfsRequest("/api/v0/repo/stat");
+            if (repoStats && typeof repoStats === "object") {
+              let repoSize = 0;
+              if ("RepoSize" in repoStats) {
+                const size = (repoStats as { RepoSize?: number | string }).RepoSize;
+                repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
+              } else if ("repoSize" in repoStats) {
+                const size = (repoStats as { repoSize?: number | string }).repoSize;
+                repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
+              }
+
+              if (repoSize > 0) {
+                stats.totalStorageBytes += repoSize;
+                loggers.server.debug(
+                  { repoSize },
+                  `   💾 Current relay IPFS repo size (fallback): ${repoSize} bytes`
+                );
+              }
+
+              // Get pin count
+              const pinLs = await ipfsRequest("/api/v0/pin/ls?type=recursive");
+              if (pinLs && typeof pinLs === "object" && "Keys" in pinLs) {
+                const keys = (pinLs as { Keys?: Record<string, any> }).Keys;
+                if (keys) {
+                  const pinCount = Object.keys(keys).length;
+                  stats.totalPins += pinCount;
+                  loggers.server.debug(
+                    { pinCount },
+                    `   📌 Current relay IPFS pins (fallback): ${pinCount}`
+                  );
+                }
+              }
+            }
+          } catch (ipfsError) {
+            // Ignore IPFS errors in fallback
+          }
+
           loggers.server.debug(
             { host: currentRelayHost, activeWires },
             `   📡 Current relay included from local data (fallback): ${currentRelayHost}, connections: ${activeWires}`
           );
+        } else if (currentRelayIncluded) {
+          // Current relay was included but might not have IPFS data in pulse, try to add it
+          const currentRelayData = await new Promise<{ pulse?: { ipfs?: any } } | null>(
+            (resolve) => {
+              gun
+                .get("relays")
+                .get(currentRelayHost)
+                .once((data: any) => resolve(data || null));
+              setTimeout(() => resolve(null), 1000);
+            }
+          );
+
+          // If pulse exists but no IPFS data, try to fetch from local node
+          if (
+            currentRelayData?.pulse &&
+            (!currentRelayData.pulse.ipfs || !currentRelayData.pulse.ipfs.repoSize)
+          ) {
+            try {
+              const repoStats = await ipfsRequest("/api/v0/repo/stat");
+              if (repoStats && typeof repoStats === "object") {
+                let repoSize = 0;
+                if ("RepoSize" in repoStats) {
+                  const size = (repoStats as { RepoSize?: number | string }).RepoSize;
+                  repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
+                } else if ("repoSize" in repoStats) {
+                  const size = (repoStats as { repoSize?: number | string }).repoSize;
+                  repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
+                }
+
+                if (repoSize > 0) {
+                  stats.totalStorageBytes += repoSize;
+                  loggers.server.debug(
+                    { repoSize },
+                    `   💾 Current relay IPFS repo size (fallback): ${repoSize} bytes`
+                  );
+                }
+
+                // Get pin count
+                const pinLs = await ipfsRequest("/api/v0/pin/ls?type=recursive");
+                if (pinLs && typeof pinLs === "object" && "Keys" in pinLs) {
+                  const keys = (pinLs as { Keys?: Record<string, any> }).Keys;
+                  if (keys) {
+                    const pinCount = Object.keys(keys).length;
+                    stats.totalPins += pinCount;
+                    loggers.server.debug(
+                      { pinCount },
+                      `   📌 Current relay IPFS pins (fallback): ${pinCount}`
+                    );
+                  }
+                }
+              }
+            } catch (ipfsError) {
+              // Ignore IPFS errors
+            }
+          }
         }
-        
+
         loggers.server.info(
           { totalRelays: stats.totalRelays, activeRelays: stats.activeRelays },
           `📊 Network stats collection complete. Total relays: ${stats.totalRelays}, Active: ${stats.activeRelays}`

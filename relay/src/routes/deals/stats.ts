@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import * as StorageDeals from "../../utils/storage-deals";
+import { registryConfig } from "../../config";
 
 const router: Router = Router();
 
@@ -61,6 +62,82 @@ router.get("/stats", async (req: Request, res: Response) => {
       );
     });
 
+    // Optional: Also check on-chain deals if relay is configured and no deals found in GunDB
+    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+    const REGISTRY_CHAIN_ID = registryConfig.chainId;
+    const dealMap = new Map<string, any>(); // Use map to deduplicate by deal ID
+
+    // Add existing deals to map
+    for (const deal of allDeals) {
+      if (deal.id) {
+        dealMap.set(deal.id, deal);
+      }
+    }
+
+    if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID && allDeals.length === 0) {
+      try {
+        const { createStorageDealRegistryClient, createRegistryClientWithSigner } =
+          await import("../../utils/registry-client.js");
+        const registryClient = createRegistryClientWithSigner(
+          RELAY_PRIVATE_KEY,
+          REGISTRY_CHAIN_ID
+        );
+        const relayAddress = registryClient.wallet.address;
+        const storageDealRegistryClient = createStorageDealRegistryClient(REGISTRY_CHAIN_ID);
+
+        const onChainDeals = await storageDealRegistryClient.getRelayDeals(relayAddress);
+
+        // Convert on-chain deals to GunDB format for stats calculation
+        for (const onChainDeal of onChainDeals) {
+          if (onChainDeal.active && new Date(onChainDeal.expiresAt) > new Date()) {
+            const deal: StorageDeals.Deal = {
+              id: onChainDeal.dealId,
+              version: 1,
+              cid: onChainDeal.cid,
+              clientAddress: onChainDeal.client,
+              providerPub: relayAddress,
+              tier: "standard",
+              sizeMB: onChainDeal.sizeMB,
+              durationDays: 0,
+              pricing: {
+                tier: "standard",
+                sizeMB: onChainDeal.sizeMB,
+                durationDays: 0,
+                months: 0,
+                pricePerMBMonth: 0,
+                basePrice: 0,
+                storageOverheadPercent: 0,
+                replicationFactor: 1,
+                totalPriceUSDC: 0,
+                features: {
+                  erasureCoding: false,
+                  slaGuarantee: false,
+                },
+              },
+              createdAt: new Date(onChainDeal.createdAt).getTime(),
+              activatedAt: new Date(onChainDeal.createdAt).getTime(),
+              expiresAt: new Date(onChainDeal.expiresAt).getTime(),
+              paymentRequired: 0,
+              paymentVerified: true,
+              erasureCoding: false,
+              replicationFactor: 1,
+              replicas: {},
+              replicaCount: 0,
+              status: StorageDeals.DEAL_STATUS.ACTIVE,
+            };
+
+            if (!dealMap.has(deal.id)) {
+              dealMap.set(deal.id, deal);
+              allDeals.push(deal);
+            }
+          }
+        }
+      } catch (onChainError) {
+        // Ignore on-chain errors - non-critical
+        console.error("Error fetching on-chain deals:", onChainError);
+      }
+    }
+
     // Calculate aggregate stats
     const stats = StorageDeals.getDealStats(allDeals);
 
@@ -68,6 +145,8 @@ router.get("/stats", async (req: Request, res: Response) => {
       success: true,
       stats: {
         ...stats,
+        total: stats.total,
+        active: stats.active,
         totalDeals: stats.total,
         activeDeals: stats.active,
         expiredDeals: stats.expired,

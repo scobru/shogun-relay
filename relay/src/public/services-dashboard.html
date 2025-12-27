@@ -1061,16 +1061,20 @@
                     if (data.success && data.stats) {
                         const stats = data.stats;
                         document.getElementById('deals-status').textContent = 'Active';
-                        document.getElementById('deals-active').textContent = stats.active || 0;
-                        document.getElementById('deals-completed').textContent = stats.completed || 0;
-                        document.getElementById('deals-total').textContent = stats.total || 0;
-                        document.getElementById('deals-summary').textContent = `${stats.active || 0} active`;
+                        document.getElementById('deals-active').textContent = stats.active || stats.activeDeals || 0;
+                        // completed deals are expired deals
+                        document.getElementById('deals-completed').textContent = stats.expired || stats.expiredDeals || 0;
+                        document.getElementById('deals-total').textContent = stats.total || stats.totalDeals || 0;
+                        document.getElementById('deals-summary').textContent = `${stats.active || stats.activeDeals || 0} active`;
 
-                        const totalValue = stats.totalValue || 0;
+                        // totalRevenueUSDC is in USDC, not ETH - convert if needed, but usually display as USDC
+                        const totalRevenue = stats.totalRevenueUSDC || stats.totalRevenue || 0;
                         document.getElementById('deals-value').textContent =
-                            totalValue > 0 ? `${(totalValue / 1e18).toFixed(4)} ETH` : '0 ETH';
+                            totalRevenue > 0 ? `${totalRevenue.toFixed(4)} USDC` : '0 USDC';
 
-                        const storageBytes = stats.totalStorage || 0;
+                        // totalSizeMB is in MB, convert to bytes for formatBytes
+                        const storageMB = stats.totalSizeMB || 0;
+                        const storageBytes = storageMB * 1024 * 1024;
                         document.getElementById('deals-storage').textContent = formatBytes(storageBytes);
 
                         updateStatusIndicator('deals', stats.active > 0 ? 'online' : 'warning');
