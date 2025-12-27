@@ -501,7 +501,24 @@
                 document.getElementById('memoryUsage').textContent = Math.round((data.memory?.heapUsed || 0) / 1024 / 1024);
                 document.getElementById('requestRate').textContent = data.dam?.in?.rate || 0;
                 const uptimeMs = data.up?.time || 0;
-                document.getElementById('uptime').textContent = Math.round(uptimeMs / 1000 / 3600);
+                const uptimeSeconds = uptimeMs / 1000;
+                const uptimeHours = uptimeSeconds / 3600;
+                // Show in minutes if less than 1 hour, otherwise show hours with decimals if less than 24 hours
+                let uptimeDisplay;
+                let uptimeUnit = '';
+                if (uptimeHours < 1) {
+                    const minutes = Math.floor(uptimeSeconds / 60);
+                    uptimeDisplay = minutes;
+                    uptimeUnit = 'min';
+                } else if (uptimeHours < 24) {
+                    uptimeDisplay = uptimeHours.toFixed(2);
+                    uptimeUnit = 'hours';
+                } else {
+                    uptimeDisplay = Math.round(uptimeHours);
+                    uptimeUnit = 'hours';
+                }
+                document.getElementById('uptime').textContent = uptimeDisplay;
+                document.getElementById('uptimeUnit').textContent = uptimeUnit;
 
                 // Detailed stats
                 document.getElementById('statVersion').textContent = data.version || '-';
