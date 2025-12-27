@@ -473,6 +473,83 @@
         </div>
     </div>
 
+    <!-- API Keys Modal -->
+    <div class="modal" id="apiKeysModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2 class="modal-title">API Keys</h2>
+                <button class="modal-close" onclick="closeApiKeysModal()">×</button>
+            </div>
+            <div style="padding: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <p style="color: var(--md-on-surface-variant); margin: 0;">
+                        Manage API keys for programmatic access to the drive
+                    </p>
+                    <button class="md-btn md-btn-filled" onclick="showCreateApiKeyModal()">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-right: 8px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Create Key
+                    </button>
+                </div>
+                <div id="apiKeysList" style="min-height: 200px;">
+                    <div class="loading">Loading API keys...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create API Key Modal -->
+    <div class="modal" id="createApiKeyModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 class="modal-title">Create API Key</h2>
+                <button class="modal-close" onclick="closeCreateApiKeyModal()">×</button>
+            </div>
+            <div style="padding: 24px;">
+                <div class="form-group">
+                    <label class="form-label">Key Name</label>
+                    <input type="text" class="form-input" id="apiKeyNameInput" placeholder="e.g., My App Key">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Expires In (Days, optional)</label>
+                    <input type="number" class="form-input" id="apiKeyExpiresInput" placeholder="Leave empty for no expiration" min="1">
+                </div>
+                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+                    <button class="md-btn md-btn-text" onclick="closeCreateApiKeyModal()">Cancel</button>
+                    <button class="md-btn md-btn-filled" onclick="doCreateApiKey()">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Show API Key Modal (after creation) -->
+    <div class="modal" id="showApiKeyModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 class="modal-title">API Key Created</h2>
+                <button class="modal-close" onclick="closeShowApiKeyModal()">×</button>
+            </div>
+            <div style="padding: 24px;">
+                <div style="background-color: var(--md-surface-container); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                    <p style="color: var(--md-error); font-weight: 500; margin: 0 0 12px 0;">
+                        ⚠️ Save this token now. It will not be shown again!
+                    </p>
+                    <div style="background-color: var(--md-surface); border: 1px solid var(--md-outline-variant); border-radius: 8px; padding: 12px; font-family: monospace; word-break: break-all; font-size: 0.875rem;" id="createdApiKeyToken"></div>
+                    <button class="md-btn md-btn-text" onclick="copyApiKeyToken()" style="margin-top: 12px;">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-right: 8px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Copy Token
+                    </button>
+                </div>
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button class="md-btn md-btn-filled" onclick="closeShowApiKeyModal()">Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Notification -->
     <div class="notification" id="notification"></div>
 
