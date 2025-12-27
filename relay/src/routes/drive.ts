@@ -20,14 +20,20 @@ export function initDriveApiKeys(gun: any, relayPub: string, relayUser: any): vo
 }
 
 // Middleware to initialize API keys manager on first request
-export function ensureApiKeysInitialized(req: Request, res: Response, next: NextFunction): void {
+export async function ensureApiKeysInitialized(req: Request, res: Response, next: NextFunction): Promise<void> {
   const gun = req.app.get("gunInstance");
   const relayPub = req.app.get("relayUserPub");
-  const { getRelayUser } = require("../utils/relay-user");
-  const relayUser = getRelayUser();
   
-  if (gun && relayPub && relayUser && !apiKeysInitialized) {
-    initDriveApiKeys(gun, relayPub, relayUser);
+  if (gun && relayPub && !apiKeysInitialized) {
+    try {
+      const { getRelayUser } = await import("../utils/relay-user");
+      const relayUser = getRelayUser();
+      if (relayUser) {
+        initDriveApiKeys(gun, relayPub, relayUser);
+      }
+    } catch (error) {
+      loggers.server.warn({ err: error }, "Failed to initialize API keys manager");
+    }
   }
   
   next();
