@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Live Stats - Shogun Relay</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Shared Styles -->
+    <link rel="stylesheet" href="styles/google-md3.css">
+    <link rel="stylesheet" href="styles/common.css">
+    <!-- Shared Components -->
+    <script src="lib/admin-auth.js"></script>
+    <script src="lib/components.js"></script>
+    <style>
+        /* Page-specific styles only */
+        .collapsible-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            background-color: var(--md-surface-container-low);
+            border-bottom: 1px solid var(--md-outline-variant);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .collapsible-header:hover {
+            background-color: var(--md-surface-container);
+        }
+
+        .collapsible-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+        }
+
+        .collapsible-content {
+            display: none;
+            padding: 18px;
+        }
+
+        .collapsible-content.open {
+            display: block;
+        }
+
+        .chevron {
+            transition: transform 0.2s;
+        }
+
+        .collapsible-header.open .chevron {
+            transform: rotate(180deg);
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px;
+        }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background-color: var(--md-surface-container);
+            border-radius: 8px;
+        }
+
+        .detail-label {
+            font-size: 0.85rem;
+            color: var(--md-on-surface-variant);
+        }
+
+        .detail-value {
+            font-weight: 500;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .peer-list {
+            list-style: none;
+            padding: 14px;
+            background-color: var(--md-surface-container);
+            border-radius: 10px;
+            max-height: 180px;
+            overflow-y: auto;
+            margin: 0;
+        }
+
+        .peer-list li {
+            padding: 6px 10px;
+            border-bottom: 1px solid var(--md-outline-variant);
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .peer-list li:last-child {
+            border-bottom: none;
+        }
+
+        .raw-json {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 11px;
+            background-color: var(--md-surface-container);
+            border-radius: 10px;
+            padding: 14px;
+            max-height: 250px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin: 0;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .form-row .md-input {
+            flex: 1;
+            height: 44px;
+            padding: 0 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header using shared component -->
+    <shogun-header title="Live Stats" subtitle="Real-time system monitoring and metrics" icon="chart" show-back>
+    </shogun-header>
+
+    <main class="md-container">
+        <!-- Quick Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon stat-icon-blue">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value" id="peersCount">-</div>
+                    <div class="stat-label">Connected Peers</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon stat-icon-purple">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value"><span id="memoryUsage">-</span> <small>MB</small></div>
+                    <div class="stat-label">Memory Usage</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon stat-icon-green">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value"><span id="requestRate">-</span> <small>req/s</small></div>
+                    <div class="stat-label">Request Rate</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon stat-icon-orange">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value"><span id="uptime">-</span> <small id="uptimeUnit">h</small></div>
+                    <div class="stat-label">Uptime</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collapsible Sections -->
+        <div class="section-card" style="padding: 0; overflow: hidden;">
+            <div class="collapsible-header" onclick="toggleSection(this)">
+                <span class="collapsible-title">🖥️ System Info</span>
+                <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            <div class="collapsible-content">
+                <div class="detail-grid">
+                    <div class="detail-item"><span class="detail-label">Version</span><span class="detail-value"
+                            id="statVersion">-</span></div>
+                    <div class="detail-item"><span class="detail-label">Uptime</span><span class="detail-value"
+                            id="statUptime">-</span></div>
+                    <div class="detail-item"><span class="detail-label">Timestamp</span><span class="detail-value"
+                            id="statTimestamp">-</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card" style="padding: 0; overflow: hidden;">
+            <div class="collapsible-header" onclick="toggleSection(this)">
+                <span class="collapsible-title">💾 Memory</span>
+                <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            <div class="collapsible-content">
+                <div class="detail-grid">
+                    <div class="detail-item"><span class="detail-label">Heap Used</span><span class="detail-value"
+                            id="statHeapUsed">-</span></div>
+                    <div class="detail-item"><span class="detail-label">Heap Total</span><span class="detail-value"
+                            id="statHeapTotal">-</span></div>
+                    <div class="detail-item"><span class="detail-label">External</span><span class="detail-value"
+                            id="statExternal">-</span></div>
+                    <div class="detail-item"><span class="detail-label">RSS</span><span class="detail-value"
+                            id="statRSS">-</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card" style="padding: 0; overflow: hidden;">
+            <div class="collapsible-header" onclick="toggleSection(this)">
+                <span class="collapsible-title">⚡ CPU</span>
+                <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            <div class="collapsible-content">
+                <div class="detail-grid">
+                    <div class="detail-item"><span class="detail-label">User (μs)</span><span class="detail-value"
+                            id="statCpuUser">-</span></div>
+                    <div class="detail-item"><span class="detail-label">System (μs)</span><span class="detail-value"
+                            id="statCpuSystem">-</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card" style="padding: 0; overflow: hidden;">
+            <div class="collapsible-header" onclick="toggleSection(this)">
+                <span class="collapsible-title">📄 Raw JSON</span>
+                <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            <div class="collapsible-content">
+                <pre class="raw-json" id="rawJsonContent"></pre>
+            </div>
+        </div>
+
+        <!-- Admin Controls -->
+        <div class="section-card">
+            <h2 class="section-title">Admin Controls</h2>
+
+            <h4 class="md-label-large md-mb-sm">Connected Peers:</h4>
+            <ul class="peer-list" id="peerList">
+                <li>Loading...</li>
+            </ul>
+            <div class="form-row md-mt-md">
+                <input type="text" id="peerInput" class="md-input" placeholder="wss://gun.example.com/gun">
+                <button id="addPeerBtn" class="md-btn md-btn-filled">Add</button>
+            </div>
+            <div id="peerStatus" class="md-body-small md-mt-sm"></div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="quick-nav">
+            <a href="/charts.html" class="quick-nav-pill">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4" />
+                </svg>
+                Charts
+            </a>
+            <a href="/network-stats" class="quick-nav-pill">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9" />
+                </svg>
+                Network
+            </a>
+        </div>
+
+        <p id="lastUpdated" class="md-body-small md-text-secondary md-text-center md-mt-lg"></p>
+
+        <footer class="md-footer">
+            <p class="md-body-small">Shogun Relay — <a href="https://github.com/scobru/shogun">GitHub</a></p>
+        </footer>
+    </main>
+
+    <script>
+        // Toggle collapsible sections
+        function toggleSection(header) {
+            header.classList.toggle('open');
+            header.nextElementSibling.classList.toggle('open');
+        }
+
+        // Get auth token
+        function getAuthToken() {
+            return ShogunAdmin.getPassword() || null;
+        }
+
+        // Fetch stats
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/v1/system/stats.json');
+                const data = await res.json();
+
+                document.getElementById('peersCount').textContent = data.peers?.count || 0;
+                document.getElementById('memoryUsage').textContent = Math.round((data.memory?.heapUsed || 0) / 1024 / 1024);
+                document.getElementById('requestRate').textContent = data.dam?.in?.rate || 0;
+
+                const uptimeMs = data.up?.time || (data.uptime ? data.uptime * 1000 : 0);
+                const uptimeH = uptimeMs / 3600000;
+                if (uptimeH < 1) {
+                    document.getElementById('uptime').textContent = Math.floor(uptimeMs / 60000);
+                    document.getElementById('uptimeUnit').textContent = 'm';
+                } else {
+                    document.getElementById('uptime').textContent = uptimeH.toFixed(1);
+                    document.getElementById('uptimeUnit').textContent = 'h';
+                }
+
+                document.getElementById('statVersion').textContent = data.version || '-';
+                document.getElementById('statUptime').textContent = `${Math.round(uptimeMs / 60000)} min`;
+                document.getElementById('statTimestamp').textContent = new Date(data.timestamp || Date.now()).toLocaleString();
+                document.getElementById('statHeapUsed').textContent = `${Math.round((data.memory?.heapUsed || 0) / 1048576)} MB`;
+                document.getElementById('statHeapTotal').textContent = `${Math.round((data.memory?.heapTotal || 0) / 1048576)} MB`;
+                document.getElementById('statExternal').textContent = `${Math.round((data.memory?.external || 0) / 1048576)} MB`;
+                document.getElementById('statRSS').textContent = `${Math.round((data.memory?.rss || 0) / 1048576)} MB`;
+                document.getElementById('statCpuUser').textContent = data.cpu?.user || '-';
+                document.getElementById('statCpuSystem').textContent = data.cpu?.system || '-';
+                document.getElementById('rawJsonContent').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('lastUpdated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+            } catch (e) {
+                console.error('Stats fetch error:', e);
+            }
+        }
+
+        // Fetch peers
+        async function fetchPeers() {
+            const token = getAuthToken();
+            if (!token) {
+                document.getElementById('peerList').innerHTML = '<li>Auth required</li>';
+                return;
+            }
+            try {
+                const res = await fetch('/api/v1/system/peers', { headers: ShogunAdmin.getAuthHeaders() });
+                const data = await res.json();
+                if (data.success && data.peers?.length) {
+                    document.getElementById('peerList').innerHTML = data.peers.map(p => `<li>${p}</li>`).join('');
+                } else {
+                    document.getElementById('peerList').innerHTML = '<li>No peers</li>';
+                }
+            } catch (e) {
+                document.getElementById('peerList').innerHTML = `<li>Error: ${e.message}</li>`;
+            }
+        }
+
+        // Add peer
+        async function addPeer() {
+            const token = getAuthToken();
+            if (!token) return ShogunUtils.showToast('Auth required', 'error');
+
+            const peer = document.getElementById('peerInput').value.trim();
+            if (!peer) return ShogunUtils.showToast('Enter peer address', 'warning');
+
+            try {
+                const res = await ShogunUtils.fetchWithAuth('/api/v1/system/peers/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ peer })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('peerInput').value = '';
+                    ShogunUtils.showToast('Peer added', 'success');
+                    fetchPeers();
+                } else {
+                    ShogunUtils.showToast(data.error, 'error');
+                }
+            } catch (e) {
+                ShogunUtils.showToast(e.message, 'error');
+            }
+        }
+
+        // Init
+        document.getElementById('addPeerBtn').addEventListener('click', addPeer);
+        fetchStats();
+        fetchPeers();
+        setInterval(fetchStats, 5000);
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,453 @@
+/**
+ * Shogun Relay - Common Dashboard Styles
+ * Extracted from inline styles across all pages
+ * Use alongside google-md3.css for consistent styling
+ */
+
+/* ============================================================================
+   PAGE LAYOUT
+   ============================================================================ */
+
+.page-header {
+  background: radial-gradient(ellipse at top, rgba(255, 105, 180, 0.18) 0%, transparent 60%),
+              linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+  color: white;
+  padding: 32px 24px;
+  text-align: center;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.page-header-compact {
+  padding: 24px 16px;
+}
+
+.page-header-icon {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background-color: rgba(255, 255, 255, 0.15);
+  margin: 0 auto 16px;
+}
+
+.page-header-icon svg {
+  width: 32px;
+  height: 32px;
+  color: white;
+}
+
+.page-header h1 {
+  font-family: var(--md-font-display);
+  font-size: 1.75rem;
+  font-weight: 500;
+  margin: 0 0 8px 0;
+}
+
+.page-header p {
+  opacity: 0.85;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+/* ============================================================================
+   QUICK NAVIGATION
+   ============================================================================ */
+
+.quick-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  background-color: var(--md-surface-container-low);
+  border-radius: 12px;
+}
+
+.quick-nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 100px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  background-color: var(--md-surface-container);
+  border: 1px solid var(--md-outline);
+  transition: all 0.2s;
+}
+
+.quick-nav-pill:hover {
+  background-color: var(--md-primary-container);
+  border-color: var(--md-primary);
+  color: var(--md-on-primary-container);
+}
+
+.quick-nav-pill svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ============================================================================
+   STAT CARDS
+   ============================================================================ */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background-color: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.2s;
+}
+
+.stat-card:hover {
+  border-color: var(--md-primary);
+}
+
+.stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.stat-icon-green { background-color: rgba(76, 175, 80, 0.18); color: #4CAF50; }
+.stat-icon-blue { background-color: rgba(66, 165, 245, 0.18); color: #42A5F5; }
+.stat-icon-purple { background-color: rgba(139, 92, 246, 0.18); color: #8B5CF6; }
+.stat-icon-orange { background-color: rgba(255, 165, 0, 0.18); color: #FFA500; }
+.stat-icon-red { background-color: rgba(244, 67, 54, 0.18); color: #F44336; }
+.stat-icon-cyan { background-color: rgba(0, 188, 212, 0.18); color: #00BCD4; }
+.stat-icon-pink { background-color: rgba(255, 105, 180, 0.18); color: #ff69b4; }
+
+.stat-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.stat-value {
+  font-family: var(--md-font-display);
+  font-size: 1.35rem;
+  font-weight: 500;
+  color: var(--md-on-surface);
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--md-on-surface-variant);
+  margin-top: 2px;
+}
+
+/* ============================================================================
+   ACTION CARDS / NAV ITEMS
+   ============================================================================ */
+
+.action-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.action-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--md-on-surface);
+  background-color: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  transition: all 0.2s;
+}
+
+.action-card:hover {
+  background-color: var(--md-surface-container-high);
+  border-color: var(--md-primary);
+}
+
+.action-card-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.action-card-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.action-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.action-card-title {
+  font-weight: 500;
+  font-size: 0.95rem;
+  margin-bottom: 2px;
+}
+
+.action-card-desc {
+  font-size: 0.8rem;
+  color: var(--md-on-surface-variant);
+}
+
+/* ============================================================================
+   SECTION CARDS
+   ============================================================================ */
+
+.section-card {
+  background-color: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-family: var(--md-font-display);
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--md-on-surface);
+  margin-bottom: 16px;
+  padding-left: 12px;
+  border-left: 3px solid var(--md-primary);
+}
+
+/* ============================================================================
+   TABLES
+   ============================================================================ */
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.data-table th {
+  font-weight: 500;
+  color: var(--md-on-surface-variant);
+  background-color: var(--md-surface-container);
+}
+
+.data-table tr:hover td {
+  background-color: var(--md-surface-container-low);
+}
+
+.data-table-empty {
+  text-align: center;
+  padding: 32px;
+  color: var(--md-on-surface-variant);
+}
+
+/* ============================================================================
+   CODE / HASH DISPLAY
+   ============================================================================ */
+
+.code-block {
+  background-color: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.hash-display {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--md-on-surface-variant);
+  background-color: var(--md-surface-container);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--md-on-surface-variant);
+  transition: all 0.2s;
+}
+
+.copy-btn:hover {
+  background-color: var(--md-surface-container-high);
+  color: var(--md-primary);
+}
+
+/* ============================================================================
+   STATUS BADGES
+   ============================================================================ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-success { background-color: var(--md-success-container); color: #4CAF50; }
+.badge-error { background-color: var(--md-error-container); color: #F44336; }
+.badge-warning { background-color: var(--md-warning-container); color: #FFA500; }
+.badge-info { background-color: var(--md-primary-container); color: var(--md-on-primary-container); }
+.badge-protected { background-color: var(--md-warning-container); color: #FFA500; }
+.badge-new { background-color: var(--md-primary-container); color: var(--md-on-primary-container); }
+
+/* ============================================================================
+   LOADING STATES
+   ============================================================================ */
+
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+}
+
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--md-outline-variant);
+  border-top-color: var(--md-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--md-surface-container) 25%, var(--md-surface-container-high) 50%, var(--md-surface-container) 75%);
+  background-size: 200% 100%;
+  animation: skeleton 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+@keyframes skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ============================================================================
+   EMPTY STATES
+   ============================================================================ */
+
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--md-on-surface-variant);
+}
+
+.empty-state-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  opacity: 0.5;
+}
+
+.empty-state-title {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--md-on-surface);
+}
+
+.empty-state-desc {
+  font-size: 0.9rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* ============================================================================
+   RESPONSIVE
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .page-header {
+    padding: 24px 16px;
+  }
+  
+  .page-header h1 {
+    font-size: 1.4rem;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .section-card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .quick-nav {
+    gap: 8px;
+  }
+  
+  .quick-nav-pill {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  
+  .stat-card {
+    padding: 12px 14px;
+  }
+  
+  .stat-value {
+    font-size: 1.2rem;
+  }
+}
