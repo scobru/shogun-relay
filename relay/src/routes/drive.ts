@@ -617,6 +617,6 @@ export async function handlePublicLinkAccess(req: Request, res: Response): Promi
       });
     }
   }
-});
+}
 
 export default router;
