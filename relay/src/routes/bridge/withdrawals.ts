@@ -263,8 +263,56 @@ router.get("/nonce/:user", async (req, res) => {
     }
 
     // Use async version to read from GunDB if not in cache
-    const lastNonce = await getLastNonceAsync(gun, userAddress);
+    let lastNonce = await getLastNonceAsync(gun, userAddress);
+
+    // Also check pending withdrawals to ensure we have the most recent nonce
+    // This handles cases where the nonce hasn't been persisted yet
+    try {
+      const pendingWithdrawals = await getPendingWithdrawals(gun);
+      const userPendingWithdrawals = pendingWithdrawals.filter(
+        (w: PendingWithdrawal) => w.user.toLowerCase() === userAddress.toLowerCase()
+      );
+
+      if (userPendingWithdrawals.length > 0) {
+        // Find the highest nonce among pending withdrawals
+        const maxPendingNonce = userPendingWithdrawals.reduce(
+          (max: bigint, w: PendingWithdrawal) => {
+            const nonce = BigInt(w.nonce);
+            return nonce > max ? nonce : max;
+          },
+          0n
+        );
+
+        // Use the higher of the two: persisted nonce or max pending nonce
+        if (maxPendingNonce > lastNonce) {
+          log.debug(
+            {
+              user: userAddress,
+              persistedNonce: lastNonce.toString(),
+              maxPendingNonce: maxPendingNonce.toString(),
+            },
+            "Found higher nonce in pending withdrawals"
+          );
+          lastNonce = maxPendingNonce;
+        }
+      }
+    } catch (err) {
+      log.warn(
+        { user: userAddress, err },
+        "Failed to check pending withdrawals for nonce calculation"
+      );
+    }
+
     const nextNonce = lastNonce + 1n;
+
+    log.debug(
+      {
+        user: userAddress,
+        lastNonce: lastNonce.toString(),
+        nextNonce: nextNonce.toString(),
+      },
+      "Returning next nonce for user"
+    );
 
     res.json({
       success: true,

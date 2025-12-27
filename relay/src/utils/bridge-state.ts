@@ -160,9 +160,20 @@ export async function getLastNonceAsync(gun: IGunInstance, userAddress: string):
   // Always read from GunDB to ensure we have the latest value
   // The cache might be stale after a relay restart or if persistence hasn't completed
   return new Promise((resolve) => {
+    const cachedBeforeRead = lastNonceByUser.get(normalizedAddress);
+    
     const timeout = setTimeout(() => {
       // Fallback to cache if GunDB read times out
       const cached = lastNonceByUser.get(normalizedAddress);
+      log.debug(
+        {
+          user: normalizedAddress,
+          cachedBeforeRead: cachedBeforeRead?.toString(),
+          cachedAfterTimeout: cached?.toString(),
+          source: "timeout",
+        },
+        "getLastNonceAsync: GunDB read timed out, using cache"
+      );
       resolve(cached !== undefined ? cached : 0n);
     }, 2000);
 
@@ -176,15 +187,44 @@ export async function getLastNonceAsync(gun: IGunInstance, userAddress: string):
           try {
             const nonce = BigInt(data.lastNonce);
             lastNonceByUser.set(normalizedAddress, nonce); // Update cache
+            log.debug(
+              {
+                user: normalizedAddress,
+                nonceFromGunDB: nonce.toString(),
+                cachedBeforeRead: cachedBeforeRead?.toString(),
+                source: "gunDB",
+              },
+              "getLastNonceAsync: Read nonce from GunDB"
+            );
             resolve(nonce);
-          } catch {
+          } catch (err) {
             // Fallback to cache on parse error
             const cached = lastNonceByUser.get(normalizedAddress);
+            log.warn(
+              {
+                user: normalizedAddress,
+                data,
+                err,
+                cached: cached?.toString(),
+                source: "parse-error",
+              },
+              "getLastNonceAsync: Failed to parse nonce from GunDB"
+            );
             resolve(cached !== undefined ? cached : 0n);
           }
         } else {
           // No data in GunDB, return cached value or 0n
           const cached = lastNonceByUser.get(normalizedAddress);
+          log.debug(
+            {
+              user: normalizedAddress,
+              hasData: !!data,
+              cachedBeforeRead: cachedBeforeRead?.toString(),
+              cached: cached?.toString(),
+              source: "no-data",
+            },
+            "getLastNonceAsync: No nonce data in GunDB"
+          );
           resolve(cached !== undefined ? cached : 0n);
         }
       });
