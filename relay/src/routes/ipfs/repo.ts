@@ -8,28 +8,11 @@ import type { IpfsRequestOptions } from "./types";
 const router: Router = Router();
 
 /**
- * Admin authentication middleware helper
+ * Admin or API Key authentication middleware helper
  */
-function adminAuthMiddleware(req: Request, res: Response, next: NextFunction) {
-  const tokenAuthMiddleware = req.app.get("tokenAuthMiddleware");
-  if (tokenAuthMiddleware) {
-    tokenAuthMiddleware(req, res, next);
-  } else {
-    const authHeader = req.headers["authorization"];
-    const bearerToken = authHeader && authHeader.split(" ")[1];
-    const customToken = req.headers["token"];
-    const token = bearerToken || customToken;
-
-    if (token === authConfig.adminPassword) {
-      next();
-    } else {
-      loggers.server.warn(
-        { bearerToken: !!bearerToken, customToken: !!customToken },
-        "Auth failed"
-      );
-      return res.status(401).json({ success: false, error: "Unauthorized" });
-    }
-  }
+async function adminOrApiKeyAuthMiddleware(req: Request, res: Response, next: NextFunction) {
+  const { adminOrApiKeyAuthMiddleware: authMiddleware } = await import("../../middleware/admin-or-api-key-auth");
+  authMiddleware(req, res, next);
 }
 
 /**
@@ -97,7 +80,7 @@ router.get("/status", async (req: Request, res: Response) => {
 /**
  * IPFS Repo GC endpoint
  */
-router.post("/repo/gc", adminAuthMiddleware, async (req, res) => {
+router.post("/repo/gc", adminOrApiKeyAuthMiddleware, async (req, res) => {
   try {
     const requestOptions: IpfsRequestOptions = {
       hostname: "127.0.0.1",
@@ -157,7 +140,7 @@ router.post("/repo/gc", adminAuthMiddleware, async (req, res) => {
 /**
  * IPFS API connectivity test endpoint
  */
-router.get("/test", adminAuthMiddleware, async (req, res) => {
+router.get("/test", adminOrApiKeyAuthMiddleware, async (req, res) => {
   try {
     loggers.server.debug("🔍 Testing IPFS API connectivity...");
 
@@ -341,7 +324,7 @@ router.get("/stat/:cid", async (req: Request, res: Response) => {
 /**
  * IPFS Repo Stats endpoint
  */
-router.get("/repo/stat", adminAuthMiddleware, async (req, res) => {
+router.get("/repo/stat", adminOrApiKeyAuthMiddleware, async (req, res) => {
   try {
     loggers.server.debug("📊 Getting IPFS repository statistics...");
 

@@ -4,35 +4,42 @@ import path from "path";
 import { driveManager } from "../utils/drive";
 import { loggers } from "../utils/logger";
 import { adminAuthMiddleware } from "../middleware/admin-auth";
-import { driveAuthMiddleware, initDriveApiKeysManager, getDriveApiKeysManager } from "../middleware/drive-auth";
+import { driveAuthMiddleware } from "../middleware/drive-auth";
+import { DrivePublicLinksManager } from "../utils/drive-public-links";
 
 const router = express.Router();
 
-// Initialize API keys manager when router is set up (will be called from routes/index.ts)
-let apiKeysInitialized = false;
+// Initialize public links manager when router is set up (will be called from routes/index.ts)
+let publicLinksInitialized = false;
+let publicLinksManager: DrivePublicLinksManager | null = null;
 
-export function initDriveApiKeys(gun: any, relayPub: string, relayUser: any): void {
-  if (!apiKeysInitialized && gun && relayPub && relayUser) {
-    initDriveApiKeysManager(gun, relayPub, relayUser);
-    apiKeysInitialized = true;
-    loggers.server.info({ relayPub }, "Drive API Keys Manager initialized");
+export function initDrivePublicLinks(gun: any, relayPub: string, relayUser: any): void {
+  if (!publicLinksInitialized && gun && relayPub && relayUser) {
+    // Initialize public links manager
+    publicLinksManager = new DrivePublicLinksManager(gun, relayPub, relayUser);
+    publicLinksInitialized = true;
+    loggers.server.info({ relayPub }, "Drive Public Links Manager initialized");
   }
 }
 
-// Middleware to initialize API keys manager on first request
-export async function ensureApiKeysInitialized(req: Request, res: Response, next: NextFunction): Promise<void> {
+function getPublicLinksManager(): DrivePublicLinksManager | null {
+  return publicLinksManager;
+}
+
+// Middleware to initialize public links manager on first request
+export async function ensurePublicLinksInitialized(req: Request, res: Response, next: NextFunction): Promise<void> {
   const gun = req.app.get("gunInstance");
   const relayPub = req.app.get("relayUserPub");
   
-  if (gun && relayPub && !apiKeysInitialized) {
+  if (gun && relayPub && !publicLinksInitialized) {
     try {
       const { getRelayUser } = await import("../utils/relay-user");
       const relayUser = getRelayUser();
       if (relayUser) {
-        initDriveApiKeys(gun, relayPub, relayUser);
+        initDrivePublicLinks(gun, relayPub, relayUser);
       }
     } catch (error) {
-      loggers.server.warn({ err: error }, "Failed to initialize API keys manager");
+      loggers.server.warn({ err: error }, "Failed to initialize public links manager");
     }
   }
   
@@ -404,30 +411,30 @@ router.get("/stats", driveAuthMiddleware, async (req: Request, res: Response) =>
 });
 
 /**
- * API Keys Management Routes (Admin only)
+ * Public Links Management Routes
  */
 
 /**
- * GET /keys
- * List all API keys
+ * GET /links
+ * List all public links
  */
-router.get("/keys", adminAuthMiddleware, async (req: Request, res: Response) => {
+router.get("/links", driveAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const manager = getDriveApiKeysManager();
+    const manager = getPublicLinksManager();
     if (!manager) {
       return res.status(503).json({
         success: false,
-        error: "API keys manager not initialized",
+        error: "Public links manager not initialized",
       });
     }
 
-    const keys = await manager.listApiKeys();
+    const links = await manager.listPublicLinks();
     res.json({
       success: true,
-      keys,
+      links,
     });
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to list API keys");
+    loggers.server.error({ err: error }, "Failed to list public links");
     res.status(500).json({
       success: false,
       error: error.message || "Internal Server Error",
@@ -436,45 +443,49 @@ router.get("/keys", adminAuthMiddleware, async (req: Request, res: Response) => 
 });
 
 /**
- * POST /keys
- * Create a new API key
+ * POST /links
+ * Create a new public link for a file
  */
-router.post("/keys", adminAuthMiddleware, express.json(), async (req: Request, res: Response) => {
+router.post("/links", driveAuthMiddleware, express.json(), async (req: Request, res: Response) => {
   try {
-    const { name, expiresInDays } = req.body;
+    const { filePath, expiresInDays } = req.body;
 
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
+    if (!filePath || typeof filePath !== "string") {
       return res.status(400).json({
         success: false,
-        error: "Key name is required",
+        error: "File path is required",
       });
     }
 
-    const manager = getDriveApiKeysManager();
+    const manager = getPublicLinksManager();
     if (!manager) {
       return res.status(503).json({
         success: false,
-        error: "API keys manager not initialized",
+        error: "Public links manager not initialized",
       });
     }
 
-    const expiresDays = expiresInDays && typeof expiresInDays === "number" && expiresInDays > 0 
-      ? expiresInDays 
-      : undefined;
+    const expiresDays =
+      expiresInDays && typeof expiresInDays === "number" && expiresInDays > 0
+        ? expiresInDays
+        : undefined;
 
-    const keyData = await manager.createApiKey(name.trim(), expiresDays);
+    const link = await manager.createPublicLink(filePath, expiresDays);
+
+    // Generate the public URL
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const publicUrl = `${baseUrl}/api/v1/drive/public/${link.linkId}`;
 
     res.status(201).json({
       success: true,
-      keyId: keyData.keyId,
-      token: keyData.token, // Only shown once!
-      name: keyData.name,
-      createdAt: keyData.createdAt,
-      expiresAt: keyData.expiresAt,
-      message: "Save this token securely. It will not be shown again.",
+      linkId: link.linkId,
+      filePath: link.filePath,
+      publicUrl,
+      createdAt: link.createdAt,
+      expiresAt: link.expiresAt,
     });
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to create API key");
+    loggers.server.error({ err: error }, "Failed to create public link");
     res.status(500).json({
       success: false,
       error: error.message || "Internal Server Error",
@@ -483,46 +494,128 @@ router.post("/keys", adminAuthMiddleware, express.json(), async (req: Request, r
 });
 
 /**
- * DELETE /keys/:keyId
- * Revoke an API key
+ * DELETE /links/:linkId
+ * Revoke a public link
  */
-router.delete("/keys/:keyId", adminAuthMiddleware, async (req: Request, res: Response) => {
+router.delete("/links/:linkId", driveAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const { keyId } = req.params;
+    const { linkId } = req.params;
 
-    if (!keyId) {
+    if (!linkId) {
       return res.status(400).json({
         success: false,
-        error: "Key ID is required",
+        error: "Link ID is required",
       });
     }
 
-    const manager = getDriveApiKeysManager();
+    const manager = getPublicLinksManager();
     if (!manager) {
       return res.status(503).json({
         success: false,
-        error: "API keys manager not initialized",
+        error: "Public links manager not initialized",
       });
     }
 
-    const revoked = await manager.revokeApiKey(keyId);
+    const revoked = await manager.revokePublicLink(linkId);
     if (revoked) {
       res.json({
         success: true,
-        message: "API key revoked successfully",
+        message: "Public link revoked successfully",
       });
     } else {
       res.status(404).json({
         success: false,
-        error: "API key not found",
+        error: "Public link not found",
       });
     }
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to revoke API key");
+    loggers.server.error({ err: error }, "Failed to revoke public link");
     res.status(500).json({
       success: false,
       error: error.message || "Internal Server Error",
     });
+  }
+});
+
+/**
+ * Handle public link access (exported for direct use without router)
+ */
+export async function handlePublicLinkAccess(req: Request, res: Response): Promise<void> {
+  try {
+    // Extract linkId from URL path if not in params
+    let linkId = req.params?.linkId;
+    if (!linkId && req.url) {
+      const match = req.url.match(/\/public\/([^/?]+)/);
+      linkId = match ? match[1] : undefined;
+    }
+
+    if (!linkId) {
+      return res.status(400).json({
+        success: false,
+        error: "Link ID is required",
+      });
+    }
+
+    const manager = getPublicLinksManager();
+    if (!manager) {
+      return res.status(503).json({
+        success: false,
+        error: "Public links manager not initialized",
+      });
+    }
+
+    const link = await manager.getPublicLink(linkId);
+    if (!link) {
+      return res.status(404).json({
+        success: false,
+        error: "Link not found or expired",
+      });
+    }
+
+    // Download the file using driveManager
+    const { buffer, filename, size } = driveManager.downloadFile(link.filePath);
+
+    // Detect content type based on file extension
+    const ext = path.extname(filename).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      ".html": "text/html",
+      ".css": "text/css",
+      ".js": "text/javascript",
+      ".json": "application/json",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".gif": "image/gif",
+      ".svg": "image/svg+xml",
+      ".pdf": "application/pdf",
+      ".zip": "application/zip",
+      ".txt": "text/plain",
+      ".md": "text/markdown",
+      ".xml": "application/xml",
+    };
+    const contentType = mimeTypes[ext] || "application/octet-stream";
+
+    // Set headers
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Length", size.toString());
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader("Cache-Control", "public, max-age=3600");
+
+    res.send(buffer);
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to access file via public link");
+
+    if (error.message && error.message.includes("does not exist")) {
+      res.status(404).json({
+        success: false,
+        error: "File not found",
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: error.message || "Internal Server Error",
+      });
+    }
   }
 });
 

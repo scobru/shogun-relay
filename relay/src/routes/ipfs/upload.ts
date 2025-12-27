@@ -29,7 +29,30 @@ router.post(
     const bearerToken = authHeader && authHeader.split(" ")[1];
     const customToken = req.headers["token"];
     const adminToken = bearerToken || customToken;
-    const isAdmin = adminToken === authConfig.adminPassword;
+    
+    // Check admin token or API key
+    let isAdmin = false;
+    let isApiKey = false;
+    
+    if (adminToken) {
+      // Check admin password
+      if (adminToken === authConfig.adminPassword) {
+        isAdmin = true;
+      } else if (adminToken.startsWith("shogun-api-")) {
+        // Check API key
+        try {
+          const { validateApiKeyToken } = await import("../../middleware/api-keys-auth");
+          const keyData = await validateApiKeyToken(adminToken);
+          if (keyData) {
+            isAdmin = true; // API keys have admin-like privileges
+            isApiKey = true;
+            loggers.server.debug({ keyId: keyData.keyId }, "IPFS upload: API key accepted");
+          }
+        } catch (apiKeyError) {
+          // API key validation failed, continue with normal flow
+        }
+      }
+    }
 
     const userAddressRaw = req.headers["x-user-address"];
     const userAddress = Array.isArray(userAddressRaw) ? userAddressRaw[0] : userAddressRaw;

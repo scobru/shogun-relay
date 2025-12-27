@@ -5021,6 +5021,415 @@ The wallet signature must be a valid EIP-191 signature of the message "I Love Sh
           },
         },
       },
+      "/api/v1/api-keys": {
+        get: {
+          tags: ["API Keys"],
+          summary: "List API keys",
+          description: "List all API keys. Requires admin authentication.",
+          operationId: "listApiKeys",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          responses: {
+            "200": {
+              description: "API keys list",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      keys: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            keyId: { type: "string" },
+                            name: { type: "string" },
+                            createdAt: { type: "number" },
+                            lastUsedAt: { type: "number", nullable: true },
+                            expiresAt: { type: "number", nullable: true },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+        post: {
+          tags: ["API Keys"],
+          summary: "Create API key",
+          description: "Generate a new API key for programmatic access to all relay services (Drive, IPFS, etc.). Requires admin authentication.",
+          operationId: "createApiKey",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", description: "Descriptive name for the API key" },
+                    expiresInDays: {
+                      type: "number",
+                      description: "Number of days until expiration (optional)",
+                    },
+                  },
+                  required: ["name"],
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "API key created",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      keyId: { type: "string" },
+                      token: {
+                        type: "string",
+                        description: "API key token (shown only once)",
+                      },
+                      name: { type: "string" },
+                      createdAt: { type: "number" },
+                      expiresAt: { type: "number", nullable: true },
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Bad request - invalid parameters",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/api-keys/{keyId}": {
+        delete: {
+          tags: ["API Keys"],
+          summary: "Revoke API key",
+          description: "Revoke (delete) an API key. Requires admin authentication.",
+          operationId: "revokeApiKey",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          parameters: [
+            {
+              name: "keyId",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "API key ID to revoke",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "API key revoked successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized - admin token required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "404": {
+              description: "API key not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/links": {
+        get: {
+          tags: ["Admin Drive"],
+          summary: "List public links",
+          description: "List all public sharing links. Requires admin or API key authentication.",
+          operationId: "listDrivePublicLinks",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          responses: {
+            "200": {
+              description: "Public links list",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      links: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            linkId: { type: "string" },
+                            filePath: { type: "string" },
+                            createdAt: { type: "number" },
+                            expiresAt: { type: "number", nullable: true },
+                            accessCount: { type: "number" },
+                            lastAccessedAt: { type: "number", nullable: true },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+        post: {
+          tags: ["Admin Drive"],
+          summary: "Create public link",
+          description: "Create a public sharing link for a file. Requires admin or API key authentication.",
+          operationId: "createDrivePublicLink",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    filePath: { type: "string", description: "Path to the file to share" },
+                    expiresInDays: {
+                      type: "number",
+                      description: "Number of days until expiration (optional)",
+                    },
+                  },
+                  required: ["filePath"],
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Public link created",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      linkId: { type: "string" },
+                      filePath: { type: "string" },
+                      publicUrl: { type: "string" },
+                      createdAt: { type: "number" },
+                      expiresAt: { type: "number", nullable: true },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Bad request - invalid parameters",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/links/{linkId}": {
+        delete: {
+          tags: ["Admin Drive"],
+          summary: "Revoke public link",
+          description: "Revoke (delete) a public link. Requires admin or API key authentication.",
+          operationId: "revokeDrivePublicLink",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          parameters: [
+            {
+              name: "linkId",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Link ID to revoke",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Link revoked successfully",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "404": {
+              description: "Link not found",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/v1/drive/public/{linkId}": {
+        get: {
+          tags: ["Admin Drive"],
+          summary: "Access file via public link",
+          description: "Access a file via public sharing link. NO AUTHENTICATION REQUIRED.",
+          operationId: "accessDriveFileViaPublicLink",
+          security: [],
+          parameters: [
+            {
+              name: "linkId",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Public link ID",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "File content",
+              content: {
+                "application/octet-stream": {
+                  schema: { type: "string", format: "binary" },
+                },
+              },
+            },
+            "404": {
+              description: "Link not found or expired",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   };
 }

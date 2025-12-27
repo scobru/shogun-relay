@@ -938,7 +938,267 @@ curl -X GET "http://localhost:8765/api/v1/drive/stats" \
 }
 ```
 
+## API Keys
+
+Generic API key management service for programmatic access to all relay services (Drive, IPFS, etc.). API keys are more secure for automation as they:
+- Can be revoked individually without changing your password
+- Don't expose your main credentials
+- Can have optional expiration dates
+- Track last usage time
+- Can be used across all relay services (Drive, IPFS, etc.)
+
+**Note**: API keys are stored in the relay's GunDB user space and are accessible only by the relay.
+
+### Base Path
+
+```
+/api/v1/api-keys
+```
+
+### List API Keys
+
+**GET** `/api/v1/api-keys`
+
+List all API keys for the drive. Requires admin authentication.
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8765/api/v1/api-keys" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "keys": [
+    {
+      "keyId": "abc123...",
+      "name": "My App Key",
+      "createdAt": 1699123456000,
+      "lastUsedAt": 1699200000000,
+      "expiresAt": null
+    }
+  ]
+}
+```
+
+### Create API Key
+
+**POST** `/api/v1/api-keys`
+
+Generate a new API key. Requires admin authentication.
+
+**Request Body:**
+
+```json
+{
+  "name": "My App Key",
+  "expiresInDays": 30
+}
+```
+
+- `name` (string, required): A descriptive name for the API key
+- `expiresInDays` (number, optional): Number of days until the key expires (omit for no expiration)
+
+**Example:**
+
+```bash
+curl -X POST "http://localhost:8765/api/v1/api-keys" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My App Key", "expiresInDays": 30}'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "keyId": "abc123...",
+      "token": "shogun-api-abc123...",
+  "name": "My App Key",
+  "createdAt": 1699123456000,
+  "expiresAt": 1701715456000,
+  "message": "Save this token securely. It will not be shown again."
+}
+```
+
+**Important**: The `token` field is only shown once when the key is created. Save it securely.
+
+### Revoke API Key
+
+**DELETE** `/api/v1/api-keys/{keyId}`
+
+Revoke (delete) an API key. Requires admin authentication.
+
+**Example:**
+
+```bash
+curl -X DELETE "http://localhost:8765/api/v1/api-keys/abc123..." \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "API key revoked successfully"
+}
+```
+
+### Using API Keys
+
+Once you have an API key, you can use it exactly like the admin password in the `Authorization` header. API keys work across all relay services:
+
+**Drive:**
+```bash
+curl -X GET "http://localhost:8765/api/v1/drive/list" \
+  -H "Authorization: Bearer shogun-api-abc123..."
+```
+
+**IPFS:**
+```bash
+curl -X POST "http://localhost:8765/api/v1/ipfs/pin/add" \
+  -H "Authorization: Bearer shogun-api-abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{"cid": "QmHash..."}'
+```
+
+All endpoints that accept admin authentication also accept API keys. API keys use the prefix `shogun-api-`.
+
+## Drive Public Links
+
+You can generate public sharing links for files in the drive. These links allow anyone with the URL to access the file without authentication.
+
+### Create Public Link
+
+**POST** `/api/v1/drive/links`
+
+Create a public sharing link for a file. Requires admin or API key authentication.
+
+**Request Body:**
+
+```json
+{
+  "filePath": "document.pdf",
+  "expiresInDays": 7
+}
+```
+
+- `filePath` (string, required): Path to the file to share
+- `expiresInDays` (number, optional): Number of days until the link expires (omit for no expiration)
+
+**Example:**
+
+```bash
+curl -X POST "http://localhost:8765/api/v1/drive/links" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"filePath": "document.pdf", "expiresInDays": 7}'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "linkId": "abc123...",
+  "filePath": "document.pdf",
+  "publicUrl": "http://localhost:8765/api/v1/drive/public/abc123...",
+  "createdAt": 1699123456000,
+  "expiresAt": 1699728256000
+}
+```
+
+### List Public Links
+
+**GET** `/api/v1/drive/links`
+
+List all public links. Requires admin or API key authentication.
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8765/api/v1/drive/links" \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "links": [
+    {
+      "linkId": "abc123...",
+      "filePath": "document.pdf",
+      "createdAt": 1699123456000,
+      "expiresAt": 1699728256000,
+      "accessCount": 42,
+      "lastAccessedAt": 1699200000000
+    }
+  ]
+}
+```
+
+### Revoke Public Link
+
+**DELETE** `/api/v1/drive/links/{linkId}`
+
+Revoke (delete) a public link. Requires admin or API key authentication.
+
+**Example:**
+
+```bash
+curl -X DELETE "http://localhost:8765/api/v1/drive/links/abc123..." \
+  -H "Authorization: Bearer YOUR_ADMIN_PASSWORD"
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Public link revoked successfully"
+}
+```
+
+### Access File via Public Link
+
+**GET** `/api/v1/drive/public/{linkId}`
+
+Access a file via public link. **NO AUTHENTICATION REQUIRED**.
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8765/api/v1/drive/public/abc123..." \
+  -o downloaded_file.pdf
+```
+
+Or simply open the URL in a browser. The file will be served directly with appropriate content-type headers.
+
 ## Changelog
+
+### v1.3.0 (2025-12-27)
+
+- **Added Generic API Keys**: API key management service for programmatic access to all relay services
+  - Generate, list, and revoke API keys
+  - Optional expiration dates
+  - Last usage tracking
+  - Keys stored securely in relay's GunDB user space
+  - Usable across all services (Drive, IPFS, etc.)
+  - Endpoints moved from `/api/v1/drive/keys` to `/api/v1/api-keys`
+- **Added Drive Public Links**: Public file sharing system
+  - Generate public sharing links for files
+  - Optional expiration dates
+  - Access count tracking
+  - Links stored in relay's GunDB user space
+  - Public access endpoint (no authentication required)
 
 ### v1.2.0 (2025-01-XX)
 

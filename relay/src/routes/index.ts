@@ -73,6 +73,7 @@ import registryRouter from "./registry";
 import bridgeRouter from "./bridge";
 import torrentRouter from "./torrent";
 import driveRouter from "./drive";
+import apiKeysRouter from "./api-keys";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
@@ -692,16 +693,51 @@ export default (app: express.Application) => {
     });
   }
 
+  // Route per API Keys (always enabled, admin-only)
+  // Initialize API Keys Manager lazily on first request
+  app.use(`${baseRoute}/api-keys`, async (req: Request, res: Response, next: NextFunction) => {
+    const gun = req.app.get("gunInstance");
+    const relayPub = req.app.get("relayUserPub");
+    if (gun && relayPub) {
+      try {
+        const { initApiKeysManager } = await import("../middleware/api-keys-auth");
+        const { getApiKeysManager } = await import("../middleware/api-keys-auth");
+        if (!getApiKeysManager()) {
+          const { getRelayUser } = await import("../utils/relay-user");
+          const relayUser = getRelayUser();
+          if (relayUser) {
+            initApiKeysManager(gun, relayPub, relayUser);
+          }
+        }
+      } catch (error) {
+        // Ignore if already initialized or not ready
+      }
+    }
+    next();
+  });
+  
+  app.use(`${baseRoute}/api-keys`, apiKeysRouter);
+  loggers.server.info(`✅ API Keys routes registered`);
+  
   // Route per Drive (always enabled, admin-only)
-  // Initialize API keys manager lazily on first request
+  // Initialize public links manager lazily on first request
   app.use(`${baseRoute}/drive`, async (req: Request, res: Response, next: NextFunction) => {
-    const { ensureApiKeysInitialized } = await import("./drive");
-    ensureApiKeysInitialized(req, res, next);
+    const { ensurePublicLinksInitialized } = await import("./drive");
+    ensurePublicLinksInitialized(req, res, next);
   });
   
   app.use(`${baseRoute}/drive`, driveRouter);
   
-  // Initialize Drive API Keys Manager after routes are set up
+  // Public endpoint for accessing files via share links (NO AUTH REQUIRED)
+  // This must be registered separately to bypass authentication
+  app.get(`${baseRoute}/drive/public/:linkId`, async (req: Request, res: Response) => {
+    const driveRouter = (await import("./drive")).default;
+    driveRouter(req, res, () => {
+      res.status(404).json({ success: false, error: "Not found" });
+    });
+  });
+  
+  // Initialize Drive Public Links Manager after routes are set up
   // This will be called when GunDB and relay user are initialized in index.ts
   app.use(`${baseRoute}/drive`, async (req: Request, res: Response, next: NextFunction) => {
     // Try to initialize if not already done
@@ -709,11 +745,11 @@ export default (app: express.Application) => {
     const relayPub = req.app.get("relayUserPub");
     if (gun && relayPub) {
       try {
-        const { initDriveApiKeys } = await import("./drive");
+        const { initDrivePublicLinks } = await import("./drive");
         const { getRelayUser } = await import("../utils/relay-user");
         const relayUser = getRelayUser();
         if (relayUser) {
-          initDriveApiKeys(gun, relayPub, relayUser);
+          initDrivePublicLinks(gun, relayPub, relayUser);
         }
       } catch (error) {
         // Ignore if already initialized or not ready

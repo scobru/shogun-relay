@@ -8,34 +8,17 @@ import type { IpfsRequestOptions } from "./types";
 const router: Router = Router();
 
 /**
- * Admin authentication middleware helper
+ * Admin or API Key authentication middleware helper
  */
-function adminAuthMiddleware(req: Request, res: Response, next: NextFunction) {
-  const tokenAuthMiddleware = req.app.get("tokenAuthMiddleware");
-  if (tokenAuthMiddleware) {
-    tokenAuthMiddleware(req, res, next);
-  } else {
-    const authHeader = req.headers["authorization"];
-    const bearerToken = authHeader && authHeader.split(" ")[1];
-    const customToken = req.headers["token"];
-    const token = bearerToken || customToken;
-
-    if (token === authConfig.adminPassword) {
-      next();
-    } else {
-      loggers.server.warn(
-        { bearerToken: !!bearerToken, customToken: !!customToken },
-        "Auth failed"
-      );
-      return res.status(401).json({ success: false, error: "Unauthorized" });
-    }
-  }
+async function adminOrApiKeyAuthMiddleware(req: Request, res: Response, next: NextFunction) {
+  const { adminOrApiKeyAuthMiddleware: authMiddleware } = await import("../../middleware/admin-or-api-key-auth");
+  authMiddleware(req, res, next);
 }
 
 /**
  * IPFS Pin add endpoint (aligned with Kubo's /api/v0/pin/add)
  */
-router.post("/pin/add", adminAuthMiddleware, async (req, res) => {
+router.post("/pin/add", adminOrApiKeyAuthMiddleware, async (req, res) => {
   try {
     loggers.server.debug({ body: req.body }, "🔍 IPFS Pin add request");
     const { cid } = req.body;
@@ -88,7 +71,7 @@ router.post("/pin/add", adminAuthMiddleware, async (req, res) => {
 /**
  * IPFS Pin remove endpoint (aligned with Kubo's /api/v0/pin/rm)
  */
-router.post("/pin/rm", adminAuthMiddleware, async (req, res) => {
+router.post("/pin/rm", adminOrApiKeyAuthMiddleware, async (req, res) => {
   try {
     loggers.server.debug({ body: req.body }, "🔍 IPFS Pin rm request");
     const { cid } = req.body;
@@ -185,7 +168,7 @@ router.post("/pin/rm", adminAuthMiddleware, async (req, res) => {
 /**
  * Alias endpoint for shogun-ipfs compatibility: /pins/rm -> /pin/rm
  */
-router.post("/pins/rm", adminAuthMiddleware, async (req, res) => {
+router.post("/pins/rm", adminOrApiKeyAuthMiddleware, async (req, res) => {
   try {
     loggers.server.debug({ body: req.body }, "🔍 IPFS Pin rm (alias /pins/rm) request");
     const { cid } = req.body;
@@ -267,7 +250,7 @@ router.post("/pins/rm", adminAuthMiddleware, async (req, res) => {
 /**
  * IPFS Pin list endpoint (aligned with Kubo's /api/v0/pin/ls)
  */
-router.get("/pin/ls", adminAuthMiddleware, async (req, res) => {
+router.get("/pin/ls", adminOrApiKeyAuthMiddleware, async (req, res) => {
   try {
     const requestOptions: IpfsRequestOptions = {
       hostname: "127.0.0.1",

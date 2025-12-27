@@ -15,22 +15,10 @@ const router: Router = Router();
  */
 router.use(
   "/proxy",
-  (req: Request, res: Response, next: NextFunction) => {
-    // Middleware di autenticazione per il proxy
-    const authHeader = req.headers["authorization"];
-    const bearerToken = authHeader && authHeader.split(" ")[1];
-    const customToken = req.headers["token"];
-    const token = bearerToken || customToken;
-
-    if (token === authConfig.adminPassword) {
-      next();
-    } else {
-      loggers.server.warn(
-        { bearerToken: !!bearerToken, customToken: !!customToken },
-        "Auth failed"
-      );
-      res.status(401).json({ success: false, error: "Unauthorized" });
-    }
+  async (req: Request, res: Response, next: NextFunction) => {
+    // Middleware di autenticazione per il proxy (admin or API key)
+    const { adminOrApiKeyAuthMiddleware } = await import("../../middleware/admin-or-api-key-auth");
+    adminOrApiKeyAuthMiddleware(req, res, next);
   },
   createProxyMiddleware({
     target: IPFS_API_URL,
