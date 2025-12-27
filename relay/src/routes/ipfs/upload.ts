@@ -34,15 +34,18 @@ router.post(
     let isAdmin = false;
     let isApiKey = false;
     
-    if (adminToken) {
+    // Ensure adminToken is a string (could be string | string[] from headers)
+    const adminTokenStr = Array.isArray(adminToken) ? adminToken[0] : adminToken;
+    
+    if (adminTokenStr && typeof adminTokenStr === "string") {
       // Check admin password
-      if (adminToken === authConfig.adminPassword) {
+      if (adminTokenStr === authConfig.adminPassword) {
         isAdmin = true;
-      } else if (adminToken.startsWith("shogun-api-")) {
+      } else if (adminTokenStr.startsWith("shogun-api-")) {
         // Check API key
         try {
           const { validateApiKeyToken } = await import("../../middleware/api-keys-auth");
-          const keyData = await validateApiKeyToken(adminToken);
+          const keyData = await validateApiKeyToken(adminTokenStr);
           if (keyData) {
             isAdmin = true; // API keys have admin-like privileges
             isApiKey = true;

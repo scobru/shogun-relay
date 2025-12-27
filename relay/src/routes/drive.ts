@@ -543,33 +543,36 @@ router.delete("/links/:linkId", driveAuthMiddleware, async (req: Request, res: R
 export async function handlePublicLinkAccess(req: Request, res: Response): Promise<void> {
   try {
     // Extract linkId from URL path if not in params
-    let linkId = req.params?.linkId;
+    let linkId: string | undefined = req.params?.linkId;
     if (!linkId && req.url) {
       const match = req.url.match(/\/public\/([^/?]+)/);
-      linkId = match ? match[1] : undefined;
+      linkId = match?.[1];
     }
 
     if (!linkId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: "Link ID is required",
       });
+      return;
     }
 
     const manager = getPublicLinksManager();
     if (!manager) {
-      return res.status(503).json({
+      res.status(503).json({
         success: false,
         error: "Public links manager not initialized",
       });
+      return;
     }
 
     const link = await manager.getPublicLink(linkId);
     if (!link) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: "Link not found or expired",
       });
+      return;
     }
 
     // Download the file using driveManager

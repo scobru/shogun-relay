@@ -451,6 +451,162 @@ export async function refreshTrustedRelaysCache(chainId?: number): Promise<strin
   return await getTrustedRelayPubKeys(chainId, true); // forceRefresh = true
 }
 
+// ============================================================================
+// DISTRIBUTED LOCK FOR RECONCILIATION
+// Prevents race conditions when multiple relays try to reconcile the same user
+// ============================================================================
+
+/**
+ * Interface for a distributed reconciliation lock
+ */
+export interface ReconciliationLock {
+  relayPub: string;
+  userAddress: string;
+  acquiredAt: number;
+  expiresAt: number;
+}
+
+const DEFAULT_LOCK_TTL_MS = 30000; // 30 seconds default TTL for reconciliation lock
+
+/**
+ * Acquire a distributed lock for reconciling a user's balance
+ * 
+ * This prevents multiple relays from reconciling the same user simultaneously,
+ * which could lead to balance overwrites and inconsistencies.
+ * 
+ * @param gun - GunDB instance
+ * @param userAddress - User's Ethereum address
+ * @param relayPub - Current relay's public key
+ * @param ttlMs - Lock time-to-live in milliseconds (default: 30 seconds)
+ * @returns true if lock was acquired, false if held by another relay
+ */
+export async function acquireReconciliationLock(
+  gun: IGunInstance,
+  userAddress: string,
+  relayPub: string,
+  ttlMs: number = DEFAULT_LOCK_TTL_MS
+): Promise<boolean> {
+  const lockPath = `bridge/reconciliation-locks/${userAddress.toLowerCase()}`;
+  const now = Date.now();
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      log.warn({ userAddress, lockPath }, "Timeout acquiring reconciliation lock");
+      resolve(false);
+    }, 5000);
+
+    gun.get(lockPath).once((existingLock: ReconciliationLock | null) => {
+      clearTimeout(timeout);
+
+      // Check if there's an existing valid lock from another relay
+      if (existingLock && existingLock.expiresAt > now && existingLock.relayPub !== relayPub) {
+        log.debug(
+          { 
+            userAddress, 
+            ownedBy: existingLock.relayPub.substring(0, 16), 
+            expiresIn: existingLock.expiresAt - now 
+          },
+          "Reconciliation lock held by another relay"
+        );
+        resolve(false);
+        return;
+      }
+
+      // Lock is available or expired - try to acquire it
+      const lock: ReconciliationLock = {
+        relayPub,
+        userAddress: userAddress.toLowerCase(),
+        acquiredAt: now,
+        expiresAt: now + ttlMs,
+      };
+
+      gun.get(lockPath).put(lock as any, (ack: GunMessagePut) => {
+        if (ack && "err" in ack && ack.err) {
+          log.warn({ userAddress, error: ack.err }, "Failed to acquire reconciliation lock");
+          resolve(false);
+        } else {
+          log.debug(
+            { userAddress, relayPub: relayPub.substring(0, 16), ttlMs },
+            "Acquired reconciliation lock"
+          );
+          resolve(true);
+        }
+      });
+    });
+  });
+}
+
+/**
+ * Release a distributed reconciliation lock
+ * 
+ * Only releases the lock if it's owned by the current relay.
+ * 
+ * @param gun - GunDB instance
+ * @param userAddress - User's Ethereum address
+ * @param relayPub - Current relay's public key
+ */
+export async function releaseReconciliationLock(
+  gun: IGunInstance,
+  userAddress: string,
+  relayPub: string
+): Promise<void> {
+  const lockPath = `bridge/reconciliation-locks/${userAddress.toLowerCase()}`;
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      log.warn({ userAddress, lockPath }, "Timeout releasing reconciliation lock");
+      resolve();
+    }, 3000);
+
+    gun.get(lockPath).once((existingLock: ReconciliationLock | null) => {
+      clearTimeout(timeout);
+
+      // Only release if we own the lock
+      if (existingLock && existingLock.relayPub === relayPub) {
+        gun.get(lockPath).put(null as any, () => {
+          log.debug({ userAddress, relayPub: relayPub.substring(0, 16) }, "Released reconciliation lock");
+          resolve();
+        });
+      } else {
+        // Lock not owned by us, nothing to release
+        resolve();
+      }
+    });
+  });
+}
+
+/**
+ * Check if a reconciliation lock is currently held for a user
+ * 
+ * @param gun - GunDB instance
+ * @param userAddress - User's Ethereum address
+ * @returns Lock info if held, null if not locked
+ */
+export async function isReconciliationLockHeld(
+  gun: IGunInstance,
+  userAddress: string
+): Promise<ReconciliationLock | null> {
+  const lockPath = `bridge/reconciliation-locks/${userAddress.toLowerCase()}`;
+  const now = Date.now();
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      resolve(null);
+    }, 3000);
+
+    gun.get(lockPath).once((existingLock: ReconciliationLock | null) => {
+      clearTimeout(timeout);
+
+      // Check if lock exists and is not expired
+      if (existingLock && existingLock.expiresAt > now) {
+        resolve(existingLock);
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
 /**
  * Get user balance from GunDB
  * Uses frozen-data pattern for secure, verifiable balance storage
@@ -2761,25 +2917,39 @@ export async function getProcessedDepositsForUser(
   return new Promise((resolve) => {
     const deposits: ProcessedDeposit[] = [];
     const normalizedUser = userAddress.toLowerCase();
+    const seenKeys = new Set<string>(); // Deduplicate deposits
     const timeout = setTimeout(() => resolve(deposits), 10000);
+    let lastUpdateTime = Date.now();
 
-    gun
+    const depositsNode = gun
       .get("bridge")
-      .get("processed-deposits")
-      .map()
-      .once((deposit: ProcessedDeposit | null, key?: string) => {
-        if (!deposit || !key) return;
+      .get("processed-deposits");
 
-        const depositUser = (deposit.user || "").toLowerCase();
-        if (depositUser === normalizedUser) {
-          deposits.push(deposit);
-        }
-      });
+    // Use .on() for better data collection from GunDB's eventual consistency
+    depositsNode.map().on((deposit: ProcessedDeposit | null, key?: string) => {
+      if (!deposit || !key || seenKeys.has(key)) return;
 
-    setTimeout(() => {
-      clearTimeout(timeout);
-      resolve(deposits);
-    }, 5000);
+      const depositUser = (deposit.user || "").toLowerCase();
+      if (depositUser === normalizedUser) {
+        seenKeys.add(key);
+        deposits.push(deposit);
+        lastUpdateTime = Date.now();
+      }
+    });
+
+    // Wait for data to settle - resolve when no new updates for 2 seconds
+    const checkAndResolve = () => {
+      const timeSinceLastUpdate = Date.now() - lastUpdateTime;
+      if (timeSinceLastUpdate >= 2000) {
+        clearTimeout(timeout);
+        depositsNode.map().off(); // Unsubscribe
+        resolve(deposits);
+      }
+    };
+
+    setTimeout(checkAndResolve, 3000);
+    setTimeout(checkAndResolve, 5000);
+    setTimeout(checkAndResolve, 7000);
   });
 }
 
@@ -2860,6 +3030,9 @@ export async function removePendingForceWithdrawals(
  * Reconcile user balance by recalculating from deposits, withdrawals, and L2 transfers
  * This fixes balance discrepancies caused by old transfer implementations
  *
+ * SYNCHRONIZATION: Uses distributed lock to prevent multiple relays from reconciling
+ * the same user simultaneously, which could lead to balance overwrites.
+ *
  * @param gun - GunDB instance
  * @param userAddress - User's Ethereum address to reconcile
  * @param relayKeyPair - Relay keypair for signing corrected balances
@@ -2877,18 +3050,38 @@ export async function reconcileUserBalance(
   calculatedBalance: string;
   targetBalance?: string; // Target balance (0 if calculated was negative)
   corrected: boolean;
+  skipped?: boolean; // True if skipped due to lock held by another relay
+  reason?: string; // Reason for skipping
   error?: string;
 }> {
-  try {
-    const normalizedAddress = userAddress.toLowerCase();
+  const normalizedAddress = userAddress.toLowerCase();
 
+  // Try to acquire distributed lock to prevent race conditions between relays
+  const lockAcquired = await acquireReconciliationLock(gun, normalizedAddress, relayKeyPair.pub);
+
+  if (!lockAcquired) {
+    log.debug(
+      { user: normalizedAddress, relayPub: relayKeyPair.pub.substring(0, 16) },
+      "Skipping reconciliation - lock held by another relay"
+    );
+    return {
+      success: true,
+      currentBalance: "0",
+      calculatedBalance: "0",
+      corrected: false,
+      skipped: true,
+      reason: "Lock held by another relay",
+    };
+  }
+
+  try {
     // Get current balance from GunDB (without specifying relayPub to get balance from any trusted relay)
     // This ensures we see the most up-to-date balance across all relays
     const currentBalance = await getUserBalance(gun, normalizedAddress);
 
     log.debug(
       { user: normalizedAddress, currentBalance: currentBalance.toString() },
-      "Starting balance reconciliation"
+      "Starting balance reconciliation (lock acquired)"
     );
 
     // Calculate correct balance from processed deposits and withdrawals
@@ -3112,6 +3305,9 @@ export async function reconcileUserBalance(
       corrected: false,
       error: errorMsg,
     };
+  } finally {
+    // Always release the lock, even if reconciliation fails
+    await releaseReconciliationLock(gun, normalizedAddress, relayKeyPair.pub);
   }
 }
 

@@ -154,11 +154,13 @@ export async function createFrozenEntry(
     throw new Error("gun, data, and keyPair are required");
   }
 
+  const now = Date.now();
+
   // Add metadata - merge with existing _meta if present
   const metaData: FrozenEntryMeta = {
     ...((data as any)._meta || (data as any).meta || {}),
     pub: keyPair.pub,
-    timestamp: Date.now(),
+    timestamp: now,
     version: 1,
   };
 
@@ -230,12 +232,50 @@ export async function createFrozenEntry(
   frozenNode.get("data").put(entry as unknown as object);
 
   // Update index to point to latest hash
+  // CONFLICT-AWARE: Read current index before updating to avoid overwriting newer entries
   if (indexKey) {
-    gun.get("shogun-index").get(namespace).get(indexKey).put({
-      latestHash: hash,
-      pub: keyPair.pub,
-      updatedAt: Date.now(),
+    // Read current index to check if we should update
+    const currentIndex = await new Promise<IndexEntry | null>((resolve) => {
+      const timeout = setTimeout(() => resolve(null), 2000);
+      gun
+        .get("shogun-index")
+        .get(namespace)
+        .get(indexKey)
+        .once((data: IndexEntry | undefined) => {
+          clearTimeout(timeout);
+          resolve(data || null);
+        });
     });
+
+    // Only update if no existing index OR our entry is newer (last-writer-wins based on timestamp)
+    const shouldUpdate = !currentIndex || !currentIndex.updatedAt || currentIndex.updatedAt <= now;
+
+    if (shouldUpdate) {
+      gun.get("shogun-index").get(namespace).get(indexKey).put({
+        latestHash: hash,
+        pub: keyPair.pub,
+        updatedAt: now,
+      });
+      log.debug(
+        {
+          namespace,
+          indexKey,
+          previousUpdatedAt: currentIndex?.updatedAt,
+          newUpdatedAt: now,
+        },
+        "Index updated with new frozen entry"
+      );
+    } else {
+      log.debug(
+        {
+          namespace,
+          indexKey,
+          existingUpdatedAt: currentIndex.updatedAt,
+          ourTimestamp: now,
+        },
+        "Skipped index update - more recent entry exists from another relay"
+      );
+    }
   }
 
   log.debug(`Frozen entry created: ${namespace}/${hash.substring(0, 16)}...`);
