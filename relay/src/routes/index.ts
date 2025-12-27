@@ -487,6 +487,11 @@ export default (app: express.Application) => {
     res.sendFile(path.resolve(publicPath, "stats.html"));
   });
 
+  app.get("/stats-v2", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "stats-v2.html"));
+  });
+
   app.get("/charts", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "charts.html"));
