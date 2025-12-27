@@ -588,7 +588,9 @@ export async function creditBalance(
           await new Promise((resolve) => setTimeout(resolve, 100 * retryCount)); // Exponential backoff
         }
 
-        const currentBalance = await getUserBalance(gun, ethereumAddress, relayKeyPair.pub);
+        // Get current balance from any trusted relay to allow balance updates
+        // even when the last balance was written by a different trusted relay
+        const currentBalance = await getUserBalance(gun, ethereumAddress);
         if (retryCount === 0) {
           initialBalance = currentBalance; // Capture initial balance on first attempt
         }
@@ -742,8 +744,9 @@ export async function debitBalance(
   // Use lock manager to prevent race conditions
   return userLockManager.executeWithLock(normalizedAddress, async () => {
     try {
-      // Get current balance (enforcing relay signature)
-      const currentBalance = await getUserBalance(gun, normalizedAddress, relayKeyPair.pub);
+      // Get current balance from any trusted relay to allow balance updates
+      // even when the last balance was written by a different trusted relay
+      const currentBalance = await getUserBalance(gun, normalizedAddress);
 
       if (currentBalance < amount) {
         throw new Error("Insufficient balance");
@@ -1261,10 +1264,11 @@ export async function transferBalance(
       );
     }
 
-    // SECURITY: Get current balances with relay signature enforcement
-    // Only trust balances that were signed by the relay to prevent spoofed balance attacks
-    const fromBalance = await getUserBalance(gun, fromAddress, relayKeyPair.pub);
-    const toBalance = await getUserBalance(gun, toAddress, relayKeyPair.pub);
+    // SECURITY: Get current balances from any trusted relay
+    // Accept balances signed by any trusted relay from the registry to allow
+    // transfers across different relays in the network
+    const fromBalance = await getUserBalance(gun, fromAddress);
+    const toBalance = await getUserBalance(gun, toAddress);
 
     // Check sufficient balance
     if (fromBalance < amount) {
@@ -1306,8 +1310,9 @@ export async function transferBalance(
     await creditBalance(gun, toAddress, amount, relayKeyPair);
 
     // Get final balances for return value (after operations complete)
-    const finalFromBalance = await getUserBalance(gun, fromAddress, relayKeyPair.pub);
-    const finalToBalance = await getUserBalance(gun, toAddress, relayKeyPair.pub);
+    // Use trusted relays to get balances that may have been written by this or other trusted relays
+    const finalFromBalance = await getUserBalance(gun, fromAddress);
+    const finalToBalance = await getUserBalance(gun, toAddress);
 
     log.debug(
       {
