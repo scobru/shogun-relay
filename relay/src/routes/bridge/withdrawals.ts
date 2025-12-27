@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { ethers } from "ethers";
 import { log, getBridgeClient, strictLimiter, getRelayHost, getSigningKeyPair } from "./utils";
 import {
@@ -515,4 +515,3 @@ router.get("/proof/:user/:amount/:nonce", async (req, res) => {
 });
 
 export default router;
-import express from "express";
