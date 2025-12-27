@@ -470,7 +470,7 @@
     <div class="notification" id="notification"></div>
 
     <script>
-        const ShogunAdmin = window.ShogunAdmin || {};
+        // ShogunAdmin is already defined by admin-auth.js
         let currentPath = '';
         let selectedFiles = [];
         let renameItemPath = null;
@@ -483,7 +483,11 @@
         });
 
         function getAuthToken() {
-            return ShogunAdmin.getPassword ? ShogunAdmin.getPassword() : localStorage.getItem('shogun-relay-admin-password');
+            // ShogunAdmin is already defined by admin-auth.js
+            if (window.ShogunAdmin && window.ShogunAdmin.getPassword) {
+                return window.ShogunAdmin.getPassword();
+            }
+            return localStorage.getItem('shogun-relay-admin-password');
         }
 
         async function apiCall(endpoint, method = 'GET', body = null) {

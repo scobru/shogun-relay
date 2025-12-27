@@ -122,6 +122,9 @@ const ShogunAdmin = (() => {
     };
 })();
 
+// Export to window for explicit access
+window.ShogunAdmin = ShogunAdmin;
+
 // Auto-initialize with default settings when script loads
 // Pages can call ShogunAdmin.init() again with custom options to override
 if (document.readyState === 'loading') {
