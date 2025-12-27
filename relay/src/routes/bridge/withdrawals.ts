@@ -9,6 +9,7 @@ import {
   setLastNonce,
   getLastNonce,
   getLastNonceAsync,
+  getMaxUsedNonce,
   getBatch,
   validateNonceIncremental,
   verifyDualSignatures,
@@ -265,12 +266,37 @@ router.get("/nonce/:user", async (req, res) => {
     // Use async version to read from GunDB if not in cache
     let lastNonce = await getLastNonceAsync(gun, userAddress);
 
+    // Check usedNonces (in-memory) to see if there are any nonces that have been used
+    // but not yet persisted (e.g., if a withdrawal failed after signature verification)
+    const maxUsedNonce = getMaxUsedNonce(userAddress);
+    if (maxUsedNonce > lastNonce) {
+      log.debug(
+        {
+          user: userAddress,
+          persistedNonce: lastNonce.toString(),
+          maxUsedNonce: maxUsedNonce.toString(),
+        },
+        "Found higher nonce in usedNonces, using it"
+      );
+      lastNonce = maxUsedNonce;
+    }
+
     // Also check pending withdrawals to ensure we have the most recent nonce
     // This handles cases where the nonce hasn't been persisted yet
     try {
       const pendingWithdrawals = await getPendingWithdrawals(gun);
+      log.debug(
+        { user: userAddress, totalPending: pendingWithdrawals.length },
+        "Checking pending withdrawals for nonce calculation"
+      );
+
       const userPendingWithdrawals = pendingWithdrawals.filter(
         (w: PendingWithdrawal) => w.user.toLowerCase() === userAddress.toLowerCase()
+      );
+
+      log.debug(
+        { user: userAddress, userPendingCount: userPendingWithdrawals.length },
+        "Filtered pending withdrawals for user"
       );
 
       if (userPendingWithdrawals.length > 0) {
@@ -283,18 +309,30 @@ router.get("/nonce/:user", async (req, res) => {
           0n
         );
 
-        // Use the higher of the two: persisted nonce or max pending nonce
+        log.debug(
+          {
+            user: userAddress,
+            currentLastNonce: lastNonce.toString(),
+            maxPendingNonce: maxPendingNonce.toString(),
+            pendingNonces: userPendingWithdrawals.map((w) => w.nonce),
+          },
+          "Comparing current lastNonce with pending withdrawals"
+        );
+
+        // Use the higher of the current lastNonce or max pending nonce
         if (maxPendingNonce > lastNonce) {
           log.debug(
             {
               user: userAddress,
-              persistedNonce: lastNonce.toString(),
+              currentLastNonce: lastNonce.toString(),
               maxPendingNonce: maxPendingNonce.toString(),
             },
-            "Found higher nonce in pending withdrawals"
+            "Found higher nonce in pending withdrawals, using it"
           );
           lastNonce = maxPendingNonce;
         }
+      } else {
+        log.debug({ user: userAddress }, "No pending withdrawals found for user");
       }
     } catch (err) {
       log.warn(

@@ -51,6 +51,32 @@ const lastNonceByUser = new Map<string, bigint>();
 // Maps user -> Set of used nonces
 const usedNonces = new Map<string, Set<string>>();
 
+/**
+ * Get the maximum nonce from usedNonces for a user (for calculating next nonce)
+ */
+export function getMaxUsedNonce(userAddress: string): bigint {
+  const normalizedAddress = userAddress.toLowerCase();
+  const userUsedNonces = usedNonces.get(normalizedAddress);
+  if (!userUsedNonces || userUsedNonces.size === 0) {
+    return 0n;
+  }
+  
+  // Find the maximum nonce from the set
+  let maxNonce = 0n;
+  for (const nonceStr of userUsedNonces) {
+    try {
+      const nonce = BigInt(nonceStr);
+      if (nonce > maxNonce) {
+        maxNonce = nonce;
+      }
+    } catch {
+      // Skip invalid nonce strings
+    }
+  }
+  
+  return maxNonce;
+}
+
 // Reference to GunDB instance for nonce persistence
 let nonceGunInstance: IGunInstance | null = null;
 
