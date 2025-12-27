@@ -546,6 +546,11 @@ export default (app: express.Application) => {
     res.sendFile(path.resolve(publicPath, "torrent.html"));
   });
 
+  app.get("/drive", (req, res) => {
+    const publicPath = path.resolve(__dirname, "../public");
+    res.sendFile(path.resolve(publicPath, "drive.html"));
+  });
+
   // Route per servire i file JavaScript dalla directory lib
   app.get("/lib/:filename", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
