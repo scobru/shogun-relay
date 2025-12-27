@@ -1,4 +1,4 @@
-import express, { Router } from "express";
+import { Router } from "express";
 import { ethers } from "ethers";
 import { log, getBridgeClient, strictLimiter, getRelayHost, getSigningKeyPair } from "./utils";
 import {
@@ -29,7 +29,7 @@ const router: Router = Router();
  *
  * Request a withdrawal from L2.
  */
-router.post("/withdraw", strictLimiter, express.json(), async (req, res) => {
+router.post("/withdraw", strictLimiter, async (req, res) => {
   try {
     const gun = req.app.get("gunInstance");
     if (!gun) {
