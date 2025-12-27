@@ -8,9 +8,12 @@ import {
   getPendingWithdrawals,
   setLastNonce,
   getLastNonce,
+  getLastNonceAsync,
   getBatch,
   validateNonceIncremental,
   verifyDualSignatures,
+  PendingWithdrawal,
+  Batch,
 } from "../../utils/bridge-state";
 import {
   isValidEthereumAddress,
@@ -19,7 +22,6 @@ import {
   isValidSignatureFormat,
 } from "../../utils/security";
 import * as Reputation from "../../utils/relay-reputation";
-import { PendingWithdrawal, Batch } from "../../utils/bridge-state";
 import { WithdrawalLeaf, generateProof } from "../../utils/merkle-tree";
 
 const router: Router = Router();
@@ -240,6 +242,14 @@ router.get("/pending-withdrawals", async (req, res) => {
  */
 router.get("/nonce/:user", async (req, res) => {
   try {
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
     const { user } = req.params;
 
     let userAddress: string;
@@ -252,7 +262,8 @@ router.get("/nonce/:user", async (req, res) => {
       });
     }
 
-    const lastNonce = getLastNonce(userAddress);
+    // Use async version to read from GunDB if not in cache
+    const lastNonce = await getLastNonceAsync(gun, userAddress);
     const nextNonce = lastNonce + 1n;
 
     res.json({
