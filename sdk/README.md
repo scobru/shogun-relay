@@ -76,6 +76,108 @@ const result = await sdk.ipfs.uploadFile(
 );
 ```
 
+## API Keys
+
+Manage API keys for programmatic access to all relay services:
+
+```typescript
+// List all API keys
+const keys = await sdk.apiKeys.list();
+
+// Create a new API key
+const newKey = await sdk.apiKeys.create('My App Key', 30); // 30 days expiration
+console.log('API Key:', newKey.token); // Save this, it's only shown once!
+
+// Use the API key for authentication
+sdk.apiKeys.useApiKey(newKey.token);
+
+// Or use it directly
+sdk.setToken(newKey.token);
+
+// Revoke an API key
+await sdk.apiKeys.revoke(newKey.keyId);
+```
+
+**Note**: API keys work across all relay services (Drive, IPFS, etc.) and use the prefix `shogun-api-`.
+
+## Drive Operations
+
+The Drive module provides file system operations for the admin drive:
+
+### List Files
+
+```typescript
+// List root directory
+const files = await sdk.drive.list();
+
+// List specific directory
+const files = await sdk.drive.list('folder/subfolder');
+```
+
+### Upload Files
+
+```typescript
+// Upload single file
+const result = await sdk.drive.uploadFile(
+  fileBuffer,
+  'example.txt',
+  'folder' // optional path
+);
+
+// Upload multiple files
+const result = await sdk.drive.uploadFiles([
+  { file: fileBuffer1, filename: 'file1.txt' },
+  { file: fileBuffer2, filename: 'file2.txt' }
+], 'folder');
+```
+
+### Download Files
+
+```typescript
+const fileBuffer = await sdk.drive.download('path/to/file.txt');
+```
+
+### Directory Operations
+
+```typescript
+// Create directory
+await sdk.drive.createDirectory('new-folder', 'parent-folder');
+
+// Rename file/directory
+await sdk.drive.rename('old-name.txt', 'new-name.txt');
+
+// Move file/directory
+await sdk.drive.move('source.txt', 'destination/folder/source.txt');
+
+// Delete file/directory
+await sdk.drive.delete('path/to/item');
+```
+
+### Storage Statistics
+
+```typescript
+const stats = await sdk.drive.getStats();
+console.log(`Total: ${stats.stats.totalSizeMB} MB`);
+console.log(`Files: ${stats.stats.fileCount}`);
+```
+
+### Public Links
+
+```typescript
+// Create a public sharing link
+const link = await sdk.drive.createPublicLink('document.pdf', 7); // 7 days expiration
+console.log('Public URL:', link.publicUrl);
+
+// List all public links
+const links = await sdk.drive.listPublicLinks();
+
+// Revoke a link
+await sdk.drive.revokePublicLink(link.linkId);
+
+// Get public file URL (for direct access)
+const publicUrl = sdk.drive.getPublicFileUrl(link.linkId, 'https://shogun-relay.scobrudot.dev');
+```
+
 ## IPFS Operations
 
 ### Upload Single File
@@ -290,6 +392,8 @@ See the main [API Documentation](../docs/API.md) for complete endpoint reference
 
 - **System**: Health checks, stats, system information
 - **IPFS**: File uploads, directory uploads, content retrieval, pinning
+- **Drive**: Admin drive file system operations, public link sharing
+- **API Keys**: API key management for programmatic access
 - **Deals**: Storage deal creation, activation, management
 - **Registry**: On-chain relay registry operations
 - **Network**: Network federation, reputation, relay discovery
