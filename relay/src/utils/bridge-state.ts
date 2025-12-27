@@ -2882,8 +2882,9 @@ export async function reconcileUserBalance(
   try {
     const normalizedAddress = userAddress.toLowerCase();
 
-    // Get current balance from GunDB
-    const currentBalance = await getUserBalance(gun, normalizedAddress, relayKeyPair.pub);
+    // Get current balance from GunDB (without specifying relayPub to get balance from any trusted relay)
+    // This ensures we see the most up-to-date balance across all relays
+    const currentBalance = await getUserBalance(gun, normalizedAddress);
 
     log.debug(
       { user: normalizedAddress, currentBalance: currentBalance.toString() },
