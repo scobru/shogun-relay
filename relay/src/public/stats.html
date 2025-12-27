@@ -500,9 +500,11 @@
                 document.getElementById('peersCount').textContent = data.peers?.count || 0;
                 document.getElementById('memoryUsage').textContent = Math.round((data.memory?.heapUsed || 0) / 1024 / 1024);
                 document.getElementById('requestRate').textContent = data.dam?.in?.rate || 0;
-                const uptimeMs = data.up?.time || 0;
+                // Handle uptime - check both data.up.time and direct uptime property
+                const uptimeMs = (data.up?.time || data.uptime ? (data.uptime * 1000) : 0) || 0;
                 const uptimeSeconds = uptimeMs / 1000;
                 const uptimeHours = uptimeSeconds / 3600;
+                
                 // Show in minutes if less than 1 hour, otherwise show hours with decimals if less than 24 hours
                 let uptimeDisplay;
                 let uptimeUnit = '';
