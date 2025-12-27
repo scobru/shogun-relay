@@ -152,19 +152,19 @@ export function getLastNonce(userAddress: string): bigint {
 
 /**
  * Get the last used nonce for a user, checking GunDB if not in cache
+ * Always checks GunDB to ensure we have the latest value (cache may be stale)
  */
 export async function getLastNonceAsync(gun: IGunInstance, userAddress: string): Promise<bigint> {
   const normalizedAddress = userAddress.toLowerCase();
 
-  // Check cache first
-  const cached = lastNonceByUser.get(normalizedAddress);
-  if (cached !== undefined) {
-    return cached;
-  }
-
-  // Fallback to GunDB
+  // Always read from GunDB to ensure we have the latest value
+  // The cache might be stale after a relay restart or if persistence hasn't completed
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve(0n), 2000);
+    const timeout = setTimeout(() => {
+      // Fallback to cache if GunDB read times out
+      const cached = lastNonceByUser.get(normalizedAddress);
+      resolve(cached !== undefined ? cached : 0n);
+    }, 2000);
 
     gun
       .get("bridge")
@@ -178,10 +178,14 @@ export async function getLastNonceAsync(gun: IGunInstance, userAddress: string):
             lastNonceByUser.set(normalizedAddress, nonce); // Update cache
             resolve(nonce);
           } catch {
-            resolve(0n);
+            // Fallback to cache on parse error
+            const cached = lastNonceByUser.get(normalizedAddress);
+            resolve(cached !== undefined ? cached : 0n);
           }
         } else {
-          resolve(0n);
+          // No data in GunDB, return cached value or 0n
+          const cached = lastNonceByUser.get(normalizedAddress);
+          resolve(cached !== undefined ? cached : 0n);
         }
       });
   });
