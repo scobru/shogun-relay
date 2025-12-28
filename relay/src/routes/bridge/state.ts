@@ -11,6 +11,8 @@ import {
   getPendingWithdrawals,
   compareBalances,
   syncMissingDeposits,
+  validateGlobalSupply,
+  fixGlobalSupply,
 } from "../../utils/bridge-state";
 import { getRelayKeyPair } from "../../utils/relay-user";
 import { authConfig } from "../../config";
@@ -554,6 +556,128 @@ router.post("/sync-deposits", express.json(), async (req, res) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log.error({ error }, "Error syncing deposits");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /api/v1/bridge/supply
+ *
+ * Get total L2 circulating supply and compare with bridge contract balance.
+ * Shows discrepancy status and list of all users with balances.
+ */
+router.get("/supply", async (req, res) => {
+  try {
+    const gun = req.app.get("gunInstance");
+    const client = getBridgeClient();
+
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
+    log.info("Validating global supply");
+
+    const validation = await validateGlobalSupply(gun, client);
+
+    res.json({
+      success: true,
+      supply: {
+        l2Supply: validation.l2Supply.toString(),
+        l2SupplyEth: validation.l2SupplyEth,
+        contractBalance: validation.contractBalance.toString(),
+        contractBalanceEth: validation.contractBalanceEth,
+        discrepancy: validation.discrepancy.toString(),
+        discrepancyEth: validation.discrepancyEth,
+        isHealthy: validation.isHealthy,
+        userCount: validation.userCount,
+        status: validation.isHealthy
+          ? "healthy"
+          : "CRITICAL: L2 supply exceeds contract balance",
+      },
+      users: validation.usersWithBalance,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error }, "Error validating global supply");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/bridge/fix-supply
+ *
+ * Fix global supply discrepancy by proportionally reducing user balances.
+ * ADMIN ONLY - requires authentication.
+ * Use dryRun=true (default) to preview changes without applying them.
+ */
+router.post("/fix-supply", express.json(), async (req, res) => {
+  try {
+    // Admin authentication
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const token = bearerToken || req.headers["token"];
+
+    if (token !== authConfig.adminPassword) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized - admin authentication required",
+      });
+    }
+
+    const gun = req.app.get("gunInstance");
+    const client = getBridgeClient();
+    const relayKeyPair = getRelayKeyPair();
+
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
+    if (!relayKeyPair) {
+      return res.status(503).json({
+        success: false,
+        error: "Relay keypair not initialized",
+      });
+    }
+
+    // Default to dry run for safety
+    const dryRun = req.body?.dryRun !== false;
+
+    log.info({ dryRun }, "Starting global supply fix");
+
+    const result = await fixGlobalSupply(gun, client, relayKeyPair, dryRun);
+
+    res.json({
+      success: result.success,
+      dryRun: result.dryRun,
+      message: result.dryRun
+        ? "Dry run completed - no changes made. Set dryRun=false to apply corrections."
+        : result.success
+        ? "Supply corrections applied successfully"
+        : "Supply fix failed",
+      before: {
+        l2Supply: result.beforeValidation.l2SupplyEth,
+        contractBalance: result.beforeValidation.contractBalanceEth,
+        discrepancy: result.beforeValidation.discrepancyEth,
+        isHealthy: result.beforeValidation.isHealthy,
+      },
+      corrections: result.corrections,
+      error: result.error,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error }, "Error fixing global supply");
     res.status(500).json({
       success: false,
       error: errorMessage,

@@ -3656,3 +3656,368 @@ export async function listL2Transfers(
     }, 5000);
   });
 }
+
+// ============================================================================
+// GLOBAL SUPPLY VALIDATION
+// These functions validate that total L2 circulating supply matches contract
+// ============================================================================
+
+/**
+ * Result from total supply calculation
+ */
+export interface TotalSupplyResult {
+  totalSupply: bigint;
+  userCount: number;
+  balances: Map<string, bigint>;
+}
+
+/**
+ * Result from global supply validation
+ */
+export interface GlobalSupplyValidation {
+  l2Supply: bigint;
+  l2SupplyEth: string;
+  contractBalance: bigint;
+  contractBalanceEth: string;
+  discrepancy: bigint;
+  discrepancyEth: string;
+  isHealthy: boolean;
+  userCount: number;
+  usersWithBalance: Array<{ address: string; balance: string; balanceEth: string }>;
+}
+
+/**
+ * Get total L2 circulating supply by summing all user balances
+ * 
+ * @param gun - GunDB instance
+ * @param chainId - Optional chain ID for registry lookup
+ * @returns Total supply and individual user balances
+ */
+export async function getTotalL2Supply(
+  gun: IGunInstance,
+  chainId?: number
+): Promise<TotalSupplyResult> {
+  return new Promise(async (resolve) => {
+    const balances = new Map<string, bigint>();
+    const seenAddresses = new Set<string>();
+    const timeout = setTimeout(() => {
+      log.warn("Timeout in getTotalL2Supply, returning partial results");
+      finalize();
+    }, 30000);
+
+    log.debug(
+      { chainId },
+      "Starting total L2 supply calculation"
+    );
+
+    // Read all balance indices to find users with balances
+    const balancesIndex = gun.get("bridge").get("balances-index");
+    let lastUpdateTime = Date.now();
+
+    balancesIndex.map().on(async (index: any, ethereumAddress?: string) => {
+      if (!index || !ethereumAddress || seenAddresses.has(ethereumAddress.toLowerCase())) {
+        return;
+      }
+
+      // Skip metadata keys
+      if (ethereumAddress === "_" || ethereumAddress.startsWith("_")) {
+        return;
+      }
+
+      lastUpdateTime = Date.now();
+      const normalizedAddress = ethereumAddress.toLowerCase();
+      seenAddresses.add(normalizedAddress);
+
+      try {
+        // Get actual balance for this user
+        // Don't pass trustedRelays explicitly - getUserBalance will fetch them internally
+        const balance = await getUserBalance(gun, normalizedAddress);
+        if (balance > 0n) {
+          balances.set(normalizedAddress, balance);
+          log.debug(
+            { user: normalizedAddress, balance: balance.toString() },
+            "Found user balance for supply calculation"
+          );
+        }
+      } catch (error) {
+        log.warn({ error, user: normalizedAddress }, "Error getting balance for supply calculation");
+      }
+    });
+
+    const finalize = () => {
+      clearTimeout(timeout);
+      balancesIndex.map().off();
+
+      // Calculate total
+      let totalSupply = 0n;
+      for (const balance of balances.values()) {
+        totalSupply = totalSupply + balance;
+      }
+
+      log.info(
+        {
+          totalSupply: totalSupply.toString(),
+          userCount: balances.size,
+        },
+        "Total L2 supply calculated"
+      );
+
+      resolve({
+        totalSupply,
+        userCount: balances.size,
+        balances,
+      });
+    };
+
+    // Check for completion at intervals
+    const checkAndFinalize = () => {
+      const timeSinceLastUpdate = Date.now() - lastUpdateTime;
+      if (timeSinceLastUpdate >= 3000) {
+        finalize();
+      }
+    };
+
+    setTimeout(checkAndFinalize, 5000);
+    setTimeout(checkAndFinalize, 8000);
+    setTimeout(checkAndFinalize, 12000);
+    setTimeout(checkAndFinalize, 15000);
+  });
+}
+
+/**
+ * Validate global L2 supply against bridge contract balance
+ * 
+ * This is a critical health check that ensures:
+ * - Total L2 circulating supply <= Contract balance
+ * - No money has been created out of thin air
+ * 
+ * @param gun - GunDB instance
+ * @param bridgeClient - Bridge client for querying contract balance
+ * @param chainId - Optional chain ID
+ * @returns Validation result with discrepancy details
+ */
+export async function validateGlobalSupply(
+  gun: IGunInstance,
+  bridgeClient: {
+    getBalance: () => Promise<bigint>;
+  },
+  chainId?: number
+): Promise<GlobalSupplyValidation> {
+  const { ethers } = await import("ethers");
+
+  log.info("Starting global supply validation");
+
+  // Get total L2 supply
+  const supplyResult = await getTotalL2Supply(gun, chainId);
+
+  // Get contract balance
+  const contractBalance = await bridgeClient.getBalance();
+
+  // Calculate discrepancy (negative = L2 supply exceeds contract = BAD)
+  const discrepancy = contractBalance - supplyResult.totalSupply;
+  const isHealthy = discrepancy >= 0n;
+
+  // Prepare user list sorted by balance (highest first)
+  const usersWithBalance = Array.from(supplyResult.balances.entries())
+    .map(([address, balance]) => ({
+      address,
+      balance: balance.toString(),
+      balanceEth: ethers.formatEther(balance),
+    }))
+    .sort((a, b) => {
+      const balA = BigInt(a.balance);
+      const balB = BigInt(b.balance);
+      if (balB > balA) return 1;
+      if (balB < balA) return -1;
+      return 0;
+    });
+
+  const result: GlobalSupplyValidation = {
+    l2Supply: supplyResult.totalSupply,
+    l2SupplyEth: ethers.formatEther(supplyResult.totalSupply),
+    contractBalance,
+    contractBalanceEth: ethers.formatEther(contractBalance),
+    discrepancy,
+    discrepancyEth: ethers.formatEther(discrepancy),
+    isHealthy,
+    userCount: supplyResult.userCount,
+    usersWithBalance,
+  };
+
+  if (!isHealthy) {
+    log.error(
+      {
+        l2Supply: result.l2SupplyEth,
+        contractBalance: result.contractBalanceEth,
+        discrepancy: result.discrepancyEth,
+        userCount: result.userCount,
+      },
+      "⚠️  CRITICAL: L2 supply exceeds contract balance! Bridge is insolvent."
+    );
+  } else {
+    log.info(
+      {
+        l2Supply: result.l2SupplyEth,
+        contractBalance: result.contractBalanceEth,
+        surplus: result.discrepancyEth,
+        userCount: result.userCount,
+      },
+      "✅ Global supply validation passed"
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Fix global supply discrepancy by proportionally reducing user balances
+ * 
+ * This is a DESTRUCTIVE operation that should only be used when:
+ * - L2 supply exceeds contract balance
+ * - The root cause has been identified
+ * - Admin has approved the correction
+ * 
+ * Strategy: Reduce all user balances proportionally to match contract balance
+ * 
+ * @param gun - GunDB instance
+ * @param bridgeClient - Bridge client
+ * @param relayKeyPair - Relay keypair for signing
+ * @param dryRun - If true, only calculate what would happen without making changes
+ * @returns Correction result
+ */
+export async function fixGlobalSupply(
+  gun: IGunInstance,
+  bridgeClient: { getBalance: () => Promise<bigint> },
+  relayKeyPair: { pub: string; priv: string; epub?: string; epriv?: string },
+  dryRun: boolean = true
+): Promise<{
+  success: boolean;
+  dryRun: boolean;
+  beforeValidation: GlobalSupplyValidation;
+  corrections: Array<{
+    user: string;
+    oldBalance: string;
+    newBalance: string;
+    reduction: string;
+  }>;
+  error?: string;
+}> {
+  const { ethers } = await import("ethers");
+
+  log.info({ dryRun }, "Starting global supply fix");
+
+  // First, validate current state
+  const beforeValidation = await validateGlobalSupply(gun, bridgeClient);
+
+  if (beforeValidation.isHealthy) {
+    log.info("Supply is healthy, no fix needed");
+    return {
+      success: true,
+      dryRun,
+      beforeValidation,
+      corrections: [],
+    };
+  }
+
+  // Calculate correction ratio
+  // If L2 supply is 10 ETH but contract only has 8 ETH, ratio = 0.8
+  const l2Supply = beforeValidation.l2Supply;
+  const contractBalance = beforeValidation.contractBalance;
+
+  if (l2Supply === 0n) {
+    return {
+      success: false,
+      dryRun,
+      beforeValidation,
+      corrections: [],
+      error: "L2 supply is zero, nothing to correct",
+    };
+  }
+
+  // Calculate the scale factor (using 18 decimal precision)
+  const PRECISION = 10n ** 18n;
+  const scaleFactor = (contractBalance * PRECISION) / l2Supply;
+
+  log.warn(
+    {
+      l2Supply: beforeValidation.l2SupplyEth,
+      contractBalance: beforeValidation.contractBalanceEth,
+      scaleFactor: Number(scaleFactor) / Number(PRECISION),
+    },
+    "Calculating proportional balance reductions"
+  );
+
+  const corrections: Array<{
+    user: string;
+    oldBalance: string;
+    newBalance: string;
+    reduction: string;
+  }> = [];
+
+  // Get all user balances
+  const supplyResult = await getTotalL2Supply(gun);
+
+  for (const [address, oldBalance] of supplyResult.balances) {
+    // Calculate new balance proportionally
+    const newBalance = (oldBalance * scaleFactor) / PRECISION;
+    const reduction = oldBalance - newBalance;
+
+    corrections.push({
+      user: address,
+      oldBalance: ethers.formatEther(oldBalance),
+      newBalance: ethers.formatEther(newBalance),
+      reduction: ethers.formatEther(reduction),
+    });
+
+    if (!dryRun && reduction > 0n) {
+      // Actually apply the correction
+      try {
+        const balanceData: any = {
+          balance: newBalance.toString(),
+          user: address,
+          ethereumAddress: address,
+          updatedAt: Date.now(),
+          type: "bridge-balance",
+          corrected: true,
+          supplyCorrection: true,
+          previousBalance: oldBalance.toString(),
+        };
+
+        await FrozenData.createFrozenEntry(
+          gun,
+          balanceData,
+          relayKeyPair,
+          "bridge-balances",
+          address
+        );
+
+        log.info(
+          {
+            user: address,
+            oldBalance: ethers.formatEther(oldBalance),
+            newBalance: ethers.formatEther(newBalance),
+          },
+          "Applied balance correction"
+        );
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        log.error({ error: errorMsg, user: address }, "Failed to apply balance correction");
+        return {
+          success: false,
+          dryRun,
+          beforeValidation,
+          corrections,
+          error: `Failed to correct balance for ${address}: ${errorMsg}`,
+        };
+      }
+    }
+  }
+
+  return {
+    success: true,
+    dryRun,
+    beforeValidation,
+    corrections,
+  };
+}
+
