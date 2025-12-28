@@ -3298,17 +3298,15 @@ export async function reconcileUserBalance(
       "Starting balance reconciliation (lock acquired)"
     );
 
-    // Calculate correct balance from processed deposits and withdrawals
-    // Use processed deposits (not all on-chain deposits) to avoid double-counting
-    const processedDeposits = await getProcessedDepositsForUser(gun, normalizedAddress);
-    const totalDeposits: bigint = processedDeposits.reduce(
-      (sum: bigint, d: ProcessedDeposit) => sum + BigInt(d.amount || "0"),
-      0n
-    );
+    // Use on-chain deposits as source of truth to ensure consistency across all relays
+    // This ensures that even if a relay was offline when deposits were processed,
+    // it will still see all deposits from the blockchain
+    const onChainBalance = await getOnChainUserBalance(bridgeClient, normalizedAddress);
+    const totalDeposits: bigint = onChainBalance.totalDeposits;
 
     // Get processed withdrawals from batches (on-chain withdrawals that have been processed)
-    // We can't use queryWithdrawals because it returns all withdrawals, not just processed ones
-    // Instead, we'll calculate from batches
+    // We use batches instead of queryWithdrawals to only count withdrawals that have been
+    // successfully processed and included in a batch
     const allBatches = await getAllBatches(gun);
     let totalWithdrawals: bigint = 0n;
     
@@ -3324,7 +3322,7 @@ export async function reconcileUserBalance(
       }
     }
 
-    // Calculate base balance from deposits - withdrawals
+    // Calculate base balance from on-chain deposits - processed withdrawals
     let calculatedBalance: bigint = totalDeposits - totalWithdrawals;
 
     // Now account for L2 transfers
@@ -3354,6 +3352,8 @@ export async function reconcileUserBalance(
         calculatedBalance: calculatedBalance.toString(),
         totalDeposits: totalDeposits.toString(),
         totalWithdrawals: totalWithdrawals.toString(),
+        depositCount: onChainBalance.depositCount,
+        withdrawalCount: onChainBalance.withdrawalCount,
         transferCount: allTransfers.length,
       },
       "Balance reconciliation calculation complete"
