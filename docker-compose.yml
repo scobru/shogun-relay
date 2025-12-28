@@ -48,7 +48,6 @@ services:
       - HOLSTER_ENABLED=${HOLSTER_ENABLED:-false}
       - X402_ENABLED=${X402_ENABLED:-false}
       - REGISTRY_ENABLED=${REGISTRY_ENABLED:-false}
-      - BRIDGE_ENABLED=${BRIDGE_ENABLED:-false}
       - DEALS_ENABLED=${DEALS_ENABLED:-false}
       - DEAL_SYNC_ENABLED=${DEAL_SYNC_ENABLED:-false}
       - WORMHOLE_ENABLED=${WORMHOLE_ENABLED:-false}
@@ -94,12 +93,6 @@ services:
       # ============================================================================
       - REGISTRY_NETWORKS=base-sepolia,base
       - REGISTRY_DEFAULT_NETWORK=base-sepolia
-      # ============================================================================
-      # BRIDGE
-      # ============================================================================
-      - BRIDGE_NETWORKS=base-sepolia,base
-      - BRIDGE_DEFAULT_NETWORK=base-sepolia
-      - BRIDGE_VALID_CHAIN_IDS=84532,42161
       # ============================================================================
       # DEALS
       # ============================================================================

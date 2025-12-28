@@ -8,7 +8,6 @@
  *
  * Multi-Chain Support:
  * - X402_NETWORKS, X402_DEFAULT_NETWORK, X402_<NETWORK>_RPC
- * - BRIDGE_NETWORKS, BRIDGE_DEFAULT_NETWORK, BRIDGE_<NETWORK>_RPC
  * - DEALS_NETWORKS, DEALS_DEFAULT_NETWORK, DEALS_<NETWORK>_RPC
  */
 
@@ -236,70 +235,6 @@ export const config = {
   },
 
   // ============================================================================
-  // BRIDGE CONFIGURATION (Multi-Chain)
-  // ============================================================================
-
-  bridge: {
-    enabled: process.env.BRIDGE_ENABLED === "true" || false,
-
-    // Multi-chain configuration
-    networks: parseNetworkList(process.env.BRIDGE_NETWORKS, ["base-sepolia"]),
-    defaultNetwork: (process.env.BRIDGE_DEFAULT_NETWORK || "base-sepolia") as NetworkId,
-
-    // Get RPC URL for specific network (or default)
-    getRpcUrl: (network?: NetworkId): string => {
-      const targetNetwork =
-        network || ((process.env.BRIDGE_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
-      return getRpcForNetwork(targetNetwork, "bridge");
-    },
-
-    // Get chain ID for specific network (or default)
-    getChainId: (network?: NetworkId): number => {
-      const targetNetwork =
-        network || ((process.env.BRIDGE_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
-      return getChainIdForNetwork(targetNetwork);
-    },
-
-    // RPC URLs map for all configured networks
-    rpcUrls: (() => {
-      const networks = parseNetworkList(process.env.BRIDGE_NETWORKS, ["base-sepolia"]);
-      const urls: Record<string, string> = {};
-      for (const network of networks) {
-        urls[network] = getRpcForNetwork(network, "bridge");
-      }
-      return urls;
-    })(),
-
-    // Default chain ID (for backward compatibility)
-    chainId: getChainIdForNetwork(
-      (process.env.BRIDGE_DEFAULT_NETWORK || "base-sepolia") as NetworkId
-    ),
-
-    // Sequencer configuration (PRIVATE_KEY is fallback)
-    sequencerPrivateKey:
-      process.env.BRIDGE_SEQUENCER_PRIVATE_KEY ||
-      process.env.RELAY_PRIVATE_KEY ||
-      process.env.PRIVATE_KEY,
-    startBlock: process.env.BRIDGE_START_BLOCK
-      ? parseInt(process.env.BRIDGE_START_BLOCK)
-      : undefined,
-    minConfirmations: parseInt(process.env.BRIDGE_MIN_CONFIRMATIONS || "3") || 3,
-
-    // Auto batch submission
-    autoBatchEnabled: process.env.BRIDGE_AUTO_BATCH_ENABLED !== "false",
-    autoBatchIntervalMs:
-      parseInt(process.env.BRIDGE_AUTO_BATCH_INTERVAL_MS || "300000") || 5 * 60 * 1000,
-    autoBatchMinWithdrawals: parseInt(process.env.BRIDGE_AUTO_BATCH_MIN_WITHDRAWALS || "1") || 1,
-
-    // Security: Allowed chain IDs
-    validChainIds: process.env.BRIDGE_VALID_CHAIN_IDS
-      ? process.env.BRIDGE_VALID_CHAIN_IDS.split(",")
-          .map((id) => parseInt(id.trim()))
-          .filter((id) => !isNaN(id))
-      : [1, 11155111, 8453, 84532, 42161, 421614, 10, 11155420, 137, 80002],
-  },
-
-  // ============================================================================
   // DEALS CONFIGURATION (Multi-Chain)
   // ============================================================================
 
@@ -455,7 +390,6 @@ export const storageConfig = config.storage;
 export const relayKeysConfig = config.relayKeys;
 export const registryConfig = config.registry;
 export const x402Config = config.x402;
-export const bridgeConfig = config.bridge;
 export const dealsConfig = config.deals;
 export const dealSyncConfig = config.dealSync;
 export const wormholeConfig = config.wormhole;

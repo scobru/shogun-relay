@@ -6,7 +6,7 @@ import { NetworkModule } from "./modules/network";
 import { DealsModule } from "./modules/deals";
 import { RegistryModule } from "./modules/registry";
 import { UploadsModule } from "./modules/uploads";
-import { BridgeModule } from "./modules/bridge";
+
 import { AnnasArchiveModule } from "./modules/annas-archive";
 import { DriveModule } from "./modules/drive";
 import { ApiKeysModule } from "./modules/api-keys";
@@ -30,7 +30,7 @@ export class ShogunRelaySDK {
   public deals: DealsModule;
   public registry: RegistryModule;
   public uploads: UploadsModule;
-  public bridge: BridgeModule;
+
   public annasArchive: AnnasArchiveModule;
   public drive: DriveModule;
   public apiKeys: ApiKeysModule;
@@ -45,7 +45,7 @@ export class ShogunRelaySDK {
     this.deals = new DealsModule(this.client);
     this.registry = new RegistryModule(this.client);
     this.uploads = new UploadsModule(this.client);
-    this.bridge = new BridgeModule(this.client);
+
     this.annasArchive = new AnnasArchiveModule(this.client);
     this.drive = new DriveModule(this.client);
     this.apiKeys = new ApiKeysModule(this.client);

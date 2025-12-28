@@ -700,6 +700,32 @@
                     <button onclick="fixSupply()" class="md-btn md-btn-tonal">Reconcile</button>
                 </div>
             </div>
+
+            <!-- User Balance Reconcile Card -->
+            <div class="service-card">
+                <div class="service-card-header">
+                    <div class="service-name">
+                        <span class="md-status-dot"></span>
+                        User Reconcile
+                    </div>
+                    <span class="md-chip">Admin</span>
+                </div>
+                <div class="service-card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">User Address</span>
+                    </div>
+                    <input type="text" id="reconcile-user-address" placeholder="0x..."
+                        style="width: 100%; padding: 8px; border-radius: 8px; background: var(--md-surface-container); color: var(--md-on-surface); border: 1px solid var(--md-outline); margin-bottom: 12px;">
+                    <div class="stat-row">
+                        <span class="stat-label">Result</span>
+                        <span class="stat-value" id="reconcile-result">--</span>
+                    </div>
+                </div>
+                <div class="service-card-footer">
+                    <button onclick="checkUserBalance()" class="md-btn md-btn-text">Check</button>
+                    <button onclick="reconcileUserBalance()" class="md-btn md-btn-tonal">Reconcile</button>
+                </div>
+            </div>
         </div>
 
         <!-- Service Logs -->
@@ -1358,6 +1384,83 @@
             } catch (error) {
                 log(`Supply fix error: ${error.message}`, 'error');
                 alert('Supply fix error: ' + error.message);
+            }
+        }
+
+        async function checkUserBalance() {
+            const address = document.getElementById('reconcile-user-address').value.trim();
+            if (!address || !address.startsWith('0x')) {
+                alert('Please enter a valid address');
+                return;
+            }
+
+            try {
+                log(`Checking balance for ${address}...`);
+                const response = await fetch(`/api/v1/bridge/compare-balance/${address}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const onChain = data.onChain?.netBalanceEth || '0';
+                    const gunDb = data.gunDb?.balanceEth || '0';
+                    const status = data.discrepancy?.status || 'unknown';
+                    document.getElementById('reconcile-result').innerHTML =
+                        `On-chain: ${onChain} ETH<br>GunDB: ${gunDb} ETH<br><small>${status}</small>`;
+                    log(`Balance check complete: ${status}`, data.discrepancy?.hasDiscrepancy ? 'error' : 'success');
+                } else {
+                    document.getElementById('reconcile-result').textContent = data.error || 'Error';
+                    log(`Balance check failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                document.getElementById('reconcile-result').textContent = 'Error';
+                log(`Balance check error: ${error.message}`, 'error');
+            }
+        }
+
+        async function reconcileUserBalance() {
+            const password = getAdminPassword();
+            if (!password) {
+                alert('Admin password required');
+                return;
+            }
+
+            const address = document.getElementById('reconcile-user-address').value.trim();
+            if (!address || !address.startsWith('0x')) {
+                alert('Please enter a valid address');
+                return;
+            }
+
+            if (!confirm(`Reconcile balance for ${address}? This will correct the balance based on on-chain data.`)) {
+                return;
+            }
+
+            try {
+                log(`Reconciling balance for ${address}...`);
+                const response = await fetch('/api/v1/bridge/reconcile-balance', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${password}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ user: address })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    const msg = data.corrected
+                        ? `Corrected! ${data.currentBalance} → ${data.calculatedBalance}`
+                        : 'Already correct';
+                    document.getElementById('reconcile-result').textContent = msg;
+                    log(`Reconcile complete: ${data.message}`, 'success');
+                    alert(data.message);
+                } else {
+                    document.getElementById('reconcile-result').textContent = data.error || 'Error';
+                    log(`Reconcile failed: ${data.error}`, 'error');
+                    alert('Reconcile failed: ' + data.error);
+                }
+            } catch (error) {
+                document.getElementById('reconcile-result').textContent = 'Error';
+                log(`Reconcile error: ${error.message}`, 'error');
+                alert('Reconcile error: ' + error.message);
             }
         }
 

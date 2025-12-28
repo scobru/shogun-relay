@@ -70,14 +70,14 @@ import x402Router from "./x402";
 import networkRouter from "./network";
 import dealsRouter from "./deals";
 import registryRouter from "./registry";
-import bridgeRouter from "./bridge";
+
 import torrentRouter from "./torrent";
 import driveRouter from "./drive";
 import apiKeysRouter from "./api-keys";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import { authConfig, ipfsConfig, registryConfig, packageConfig, x402Config, bridgeConfig, dealsConfig, torrentConfig, holsterConfig } from "../config";
+import { authConfig, ipfsConfig, registryConfig, packageConfig, x402Config, dealsConfig, torrentConfig, holsterConfig } from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -681,16 +681,7 @@ export default (app: express.Application) => {
     });
   }
 
-  // Route per L2 Bridge (conditional)
-  if (bridgeConfig.enabled) {
-    app.use(`${baseRoute}/bridge`, bridgeRouter);
-    loggers.server.info(`✅ Bridge routes registered`);
-  } else {
-    loggers.server.info(`⏭️ Bridge routes disabled (BRIDGE_ENABLED=false)`);
-    app.use(`${baseRoute}/bridge/*`, (req, res) => {
-      res.status(503).json({ success: false, error: "Bridge module is disabled" });
-    });
-  }
+
 
   // Route per Torrent (conditional)
   if (torrentConfig.enabled) {
@@ -900,7 +891,6 @@ export default (app: express.Application) => {
           x402: x402Config.enabled,
           deals: dealsConfig.enabled,
           registry: registryConfig.enabled,
-          bridge: bridgeConfig.enabled,
           torrent: torrentConfig.enabled,
         },
       },

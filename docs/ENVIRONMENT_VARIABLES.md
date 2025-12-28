@@ -58,13 +58,6 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Description**: Enable on-chain registry functionality (staking, registration). When disabled, all `/api/v1/registry/*` routes return 503.
 - **Example**: `REGISTRY_ENABLED=true`
 
-### `BRIDGE_ENABLED`
-- **Type**: Boolean (String)
-- **Required**: No
-- **Default**: `false`
-- **Description**: Enable L2 Bridge functionality (deposits, withdrawals, batch submission). When disabled, all `/api/v1/bridge/*` routes return 503 and batch scheduler is not started.
-- **Example**: `BRIDGE_ENABLED=true`
-
 ### `DEALS_ENABLED`
 - **Type**: Boolean (String)
 - **Required**: No
@@ -94,7 +87,6 @@ Shogun Relay supports modular configuration. Each module can be independently en
 | Holster | None |
 | X402 | Gun (always enabled) |
 | Registry | Gun |
-| Bridge | Gun, IPFS (recommended) |
 | Deals | Gun, IPFS |
 | Wormhole | Gun |
 | Anna's Archive | Gun, IPFS |
@@ -699,31 +691,6 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Values**: `error`, `warn`, `info`, `debug`, `trace`
 - **Example**: `LOG_LEVEL=debug`
 
-### `BRIDGE_ENABLED`
-- **Type**: Boolean (String)
-- **Required**: No
-- **Default**: Not set (disabled)
-- **Description**: Enable L2 Bridge functionality. When enabled, the relay supports bridge operations for ETH transfers between L1 and L2.
-- **Values**: `"true"` or `"false"`
-- **Example**: `BRIDGE_ENABLED=true`
-- **Note**: See [BRIDGE.md](./BRIDGE.md) for bridge configuration details.
-
-### `BRIDGE_RPC_URL`
-- **Type**: String (URL)
-- **Required**: No (required if `BRIDGE_ENABLED=true`)
-- **Default**: None
-- **Description**: RPC URL for blockchain access for bridge operations. Required when bridge is enabled.
-- **Example**: `BRIDGE_RPC_URL=https://sepolia.base.org`
-- **Note**: See [BRIDGE.md](./BRIDGE.md) for complete bridge configuration.
-
-### `BRIDGE_VALID_CHAIN_IDS`
-- **Type**: String (Comma-separated integers)
-- **Required**: No
-- **Default**: `1,11155111,8453,84532,42161,421614,10,11155420,137,80002`
-- **Description**: Whitelist of valid chain IDs for bridge operations. Bridge will not start if configured chain ID is not in this list. Prevents misconfiguration and unauthorized chain usage.
-- **Default chains**: Ethereum Mainnet, Sepolia, Base, Base Sepolia, Arbitrum, Arbitrum Sepolia, Optimism, Op Sepolia, Polygon, Polygon Amoy
-- **Example**: `BRIDGE_VALID_CHAIN_IDS=8453,42161,10` (only Base, Arbitrum, Optimism mainnets)
-
 ### `CORS_ORIGINS`
 - **Type**: String (Comma-separated URLs)
 - **Required**: No
@@ -778,9 +745,6 @@ Shogun Relay supports modular configuration. Each module can be independently en
 | `NODE_OPTIONS` | No | - | Advanced |
 | `LOG_LEVEL` | No | `info` | Advanced |
 | `VERBOSE_LOGGING` | No | `false` | Advanced |
-| `BRIDGE_ENABLED` | No | - | Bridge |
-| `BRIDGE_RPC_URL` | No | - | Bridge |
-| `BRIDGE_VALID_CHAIN_IDS` | No | `1,11155111,...` | Security |
 | `CORS_ORIGINS` | No | `*` | Security |
 | `CORS_CREDENTIALS` | No | `false` | Security |
 
