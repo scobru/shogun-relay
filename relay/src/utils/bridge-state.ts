@@ -3329,25 +3329,13 @@ export async function reconcileUserBalance(
     const onChainBalance = await getOnChainUserBalance(bridgeClient, normalizedAddress);
     const totalDeposits: bigint = onChainBalance.totalDeposits;
 
-    // Get processed withdrawals from batches (on-chain withdrawals that have been processed)
-    // We use batches instead of queryWithdrawals to only count withdrawals that have been
-    // successfully processed and included in a batch
-    const allBatches = await getAllBatches(gun);
-    let totalWithdrawals: bigint = 0n;
-    
-    // Sum withdrawals from all batches for this user
-    for (const batch of allBatches) {
-      if (batch.withdrawals) {
-        for (const withdrawal of batch.withdrawals) {
-          const withdrawalUser = (withdrawal.user || "").toLowerCase();
-          if (withdrawalUser === normalizedAddress) {
-            totalWithdrawals = totalWithdrawals + BigInt(withdrawal.amount || "0");
-          }
-        }
-      }
-    }
+    // Use on-chain withdrawals as source of truth (not GunDB batches)
+    // This is critical because GunDB batches might be missing withdrawals that were
+    // successfully processed on-chain, causing balance inflation
+    // The on-chain withdrawal events are the definitive record of what was actually withdrawn
+    const totalWithdrawals: bigint = onChainBalance.totalWithdrawals;
 
-    // Calculate base balance from on-chain deposits - processed withdrawals
+    // Calculate base balance from on-chain deposits - on-chain withdrawals
     let calculatedBalance: bigint = totalDeposits - totalWithdrawals;
 
     // Now account for L2 transfers
