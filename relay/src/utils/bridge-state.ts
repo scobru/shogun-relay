@@ -3697,91 +3697,92 @@ export async function getTotalL2Supply(
   gun: IGunInstance,
   chainId?: number
 ): Promise<TotalSupplyResult> {
-  return new Promise(async (resolve) => {
-    const balances = new Map<string, bigint>();
-    const seenAddresses = new Set<string>();
-    const timeout = setTimeout(() => {
-      log.warn("Timeout in getTotalL2Supply, returning partial results");
-      finalize();
-    }, 30000);
+  const balances = new Map<string, bigint>();
 
-    log.debug(
-      { chainId },
-      "Starting total L2 supply calculation"
-    );
+  log.info("Starting total L2 supply calculation using frozen entries");
 
-    // Read all balance indices to find users with balances
-    const balancesIndex = gun.get("bridge").get("balances-index");
-    let lastUpdateTime = Date.now();
-
-    balancesIndex.map().on(async (index: any, ethereumAddress?: string) => {
-      if (!index || !ethereumAddress || seenAddresses.has(ethereumAddress.toLowerCase())) {
-        return;
-      }
-
-      // Skip metadata keys
-      if (ethereumAddress === "_" || ethereumAddress.startsWith("_")) {
-        return;
-      }
-
-      lastUpdateTime = Date.now();
-      const normalizedAddress = ethereumAddress.toLowerCase();
-      seenAddresses.add(normalizedAddress);
-
-      try {
-        // Get actual balance for this user
-        // Don't pass trustedRelays explicitly - getUserBalance will fetch them internally
-        const balance = await getUserBalance(gun, normalizedAddress);
-        if (balance > 0n) {
-          balances.set(normalizedAddress, balance);
-          log.debug(
-            { user: normalizedAddress, balance: balance.toString() },
-            "Found user balance for supply calculation"
-          );
-        }
-      } catch (error) {
-        log.warn({ error, user: normalizedAddress }, "Error getting balance for supply calculation");
-      }
+  try {
+    // Use listFrozenEntries to get all balance entries from the correct namespace
+    // The namespace is "bridge-balances" as used in createFrozenEntry calls
+    const entries = await FrozenData.listFrozenEntries(gun, "bridge-balances", {
+      verifyAll: true,  // Verify signatures to only count valid balances
+      limit: 1000,      // Large limit to get all users
     });
 
-    const finalize = () => {
-      clearTimeout(timeout);
-      balancesIndex.map().off();
+    log.debug(
+      { entriesFound: entries.length },
+      "Listed frozen balance entries"
+    );
 
-      // Calculate total
-      let totalSupply = 0n;
-      for (const balance of balances.values()) {
-        totalSupply = totalSupply + balance;
+    // Group by user address and take the latest balance for each user
+    const userLatestEntry = new Map<string, { balance: bigint; updatedAt: number }>();
+
+    for (const entry of entries) {
+      if (!entry.verified || !entry.data) {
+        log.debug({ key: entry.key }, "Skipping unverified entry");
+        continue;
       }
 
-      log.info(
-        {
-          totalSupply: totalSupply.toString(),
-          userCount: balances.size,
-        },
-        "Total L2 supply calculated"
-      );
+      const balanceData = entry.data as {
+        balance?: string;
+        user?: string;
+        ethereumAddress?: string;
+        type?: string;
+      };
 
-      resolve({
-        totalSupply,
-        userCount: balances.size,
-        balances,
-      });
-    };
-
-    // Check for completion at intervals
-    const checkAndFinalize = () => {
-      const timeSinceLastUpdate = Date.now() - lastUpdateTime;
-      if (timeSinceLastUpdate >= 3000) {
-        finalize();
+      // Only count bridge-balance type entries
+      if (balanceData.type !== "bridge-balance") {
+        continue;
       }
-    };
 
-    setTimeout(checkAndFinalize, 5000);
-    setTimeout(checkAndFinalize, 8000);
-    setTimeout(checkAndFinalize, 12000);
-    setTimeout(checkAndFinalize, 15000);
-  });
+      const userAddress = (balanceData.ethereumAddress || balanceData.user || entry.key || "").toLowerCase();
+      if (!userAddress || userAddress === "_") {
+        continue;
+      }
+
+      const balance = BigInt(balanceData.balance || "0");
+      const updatedAt = entry.updatedAt || 0;
+
+      // Keep only the most recent balance entry for each user
+      const existing = userLatestEntry.get(userAddress);
+      if (!existing || updatedAt > existing.updatedAt) {
+        userLatestEntry.set(userAddress, { balance, updatedAt });
+      }
+    }
+
+    // Build final balances map with positive balances only
+    for (const [address, { balance }] of userLatestEntry) {
+      if (balance > 0n) {
+        balances.set(address, balance);
+        log.debug(
+          { user: address, balance: balance.toString() },
+          "Found user balance for supply calculation"
+        );
+      }
+    }
+  } catch (error) {
+    log.error({ error }, "Error listing frozen balance entries");
+  }
+
+  // Calculate total
+  let totalSupply = 0n;
+  for (const balance of balances.values()) {
+    totalSupply = totalSupply + balance;
+  }
+
+  log.info(
+    {
+      totalSupply: totalSupply.toString(),
+      userCount: balances.size,
+    },
+    "Total L2 supply calculated"
+  );
+
+  return {
+    totalSupply,
+    userCount: balances.size,
+    balances,
+  };
 }
 
 /**
