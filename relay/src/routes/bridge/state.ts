@@ -9,7 +9,11 @@ import {
   getBatch,
   refreshTrustedRelaysCache,
   getPendingWithdrawals,
+  compareBalances,
+  syncMissingDeposits,
 } from "../../utils/bridge-state";
+import { getRelayKeyPair } from "../../utils/relay-user";
+import { authConfig } from "../../config";
 import { PendingWithdrawal, Batch } from "../../utils/bridge-state";
 import { WithdrawalLeaf, generateProof } from "../../utils/merkle-tree";
 
@@ -418,6 +422,138 @@ router.post("/refresh-trusted-relays", express.json(), async (req, res) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     log.error({ error }, "Error refreshing trusted relays cache");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /api/v1/bridge/compare-balance/:user
+ *
+ * Compare user's on-chain balance with GunDB balance.
+ * Useful for detecting discrepancies and missing deposits.
+ */
+router.get("/compare-balance/:user", async (req, res) => {
+  try {
+    const gun = req.app.get("gunInstance");
+    const client = getBridgeClient();
+
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
+    const { user } = req.params;
+
+    let userAddress: string;
+    try {
+      userAddress = ethers.getAddress(user);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid user address",
+      });
+    }
+
+    log.debug({ user: userAddress }, "Comparing on-chain vs GunDB balance");
+
+    const comparison = await compareBalances(gun, client, userAddress);
+
+    res.json({
+      success: true,
+      user: userAddress,
+      onChain: {
+        totalDeposits: comparison.onChain.totalDeposits.toString(),
+        totalWithdrawals: comparison.onChain.totalWithdrawals.toString(),
+        netBalance: comparison.onChain.netBalance.toString(),
+        netBalanceEth: ethers.formatEther(comparison.onChain.netBalance),
+        depositCount: comparison.onChain.depositCount,
+        withdrawalCount: comparison.onChain.withdrawalCount,
+      },
+      gunDb: {
+        balance: comparison.gunDb.toString(),
+        balanceEth: ethers.formatEther(comparison.gunDb),
+      },
+      discrepancy: {
+        amount: comparison.discrepancy.toString(),
+        amountEth: ethers.formatEther(comparison.discrepancy),
+        hasDiscrepancy: comparison.hasDiscrepancy,
+        status: comparison.discrepancy > 0n
+          ? "on-chain higher (missing deposits in GunDB)"
+          : comparison.discrepancy < 0n
+          ? "GunDB higher (possible double-credit)"
+          : "balanced",
+      },
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error }, "Error comparing balances");
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/bridge/sync-deposits
+ *
+ * Sync missing deposits from on-chain to GunDB.
+ * ADMIN ONLY - requires authentication.
+ */
+router.post("/sync-deposits", express.json(), async (req, res) => {
+  try {
+    // Admin authentication
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const token = bearerToken || req.headers["token"];
+
+    if (token !== authConfig.adminPassword) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized - admin authentication required",
+      });
+    }
+
+    const gun = req.app.get("gunInstance");
+    const client = getBridgeClient();
+    const relayKeyPair = getRelayKeyPair();
+
+    if (!gun) {
+      return res.status(503).json({
+        success: false,
+        error: "GunDB not initialized",
+      });
+    }
+
+    if (!relayKeyPair) {
+      return res.status(503).json({
+        success: false,
+        error: "Relay keypair not initialized",
+      });
+    }
+
+    const startBlock = req.body?.startBlock ? parseInt(req.body.startBlock) : 0;
+
+    log.info({ startBlock }, "Starting deposit sync from on-chain");
+
+    const result = await syncMissingDeposits(gun, client, relayKeyPair, startBlock);
+
+    res.json({
+      success: true,
+      synced: result.synced,
+      skipped: result.skipped,
+      errors: result.errors,
+      details: result.details,
+      message: `Synced ${result.synced} missing deposits, skipped ${result.skipped}, errors: ${result.errors}`,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error({ error }, "Error syncing deposits");
     res.status(500).json({
       success: false,
       error: errorMessage,

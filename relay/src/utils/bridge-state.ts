@@ -3026,6 +3026,220 @@ export async function removePendingForceWithdrawals(
   }
 }
 
+// ============================================================================
+// ON-CHAIN BALANCE VERIFICATION
+// These functions query the blockchain directly to verify balance consistency
+// ============================================================================
+
+/**
+ * Result from on-chain balance query
+ */
+export interface OnChainBalanceResult {
+  totalDeposits: bigint;
+  totalWithdrawals: bigint;
+  netBalance: bigint;
+  depositCount: number;
+  withdrawalCount: number;
+}
+
+/**
+ * Get user's on-chain balance by querying deposit and withdrawal events
+ *
+ * This is the SOURCE OF TRUTH for user balances. It queries the blockchain
+ * directly to get all deposits and withdrawals for a user.
+ *
+ * @param bridgeClient - Bridge client for querying events
+ * @param userAddress - User's Ethereum address
+ * @param startBlock - Block to start querying from (default: 0)
+ * @returns On-chain balance information
+ */
+export async function getOnChainUserBalance(
+  bridgeClient: {
+    queryDeposits: (fromBlock: number, toBlock: number | "latest", userAddress?: string) => Promise<Array<{ amount: bigint }>>;
+    queryWithdrawals: (fromBlock: number, toBlock: number | "latest", userAddress?: string) => Promise<Array<{ amount: bigint }>>;
+  },
+  userAddress: string,
+  startBlock: number = 0
+): Promise<OnChainBalanceResult> {
+  const normalizedUser = userAddress.toLowerCase();
+
+  log.debug({ user: normalizedUser, startBlock }, "Querying on-chain balance");
+
+  // Query all deposits for this user from the blockchain
+  const deposits = await bridgeClient.queryDeposits(startBlock, "latest", normalizedUser);
+  const totalDeposits = deposits.reduce((sum, d) => sum + d.amount, 0n);
+
+  // Query all withdrawals for this user from the blockchain
+  const withdrawals = await bridgeClient.queryWithdrawals(startBlock, "latest", normalizedUser);
+  const totalWithdrawals = withdrawals.reduce((sum, w) => sum + w.amount, 0n);
+
+  const result = {
+    totalDeposits,
+    totalWithdrawals,
+    netBalance: totalDeposits - totalWithdrawals,
+    depositCount: deposits.length,
+    withdrawalCount: withdrawals.length,
+  };
+
+  log.debug(
+    {
+      user: normalizedUser,
+      totalDeposits: totalDeposits.toString(),
+      totalWithdrawals: totalWithdrawals.toString(),
+      netBalance: result.netBalance.toString(),
+      depositCount: deposits.length,
+      withdrawalCount: withdrawals.length,
+    },
+    "On-chain balance query complete"
+  );
+
+  return result;
+}
+
+/**
+ * Compare on-chain balance with GunDB balance
+ *
+ * @param gun - GunDB instance
+ * @param bridgeClient - Bridge client for querying events
+ * @param userAddress - User's Ethereum address
+ * @param relayPub - Optional relay public key for GunDB balance query
+ * @returns Comparison result with discrepancy details
+ */
+export async function compareBalances(
+  gun: IGunInstance,
+  bridgeClient: {
+    queryDeposits: (fromBlock: number, toBlock: number | "latest", userAddress?: string) => Promise<Array<{ amount: bigint }>>;
+    queryWithdrawals: (fromBlock: number, toBlock: number | "latest", userAddress?: string) => Promise<Array<{ amount: bigint }>>;
+  },
+  userAddress: string,
+  relayPub?: string
+): Promise<{
+  onChain: OnChainBalanceResult;
+  gunDb: bigint;
+  discrepancy: bigint;
+  hasDiscrepancy: boolean;
+}> {
+  const normalizedUser = userAddress.toLowerCase();
+
+  // Get on-chain balance
+  const onChain = await getOnChainUserBalance(bridgeClient, normalizedUser);
+
+  // Get GunDB balance
+  const gunDb = await getUserBalance(gun, normalizedUser, relayPub);
+
+  // Calculate discrepancy (positive = on-chain has more, should credit)
+  const discrepancy = onChain.netBalance - gunDb;
+
+  if (discrepancy !== 0n) {
+    log.warn(
+      {
+        user: normalizedUser,
+        onChainBalance: onChain.netBalance.toString(),
+        gunDbBalance: gunDb.toString(),
+        discrepancy: discrepancy.toString(),
+      },
+      "Balance discrepancy detected between on-chain and GunDB"
+    );
+  }
+
+  return {
+    onChain,
+    gunDb,
+    discrepancy,
+    hasDiscrepancy: discrepancy !== 0n,
+  };
+}
+
+/**
+ * Sync missing deposits from on-chain to GunDB
+ *
+ * This function queries all deposits from the blockchain and ensures
+ * each one is properly credited in GunDB. This handles cases where:
+ * - A relay was offline when deposits occurred
+ * - A deposit event was missed due to network issues
+ * - GunDB data was lost or corrupted
+ *
+ * @param gun - GunDB instance
+ * @param bridgeClient - Bridge client for querying events
+ * @param relayKeyPair - Relay keypair for signing balance updates
+ * @param startBlock - Block to start querying from (default: 0)
+ * @returns Sync result with count of synced deposits
+ */
+export async function syncMissingDeposits(
+  gun: IGunInstance,
+  bridgeClient: {
+    queryDeposits: (fromBlock: number, toBlock: number | "latest", userAddress?: string) => Promise<Array<{
+      txHash: string;
+      user: string;
+      amount: bigint;
+      blockNumber: number;
+    }>>;
+  },
+  relayKeyPair: { pub: string; priv: string; epub?: string; epriv?: string },
+  startBlock: number = 0
+): Promise<{ synced: number; skipped: number; errors: number; details: string[] }> {
+  log.info({ startBlock }, "Starting sync of missing deposits from on-chain");
+
+  // Query all deposits from the blockchain
+  const deposits = await bridgeClient.queryDeposits(startBlock, "latest");
+
+  let synced = 0;
+  let skipped = 0;
+  let errors = 0;
+  const details: string[] = [];
+
+  for (const deposit of deposits) {
+    const normalizedUser = deposit.user.toLowerCase();
+    const depositKey = `${deposit.txHash}:${normalizedUser}:${deposit.amount.toString()}`;
+
+    try {
+      // Check if already processed
+      const alreadyProcessed = await isDepositProcessed(gun, depositKey);
+
+      if (alreadyProcessed) {
+        skipped++;
+        continue;
+      }
+
+      log.info(
+        {
+          txHash: deposit.txHash,
+          user: normalizedUser,
+          amount: deposit.amount.toString(),
+        },
+        "Syncing missing deposit from on-chain"
+      );
+
+      // Credit the balance
+      await creditBalance(gun, normalizedUser, deposit.amount, relayKeyPair);
+
+      // Mark as processed
+      await markDepositProcessed(gun, depositKey, {
+        txHash: deposit.txHash,
+        user: normalizedUser,
+        amount: deposit.amount.toString(),
+        blockNumber: deposit.blockNumber,
+        timestamp: Date.now(),
+      });
+
+      synced++;
+      details.push(`Synced: ${deposit.txHash} for ${normalizedUser} amount ${deposit.amount.toString()}`);
+    } catch (error) {
+      errors++;
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      log.error({ error: errorMsg, deposit }, "Failed to sync deposit");
+      details.push(`Error: ${deposit.txHash} - ${errorMsg}`);
+    }
+  }
+
+  log.info(
+    { synced, skipped, errors, totalDeposits: deposits.length },
+    "Completed sync of missing deposits"
+  );
+
+  return { synced, skipped, errors, details };
+}
+
 /**
  * Reconcile user balance by recalculating from deposits, withdrawals, and L2 transfers
  * This fixes balance discrepancies caused by old transfer implementations
