@@ -268,7 +268,7 @@ router.get("/transactions/:user", async (req, res) => {
           log.warn({ error: err }, "Failed to query on-chain withdrawals");
           return [];
         }),
-        listL2Transfers(gun, relayKeyPair?.pub || "").catch((err) => {
+        listL2Transfers(gun).catch((err) => {
           log.warn({ error: err }, "Failed to query L2 transfers");
           return [];
         }),
@@ -521,7 +521,7 @@ router.get("/transaction/:txHash", async (req, res) => {
         } catch (err) {}
 
         if (!transfer) {
-          const transfers = await listL2Transfers(gun, relayKeyPair?.pub || "");
+          const transfers = await listL2Transfers(gun);
           transfer = transfers.find((t) => t.transferHash === txHash.trim()) || null;
 
           if (!transfer) {

@@ -3329,7 +3329,8 @@ export async function reconcileUserBalance(
 
     // Now account for L2 transfers
     // Get all transfers where this user is sender (subtract) or receiver (add)
-    const allTransfers = await listL2Transfers(gun, relayKeyPair.pub);
+    // Use all trusted relays to see transfers from all relays, not just this one
+    const allTransfers = await listL2Transfers(gun);
 
     for (const transfer of allTransfers) {
       const from = transfer.from?.toLowerCase();
@@ -3527,14 +3528,21 @@ export async function reconcileUserBalance(
 
 /**
  * List all L2 transfers from frozen entries
+ * 
+ * @param gun - GunDB instance
+ * @param relayPub - Optional: Single relay's public key (backward compatibility).
+ *                   If not provided, uses all trusted relays from registry.
+ *                   Can also be an array of trusted relay pub keys.
+ * @param chainId - Optional: Chain ID for registry lookup (if relayPub not provided)
  */
 export async function listL2Transfers(
   gun: IGunInstance,
-  relayPub: string
+  relayPub?: string | string[],
+  chainId?: number
 ): Promise<
   Array<{ from: string; to: string; amount: string; transferHash: string; timestamp: number }>
 > {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const transfers: Array<{
       from: string;
       to: string;
@@ -3543,6 +3551,33 @@ export async function listL2Transfers(
       timestamp: number;
     }> = [];
     const timeout = setTimeout(() => resolve(transfers), 10000);
+
+    // Determine trusted signers (same logic as getUserBalance)
+    let trustedSigners: string | string[];
+    if (relayPub) {
+      // Backward compatibility: use single relay or provided array
+      trustedSigners = Array.isArray(relayPub) ? relayPub : relayPub;
+      log.debug(
+        { 
+          relayPubCount: Array.isArray(relayPub) ? relayPub.length : 1,
+          relayPubPreview: Array.isArray(relayPub) 
+            ? relayPub.map(p => p.substring(0, 16))
+            : relayPub.substring(0, 16)
+        },
+        "Looking up transfers with specified relay(s)"
+      );
+    } else {
+      // New behavior: use all trusted relays from registry
+      const trustedRelays = await getTrustedRelayPubKeys(chainId);
+      trustedSigners = trustedRelays;
+      log.debug(
+        {
+          trustedRelaysCount: trustedRelays.length,
+          trustedRelays: trustedRelays.map((p) => p.substring(0, 16)),
+        },
+        "Looking up transfers with trusted relays from registry"
+      );
+    }
 
     // Get all transfer entries from the index
     gun
@@ -3557,7 +3592,7 @@ export async function listL2Transfers(
             gun,
             "bridge-transfers",
             index.latestHash,
-            relayPub
+            trustedSigners
           );
 
           if (entry && entry.verified && entry.data) {
