@@ -210,7 +210,13 @@ export async function searchPirateBay(
     loggers.server.debug({ url, query, category }, '🔍 Searching PirateBay');
 
     const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
+      headers: { 
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://thepiratebay.org/',
+        'Origin': 'https://thepiratebay.org'
+      },
       signal: AbortSignal.timeout(15000)
     });
 
