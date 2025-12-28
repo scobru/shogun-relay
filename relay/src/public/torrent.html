@@ -304,6 +304,52 @@
             </div>
         </div>
 
+        <!-- Archive Search (Internet Archive + PirateBay) -->
+        <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
+            <h2 class="md-title-medium md-mb-md">🌍 Archive Search</h2>
+            <p class="md-body-small md-text-secondary md-mb-md">
+                Search torrents from Internet Archive and PirateBay
+            </p>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                <input type="text" id="archiveSearchQuery" placeholder="Search archives..." class="md-input"
+                    style="flex: 2; min-width: 200px;" onkeyup="if(event.key === 'Enter') searchArchives()">
+
+                <select id="archiveSourceSelect"
+                    style="padding: 12px; border: 1px solid var(--md-outline); border-radius: 8px; background: var(--md-surface); color: var(--md-on-surface); min-width: 150px;">
+                    <option value="all">All Sources</option>
+                    <option value="internet-archive">Internet Archive</option>
+                    <option value="piratebay">PirateBay</option>
+                </select>
+
+                <select id="archiveCategorySelect"
+                    style="padding: 12px; border: 1px solid var(--md-outline); border-radius: 8px; background: var(--md-surface); color: var(--md-on-surface); min-width: 120px;">
+                    <option value="">All Categories</option>
+                    <optgroup label="Internet Archive">
+                        <option value="audio">Audio</option>
+                        <option value="video">Video</option>
+                        <option value="texts">Texts</option>
+                        <option value="software">Software</option>
+                    </optgroup>
+                    <optgroup label="PirateBay">
+                        <option value="100">TPB: Audio</option>
+                        <option value="200">TPB: Video</option>
+                        <option value="300">TPB: Applications</option>
+                        <option value="400">TPB: Games</option>
+                        <option value="600">TPB: Other/E-books</option>
+                    </optgroup>
+                </select>
+
+                <button onclick="searchArchives()" class="md-btn md-btn-filled">
+                    🔍 Search
+                </button>
+            </div>
+
+            <div id="archiveSearchResults" class="md-body-small">
+                Enter a search query to find torrents from Internet Archive or PirateBay
+            </div>
+        </div>
+
         <!-- Global Registry Search -->
         <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
             <h2 class="md-title-medium md-mb-md">🔎 Global Registry Search</h2>
@@ -964,6 +1010,121 @@
                 progressBar.style.width = '0%';
                 statusText.textContent = `❌ Error: ${error.message}`;
                 statusText.style.color = 'var(--md-error)';
+            }
+        }
+
+        // ============================================================================
+        // ARCHIVE SEARCH (Internet Archive + PirateBay)
+        // ============================================================================
+
+        async function searchArchives() {
+            const query = document.getElementById('archiveSearchQuery').value.trim();
+            const source = document.getElementById('archiveSourceSelect').value;
+            const category = document.getElementById('archiveCategorySelect').value;
+            const resultsDiv = document.getElementById('archiveSearchResults');
+
+            if (query.length < 2) {
+                showToast('❌ Search query must be at least 2 characters', true);
+                return;
+            }
+
+            resultsDiv.innerHTML = '<div class="md-text-center">🔍 Searching archives...</div>';
+
+            try {
+                let url = `/api/v1/torrent/search?q=${encodeURIComponent(query)}&limit=30`;
+
+                // Add source filter
+                if (source !== 'all') {
+                    url += `&sources=${source}`;
+                }
+
+                // Add category filter
+                if (category) {
+                    // Check if it's a TPB category (numeric) or IA mediaType (string)
+                    if (/^\d+$/.test(category)) {
+                        url += `&category=${category}`;
+                    } else {
+                        url += `&mediaType=${category}`;
+                    }
+                }
+
+                const response = await fetch(url);
+                const json = await response.json();
+
+                if (json.success && json.results.length > 0) {
+                    renderArchiveResults(json.results, `Found ${json.count} results for "${query}"`);
+                } else {
+                    resultsDiv.innerHTML = `<div class="md-text-center md-text-secondary">No results found for "${query}"</div>`;
+                }
+            } catch (err) {
+                console.error('Failed to search archives', err);
+                resultsDiv.innerHTML = '<div class="md-text-center" style="color: var(--md-error);">❌ Search failed</div>';
+            }
+        }
+
+        function renderArchiveResults(results, title) {
+            const resultsDiv = document.getElementById('archiveSearchResults');
+
+            resultsDiv.innerHTML = `
+                <div class="md-body-small md-mb-md" style="color: var(--md-primary);">${title}</div>
+                <div style="max-height: 500px; overflow-y: auto;">
+                    ${results.map(r => `
+                        <div class="md-card md-card-outlined" style="padding: 12px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; gap: 12px;">
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                        <span style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: ${r.source === 'internet-archive' ? 'var(--md-tertiary-container)' : 'var(--md-secondary-container)'}; color: ${r.source === 'internet-archive' ? 'var(--md-on-tertiary-container)' : 'var(--md-on-secondary-container)'};">
+                                            ${r.source === 'internet-archive' ? '📚 IA' : '🏴‍☠️ TPB'}
+                                        </span>
+                                        <span style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            ${r.title || 'Unknown'}
+                                        </span>
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: var(--md-on-surface-variant);">
+                                        ${r.size ? formatBytes(r.size) : ''} 
+                                        ${r.category ? `• ${r.category}` : ''} 
+                                        ${r.seeders !== undefined ? `• 🌱 ${r.seeders} seeders` : ''} 
+                                        ${r.creator ? `• ${r.creator}` : ''}
+                                    </div>
+                                    ${r.description ? `<div style="font-size: 0.7rem; color: var(--md-on-surface-variant); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.description.substring(0, 100)}${r.description.length > 100 ? '...' : ''}</div>` : ''}
+                                </div>
+                                <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                                    <button onclick="addFromArchiveSearch('${r.source}', '${r.identifier}', '${r.magnetUri || ''}', '${r.torrentUrl || ''}')" 
+                                            class="btn-small md-btn md-btn-filled" style="padding: 6px 12px; font-size: 0.75rem;">
+                                        ➕ Add
+                                    </button>
+                                    <a href="${r.itemUrl}" target="_blank" class="btn-small md-btn md-btn-outlined" 
+                                       style="padding: 6px 12px; font-size: 0.75rem; text-decoration: none;">
+                                        🔗 View
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function addFromArchiveSearch(source, identifier, magnetUri, torrentUrl) {
+            try {
+                showToast('⏳ Adding torrent...');
+
+                const response = await fetch('/api/v1/torrent/add-from-search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source, identifier, magnetUri: magnetUri || undefined })
+                });
+                const json = await response.json();
+
+                if (json.success) {
+                    showToast(`✅ Torrent from ${source} added!`);
+                    updateDashboard();
+                } else {
+                    showToast('❌ ' + (json.error || 'Failed to add'), true);
+                }
+            } catch (err) {
+                console.error('Failed to add torrent', err);
+                showToast('❌ Failed to add torrent', true);
             }
         }
 
