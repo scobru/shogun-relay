@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 import { log, getBridgeClient, strictLimiter } from "./utils";
 import { transferBalance, reconcileUserBalance } from "../../utils/bridge-state";
 import { sanitizeForLog } from "../../utils/security";
+import { authConfig } from "../../config";
 
 const router: Router = Router();
 
@@ -126,9 +127,22 @@ router.post("/transfer", strictLimiter, express.json(), async (req, res) => {
  * POST /api/v1/bridge/reconcile-balance
  *
  * Reconcile a user's L2 balance.
+ * ADMIN ONLY - requires authentication.
  */
 router.post("/reconcile-balance", express.json(), async (req, res) => {
   try {
+    // Admin authentication required
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const token = bearerToken || req.headers["token"];
+
+    if (token !== authConfig.adminPassword) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized - admin authentication required",
+      });
+    }
+
     const gun = req.app.get("gunInstance");
     if (!gun) {
       return res.status(503).json({
