@@ -700,7 +700,7 @@ router.get("/contracts", async (req, res) => {
   try {
     const { getConfigByChainId } = await import("shogun-contracts-sdk");
 
-    const chainId = config.bridge.chainId;
+    const chainId = config.registry.chainId;
     const contractsConfig = getConfigByChainId(chainId);
 
     if (!contractsConfig) {

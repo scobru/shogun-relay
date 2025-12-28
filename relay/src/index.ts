@@ -1924,20 +1924,6 @@ See docs/RELAY_KEYS.md for more information.
   async function shutdown() {
     loggers.server.info("🛑 Shutting down Shogun Relay...");
 
-    // Stop bridge listener
-    try {
-      const { stopBridgeListener } = await import("./utils/bridge-listener");
-      stopBridgeListener();
-    } catch (err: any) {
-      // Ignore if module not loaded
-    }
-
-    // Cancel bridge batch interval
-    if (bridgeBatchInterval) {
-      clearInterval(bridgeBatchInterval);
-      bridgeBatchInterval = null;
-    }
-
     // Mark shutdown in progress to stop deal sync operations
     try {
       const DealSync = await import("./utils/deal-sync");

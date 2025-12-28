@@ -478,5 +478,198 @@ router.get("/registry/check/:infoHash", async (req, res) => {
   }
 });
 
+// ============================================================================
+// ARCHIVE SEARCH ENDPOINTS (Internet Archive + PirateBay)
+// ============================================================================
+
+import { 
+  searchInternetArchive, 
+  searchPirateBay, 
+  searchArchives,
+  getTorrentForItem 
+} from "../utils/archive-search";
+
+/**
+ * GET /search
+ * Unified search across Internet Archive and PirateBay
+ */
+router.get("/search", async (req, res) => {
+  try {
+    const query = req.query.q as string;
+    const sources = req.query.sources as string; // comma-separated: 'internet-archive,piratebay'
+    const limit = parseInt(req.query.limit as string) || 25;
+    const mediaType = req.query.mediaType as string; // For Internet Archive
+    const category = req.query.category ? parseInt(req.query.category as string) : undefined; // For PirateBay
+
+    if (!query || query.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: "Query (q) must be at least 2 characters"
+      });
+    }
+
+    const validSources = ['internet-archive', 'piratebay'] as const;
+    const sourceList: ('internet-archive' | 'piratebay')[] = sources 
+      ? sources.split(',').map(s => s.trim()).filter((s): s is 'internet-archive' | 'piratebay' => 
+          validSources.includes(s as any))
+      : ['internet-archive', 'piratebay'];
+
+    const results = await searchArchives(query, {
+      sources: sourceList,
+      rows: limit,
+      mediaType,
+      category
+    });
+
+    res.json({
+      success: true,
+      query,
+      sources: sourceList,
+      count: results.length,
+      results
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to search archives");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * GET /search/internet-archive
+ * Search Internet Archive for items with BitTorrent format
+ */
+router.get("/search/internet-archive", async (req, res) => {
+  try {
+    const query = req.query.q as string;
+    const mediaType = req.query.mediaType as string; // audio, video, texts, software
+    const rows = parseInt(req.query.rows as string) || 50;
+    const page = parseInt(req.query.page as string) || 1;
+
+    if (!query || query.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: "Query (q) must be at least 2 characters"
+      });
+    }
+
+    const results = await searchInternetArchive(query, { mediaType, rows, page });
+
+    res.json({
+      success: true,
+      source: 'internet-archive',
+      query,
+      mediaType: mediaType || 'all',
+      page,
+      count: results.length,
+      results
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to search Internet Archive");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * GET /search/piratebay
+ * Search PirateBay via apibay.org
+ */
+router.get("/search/piratebay", async (req, res) => {
+  try {
+    const query = req.query.q as string;
+    const category = req.query.category ? parseInt(req.query.category as string) : undefined;
+    const rows = parseInt(req.query.rows as string) || 50;
+
+    if (!query || query.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: "Query (q) must be at least 2 characters"
+      });
+    }
+
+    const results = await searchPirateBay(query, { category, rows });
+
+    res.json({
+      success: true,
+      source: 'piratebay',
+      query,
+      category: category || 'all',
+      count: results.length,
+      results
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to search PirateBay");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
+ * POST /add-from-search
+ * Add a torrent from search results
+ */
+router.post("/add-from-search", express.json(), async (req, res) => {
+  try {
+    const { source, identifier, magnetUri } = req.body;
+
+    if (!source || !identifier) {
+      return res.status(400).json({
+        success: false,
+        error: "source and identifier are required"
+      });
+    }
+
+    let torrentData: { magnetUri?: string; torrentUrl?: string } | null = null;
+
+    // If magnetUri was provided directly (from search results), use it
+    if (magnetUri) {
+      torrentData = { magnetUri };
+    } else {
+      // Otherwise fetch it
+      torrentData = await getTorrentForItem(source, identifier);
+    }
+
+    if (!torrentData) {
+      return res.status(404).json({
+        success: false,
+        error: `Could not find torrent for ${source}:${identifier}`
+      });
+    }
+
+    // Add the torrent
+    const torrentUri = torrentData.magnetUri || torrentData.torrentUrl;
+    if (!torrentUri) {
+      return res.status(400).json({
+        success: false,
+        error: "No magnet URI or torrent URL available"
+      });
+    }
+
+    torrentManager.addTorrent(torrentUri);
+
+    res.json({
+      success: true,
+      message: `Torrent from ${source} added successfully`,
+      source,
+      identifier,
+      magnetUri: torrentData.magnetUri,
+      torrentUrl: torrentData.torrentUrl
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to add torrent from search");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
 export default router;
 
