@@ -3298,6 +3298,31 @@ export async function reconcileUserBalance(
       "Starting balance reconciliation (lock acquired)"
     );
 
+    // First, sync any missing deposits from on-chain to GunDB
+    // This ensures all on-chain deposits are processed before reconciliation
+    // This is critical to avoid discrepancies between bridge contract and L2 balance
+    try {
+      const syncResult = await syncMissingDeposits(gun, bridgeClient, relayKeyPair, 0);
+      if (syncResult.synced > 0) {
+        log.info(
+          {
+            user: normalizedAddress,
+            synced: syncResult.synced,
+            skipped: syncResult.skipped,
+            errors: syncResult.errors,
+          },
+          "Synced missing deposits before reconciliation"
+        );
+        // Wait a bit for GunDB to propagate the balance updates
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    } catch (syncError) {
+      log.warn(
+        { error: syncError, user: normalizedAddress },
+        "Failed to sync missing deposits before reconciliation, continuing anyway"
+      );
+    }
+
     // Use on-chain deposits as source of truth to ensure consistency across all relays
     // This ensures that even if a relay was offline when deposits were processed,
     // it will still see all deposits from the blockchain
