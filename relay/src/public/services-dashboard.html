@@ -663,6 +663,43 @@
                     <button onclick="refreshBridgeStatus()" class="md-btn md-btn-text">Refresh</button>
                 </div>
             </div>
+
+            <!-- Supply Health Card -->
+            <div class="service-card">
+                <div class="service-card-header">
+                    <div class="service-name">
+                        <span id="supply-status-indicator" class="md-status-dot md-status-dot-pulse"></span>
+                        Supply Health
+                    </div>
+                    <span id="supply-badge" class="md-chip">--</span>
+                </div>
+                <div class="service-card-body">
+                    <div class="stat-row">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="supply-status">Checking...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">L2 Supply</span>
+                        <span class="stat-value" id="supply-l2">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Contract Balance</span>
+                        <span class="stat-value" id="supply-contract">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Discrepancy</span>
+                        <span class="stat-value" id="supply-discrepancy">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Users</span>
+                        <span class="stat-value" id="supply-users">--</span>
+                    </div>
+                </div>
+                <div class="service-card-footer">
+                    <button onclick="refreshSupplyStatus()" class="md-btn md-btn-text">Refresh</button>
+                    <button onclick="fixSupply()" class="md-btn md-btn-tonal">Reconcile</button>
+                </div>
+            </div>
         </div>
 
         <!-- Service Logs -->
@@ -913,7 +950,7 @@
                 if (data.success && data.stats) {
                     const stats = data.stats;
                     const isEnabled = stats.enabled;
-                    
+
                     document.getElementById('torrent-status').textContent = isEnabled ? 'Online' : 'Disabled';
                     document.getElementById('torrent-active').textContent = stats.activeTorrents || 0;
                     document.getElementById('torrent-files').textContent = stats.fileCount || 0;
@@ -931,9 +968,9 @@
                     // Format speeds
                     const downloadMBps = (stats.downloadSpeed || 0) / (1024 * 1024);
                     const uploadMBps = (stats.uploadSpeed || 0) / (1024 * 1024);
-                    document.getElementById('torrent-download').textContent = downloadMBps > 0 ? 
+                    document.getElementById('torrent-download').textContent = downloadMBps > 0 ?
                         `${downloadMBps.toFixed(2)} MB/s` : '0 MB/s';
-                    document.getElementById('torrent-upload').textContent = uploadMBps > 0 ? 
+                    document.getElementById('torrent-upload').textContent = uploadMBps > 0 ?
                         `${uploadMBps.toFixed(2)} MB/s` : '0 MB/s';
 
                     updateStatusIndicator('torrent', isEnabled ? 'online' : 'offline');
@@ -1220,9 +1257,113 @@
             }
         }
 
+        // Supply Health Status
+        async function refreshSupplyStatus() {
+            try {
+                const healthResponse = await fetch('/api/v1/health');
+                const healthData = await healthResponse.json();
+                const isEnabled = healthData.success && healthData.data?.modules?.bridge;
+
+                if (!isEnabled) {
+                    document.getElementById('supply-status').textContent = 'Bridge Disabled';
+                    updateStatusIndicator('supply', 'offline');
+                    return;
+                }
+
+                const response = await fetch('/api/v1/bridge/supply');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.supply) {
+                        const supply = data.supply;
+                        document.getElementById('supply-status').textContent = supply.isHealthy ? '✅ Healthy' : '⚠️ DISCREPANCY';
+                        document.getElementById('supply-status').style.color = supply.isHealthy ? 'var(--md-success)' : 'var(--md-error)';
+                        document.getElementById('supply-l2').textContent = supply.l2SupplyEth + ' ETH';
+                        document.getElementById('supply-contract').textContent = supply.contractBalanceEth + ' ETH';
+                        document.getElementById('supply-discrepancy').textContent = supply.discrepancyEth + ' ETH';
+                        document.getElementById('supply-discrepancy').style.color = supply.isHealthy ? 'var(--md-success)' : 'var(--md-error)';
+                        document.getElementById('supply-users').textContent = supply.userCount || 0;
+                        document.getElementById('supply-badge').textContent = supply.isHealthy ? 'OK' : 'ALERT';
+                        document.getElementById('supply-badge').style.backgroundColor = supply.isHealthy ? 'var(--md-success-container)' : 'var(--md-error-container)';
+                        updateStatusIndicator('supply', supply.isHealthy ? 'online' : 'offline');
+                    }
+                } else {
+                    document.getElementById('supply-status').textContent = 'Error';
+                    updateStatusIndicator('supply', 'warning');
+                }
+                log('Supply status refreshed', 'success');
+            } catch (error) {
+                document.getElementById('supply-status').textContent = 'Error';
+                updateStatusIndicator('supply', 'offline');
+                log(`Supply check failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function fixSupply() {
+            const password = getAdminPassword();
+            if (!password) {
+                alert('Admin password required');
+                return;
+            }
+
+            // First do a dry run
+            try {
+                log('Running supply fix dry run...');
+                const dryRunResponse = await fetch('/api/v1/bridge/fix-supply', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${password}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ dryRun: true })
+                });
+
+                const dryRunData = await dryRunResponse.json();
+                if (!dryRunData.success) {
+                    alert('Dry run failed: ' + (dryRunData.error || 'Unknown error'));
+                    return;
+                }
+
+                if (dryRunData.before?.isHealthy) {
+                    alert('Supply is already healthy, no fix needed.');
+                    return;
+                }
+
+                const corrections = dryRunData.corrections || [];
+                const summary = corrections.map(c => `${c.user.slice(0, 10)}...: ${c.oldBalance} → ${c.newBalance} ETH`).join('\n');
+
+                if (!confirm(`This will proportionally reduce balances to match contract:\n\n${summary}\n\nProceed with ACTUAL fix?`)) {
+                    return;
+                }
+
+                // Do the actual fix
+                log('Applying supply fix...');
+                const fixResponse = await fetch('/api/v1/bridge/fix-supply', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${password}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ dryRun: false })
+                });
+
+                const fixData = await fixResponse.json();
+                if (fixData.success) {
+                    log('Supply fix applied successfully!', 'success');
+                    alert('Supply fix applied successfully!');
+                    await refreshSupplyStatus();
+                } else {
+                    log('Supply fix failed: ' + (fixData.error || 'Unknown error'), 'error');
+                    alert('Supply fix failed: ' + (fixData.error || 'Unknown error'));
+                }
+            } catch (error) {
+                log(`Supply fix error: ${error.message}`, 'error');
+                alert('Supply fix error: ' + error.message);
+            }
+        }
+
         // Refresh all blockchain services
         async function refreshBlockchainServices() {
-            await Promise.all([refreshX402Status(), refreshDealsStatus(), refreshBridgeStatus()]);
+            await Promise.all([refreshX402Status(), refreshDealsStatus(), refreshBridgeStatus(), refreshSupplyStatus()]);
         }
 
         // Initialize
