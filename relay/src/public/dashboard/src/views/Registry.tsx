@@ -180,6 +180,34 @@ function Registry() {
       }
   }
 
+  const handleStakingAction = async () => {
+    if (!stakeActionAmount || parseFloat(stakeActionAmount) <= 0) {
+        setActionStatus('❌ Invalid amount')
+        return
+    }
+    setActionStatus(`Processing ${stakingMode}...`)
+    try {
+        let endpointUrl = '/api/v1/registry/stake'
+        if (stakingMode === 'unstake') endpointUrl = '/api/v1/registry/unstake'
+        if (stakingMode === 'withdraw') endpointUrl = '/api/v1/registry/withdraw'
+
+        const res = await fetch(endpointUrl, {
+            method: 'POST',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: parseFloat(stakeActionAmount) })
+        })
+        const data = await res.json()
+        if (data.success) {
+            setActionStatus(`✅ ${stakingMode} successful! ` + (data.txHash ? `TX: ${data.txHash.slice(0, 10)}...` : ''))
+            fetchAll()
+        } else {
+            setActionStatus('❌ Failed: ' + (data.error || 'Unknown error'))
+        }
+    } catch (e) {
+        setActionStatus('❌ Network error')
+    }
+  }
+
   // ... (rest of code)
   
   return (
@@ -296,7 +324,7 @@ function Registry() {
                   </tr>
                 </thead>
                 <tbody>
-                  {deals.slice(0, 10).map(d => (
+                  {deals.slice(0, 10).map((d: Deal) => (
                     <tr key={d.dealId}>
                       <td className="mono" title={d.cid}>{d.cid.slice(0, 10)}...</td>
                       <td className="mono">{truncateAddress(d.client)}</td>
