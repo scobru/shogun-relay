@@ -159,7 +159,9 @@ function Torrents() {
     try {
       const res = await fetch('/api/v1/torrent/list', { headers: getAuthHeaders() })
       const data = await res.json()
-      if (data.torrents) {
+      if (data.success && data.data?.torrents) {
+        setTorrents(data.data.torrents)
+      } else if (data.torrents) {
         setTorrents(data.torrents)
       }
       setLoading(false)
@@ -427,7 +429,7 @@ function Torrents() {
                 </div>
                 ) : (
                 <ul className="menu">
-                    {torrents.map(t => (
+                    {torrents.map((t: Torrent) => (
                     <li key={t.infoHash}>
                         <div className="flex flex-col w-full gap-2 p-4 hover:bg-base-200 border-b border-base-200 last:border-0">
                         <div className="flex items-center justify-between w-full">
@@ -470,7 +472,7 @@ function Torrents() {
                             <summary className="collapse-title text-sm min-h-0 py-2">Files ({t.files.length})</summary>
                             <div className="collapse-content">
                                 <ul className="text-xs space-y-1">
-                                {t.files.slice(0, 10).map((f, i) => (
+                                {t.files.slice(0, 10).map((f: any, i: number) => (
                                     <li key={i} className="flex justify-between items-center py-1 hover:bg-base-300 px-2 rounded">
                                     <span className="truncate flex-1 pr-4">{f.name}</span>
                                     <div className="flex items-center gap-2 shrink-0">
@@ -577,7 +579,7 @@ function Torrents() {
                         </div>
                     )}
                     
-                    {searchResults.map((res, i) => (
+                    {searchResults.map((res: SearchResult, i: number) => (
                     <div key={i} className="card card-compact bg-base-200 shadow-sm hover:shadow-md transition-shadow">
                         <div className="card-body flex-row justify-between items-start gap-4">
                             <div className="min-w-0 flex-1">

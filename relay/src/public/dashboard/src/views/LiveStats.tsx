@@ -38,26 +38,35 @@ function LiveStats() {
         setLastUpdated(new Date())
 
         if (isAuthenticated) {
-          const healthRes = await fetch('/health')
-          const healthData = await healthRes.json()
-          const configuredPeers = healthData.data?.peers || []
-          const configuredRelays: RelayInfo[] = configuredPeers.map((peer: string) => ({
-            host: peer, endpoint: peer, lastSeen: Date.now(), uptime: 0,
-            connections: { active: 0 }, ipfs: undefined
-          }))
           try {
-            const relaysRes = await fetch('/api/v1/network/relays', { headers: getAuthHeaders() })
-            const relaysData = await relaysRes.json()
-            if (relaysData.success && relaysData.relays) {
-              const allRelays = [...configuredRelays]
-              for (const discovered of relaysData.relays) {
-                if (!allRelays.some(r => r.host === discovered.host)) allRelays.push(discovered)
-              }
-              setRelays(allRelays)
-            } else {
-              setRelays(configuredRelays)
+            // Use /api/v1/system/peers - same endpoint as legacy stats.html
+            const peersRes = await fetch('/api/v1/system/peers', { headers: getAuthHeaders() })
+            const peersData = await peersRes.json()
+            if (peersData.success && peersData.peers && peersData.peers.length > 0) {
+              const peerRelays: RelayInfo[] = peersData.peers.map((peer: string) => ({
+                host: peer,
+                endpoint: peer,
+                lastSeen: Date.now(),
+                uptime: 0,
+                connections: { active: 0 },
+                ipfs: undefined
+              }))
+              setRelays(peerRelays)
             }
-          } catch { setRelays(configuredRelays) }
+            
+            // Also try to get discovered relays from network
+            try {
+              const relaysRes = await fetch('/api/v1/network/relays', { headers: getAuthHeaders() })
+              const relaysData = await relaysRes.json()
+              if (relaysData.success && relaysData.relays && relaysData.relays.length > 0) {
+                setRelays((prev: RelayInfo[]) => {
+                  const existingHosts = new Set(prev.map((r: RelayInfo) => r.host))
+                  const newRelays = relaysData.relays.filter((r: RelayInfo) => !existingHosts.has(r.host))
+                  return [...prev, ...newRelays]
+                })
+              }
+            } catch { /* ignore network relay discovery errors */ }
+          } catch (error) { console.error('Failed to fetch peers:', error) }
         }
       } catch (error) {
         console.error('Failed to fetch data:', error)
@@ -159,7 +168,7 @@ function LiveStats() {
                   {relays.length === 0 && (
                     <tr><td colSpan={5} className="text-center text-base-content/50">No relays discovered yet.</td></tr>
                   )}
-                  {relays.map((relay, i) => (
+                  {relays.map((relay: RelayInfo, i: number) => (
                     <tr key={i}>
                       <td className="font-mono text-xs" title={relay.host}>{relay.host.substring(0, 30)}...</td>
                       <td>{relay.endpoint || '-'}</td>

@@ -9,7 +9,9 @@ function Layout() {
       <div className="drawer-content flex flex-col">
         <Header />
         <main className="flex-1 overflow-auto bg-base-200 p-4 lg:p-6">
-          <Outlet />
+          <div className="max-w-7xl mx-auto">
+            <Outlet />
+          </div>
         </main>
       </div>
       <Sidebar />
