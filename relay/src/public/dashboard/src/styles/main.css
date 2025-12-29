@@ -1,7 +1,11 @@
 /* Shogun Dashboard - CSS Variables & Global Styles */
+
+/* Tailwind CSS v4 */
 @import "tailwindcss";
+
+/* DaisyUI Theme */
 @plugin "daisyui" {
-  themes: all;
+  themes: light --default, dark --prefersdark;
 }
 
 :root {
