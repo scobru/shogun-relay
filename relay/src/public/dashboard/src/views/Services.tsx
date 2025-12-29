@@ -71,6 +71,30 @@ function Services() {
     }
   }
 
+  const handleGlobalAction = async (action: 'health' | 'restart-all') => {
+      if (action === 'restart-all' && !confirm('Are you sure you want to RESTART ALL services? This will disrupt the relay.')) return
+
+      setRefreshing(true)
+      try {
+          if (action === 'health') {
+              const res = await fetch('/health')
+              const data = await res.json()
+              alert(`Health Check: ${data.status}\nUptime: ${data.uptime?.seconds}s\nMemory: ${data.memory?.heapUsedMB} MB`)
+          } else if (action === 'restart-all') {
+             await fetch('/api/v1/system/services/restart-all', { 
+                 method: 'POST',
+                 headers: getAuthHeaders() 
+             })
+             alert('Restart command sent. Services will reboot.')
+             setTimeout(fetchServices, 5000)
+          }
+      } catch(e) {
+          alert('Action failed: ' + e)
+      } finally {
+          setRefreshing(false)
+      }
+  }
+
   const fetchLogs = async (serviceName: string) => {
     setSelectedService(serviceName)
     setServiceLogs(['Loading logs...'])
@@ -96,13 +120,29 @@ function Services() {
           <h2>🛠️ System Services</h2>
           <p>Monitor and control relay subsystems</p>
         </div>
-        <button 
-          className="btn btn-secondary" 
-          onClick={() => { setRefreshing(true); fetchServices() }}
-          disabled={refreshing}
-        >
-          {refreshing ? 'Refreshing...' : '🔄 Refresh Status'}
-        </button>
+        <div className="flex gap-2">
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => { setRefreshing(true); fetchServices() }}
+              disabled={refreshing}
+            >
+              {refreshing ? 'Refreshing...' : '🔄 Refresh'}
+            </button>
+            <button 
+              className="btn btn-primary" 
+              onClick={() => handleGlobalAction('health')}
+              disabled={refreshing}
+            >
+              ❤️ Health Check
+            </button>
+            <button 
+              className="btn btn-warning" 
+              onClick={() => handleGlobalAction('restart-all')}
+              disabled={refreshing}
+            >
+              ⚡ Restart All
+            </button>
+        </div>
       </div>
 
       <div className="services-layout">

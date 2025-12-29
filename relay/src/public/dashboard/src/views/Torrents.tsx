@@ -41,13 +41,77 @@ function Torrents() {
   const [magnetInput, setMagnetInput] = useState('')
   const [filesToSeed, setFilesToSeed] = useState<FileList | null>(null)
 
+  // Bulk Fetch State
+  const [maxTb, setMaxTb] = useState('0.1')
+  const [fetchingBulk, setFetchingBulk] = useState(false)
+  const [bulkFetchStatus, setBulkFetchStatus] = useState('')
+
+  // Catalog State
+  const [catalogStats, setCatalogStats] = useState<{ count: number, totalPinnedFiles: number } | null>(null)
+  const [refreshingCatalog, setRefreshingCatalog] = useState(false)
+
   useEffect(() => {
     if (isAuthenticated) {
         fetchTorrents()
+        fetchCatalogStats()
         const interval = setInterval(fetchTorrents, 3000)
         return () => clearInterval(interval)
     }
   }, [isAuthenticated])
+
+  const fetchCatalogStats = async () => {
+      try {
+          const res = await fetch('/api/v1/torrent/catalog', { headers: getAuthHeaders() })
+          const data = await res.json()
+          if (data.success) {
+              setCatalogStats({ count: data.count || 0, totalPinnedFiles: data.totalPinnedFiles || 0 })
+          }
+      } catch (e) { console.error(e) }
+  }
+
+  const refreshCatalog = async () => {
+      setRefreshingCatalog(true)
+      try {
+          const res = await fetch('/api/v1/torrent/refresh-catalog', { 
+              method: 'POST',
+              headers: getAuthHeaders() 
+          })
+          if (res.ok) {
+              await fetchCatalogStats()
+              alert('Catalog refreshed successfully')
+          } else {
+              alert('Failed to refresh catalog')
+          }
+      } catch (e) {
+          alert('Network error')
+      } finally {
+          setRefreshingCatalog(false)
+      }
+  }
+
+  const handleBulkFetch = async () => {
+      setFetchingBulk(true)
+      setBulkFetchStatus('Starting fetch sequence (this may take a while)...')
+      try {
+          const res = await fetch('/api/v1/torrent/refetch', {
+              method: 'POST',
+              headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+              body: JSON.stringify({ maxTb: parseFloat(maxTb) })
+          })
+          const data = await res.json()
+          
+          if (data.success) {
+              setBulkFetchStatus(`✅ ${data.message} (${data.skipped || 0} skipped)`)
+              setTimeout(fetchTorrents, 3000)
+          } else {
+              setBulkFetchStatus(`❌ Failed: ${data.error}`)
+          }
+      } catch (e) {
+          setBulkFetchStatus('❌ Network error')
+      } finally {
+          setFetchingBulk(false)
+      }
+  }
 
   const fetchTorrents = async () => {
     try {
@@ -183,6 +247,41 @@ function Torrents() {
         }
   }
 
+  const handleDiscoverNetwork = async () => {
+      setSearching(true)
+      setSearchResults([])
+      setSearchQuery('') // Clear search query to indicate network discovery
+      setStatusMsg('Discovering network relays...')
+      
+      try {
+          const res = await fetch('/api/v1/torrent/network', { headers: getAuthHeaders() })
+          constdata = await res.json()
+          
+          if (data.success && data.network) {
+              // Transform network relay data into "search results" for display
+              const relayResults: SearchResult[] = data.network.flatMap((relay: any) => {
+                  const torrents = relay.torrents || {}
+                  return Object.entries(torrents).map(([hash, t]: [string, any]) => ({
+                      title: `[${relay.id.substring(0, 6)}...] ${t.name || 'Unknown'}`,
+                      magnet: t.magnetURI || `magnet:?xt=urn:btih:${hash}`,
+                      size: t.size ? formatBytes(t.size) : 'Unknown',
+                      source: 'dht', // Effectively DHT/P2P
+                      peers: 1
+                  }))
+              })
+              setSearchResults(relayResults)
+              setStatusMsg(`✅ Found ${data.relays} relays with ${data.totalTorrents} torrents`)
+          } else {
+              setStatusMsg('❌ No relays found or network error')
+          }
+      } catch (e) {
+          console.error(e)
+          setStatusMsg('❌ Network error')
+      } finally {
+          setSearching(false)
+      }
+  }
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B'
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -198,6 +297,18 @@ function Torrents() {
         <div>
            <h2>🧲 Torrent Manager</h2>
            <p>Downloads, Seeding & Archive Discovery</p>
+        </div>
+        <div className="torrents-actions">
+             <div className="catalog-stats" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                {catalogStats && (
+                    <span>📚 Catalog: {catalogStats.count} torrents | 📦 {catalogStats.totalPinnedFiles} pinned files</span>
+                )}
+             </div>
+             <div className="btn-group">
+                <button className="btn btn-sm btn-secondary" onClick={refreshCatalog} disabled={refreshingCatalog}>
+                    {refreshingCatalog ? '🔄 ...' : '🔄 Refresh Catalog'}
+                </button>
+             </div>
         </div>
         <div className="torrents-tabs">
             <button className={`btn-tab ${activeTab==='list'?'active':''}`} onClick={()=>setActiveTab('list')}>Active Torrents</button>
@@ -260,55 +371,104 @@ function Torrents() {
 
         {/* DISCOVERY TAB */}
         {activeTab === 'discovery' && (
-            <div className="discovery-view card">
-                <h3>Global & Archive Search</h3>
-                <form onSubmit={handleSearch} className="search-form">
-                    <input 
-                        type="text" 
-                        className="input search-input" 
-                        placeholder="Search for content..." 
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                    />
-                    <div className="search-options">
-                        <label>
-                            <input 
-                                type="checkbox" 
-                                checked={archiveMode} 
-                                onChange={e => setArchiveMode(e.target.checked)} 
-                            />
-                            Search Internet Archive (Anna's Archive)
-                        </label>
-                    </div>
-                    <button type="submit" className="btn btn-primary" disabled={searching}>
-                        {searching ? 'Searching...' : 'Search'}
-                    </button>
-                </form>
-
-                <div className="search-results">
-                    {searchResults.map((res, i) => (
-                        <div key={i} className="search-result-item">
-                            <div className="result-info">
-                                <div className="result-title">{res.title}</div>
-                                <div className="result-meta">
-                                    <span className="source-tag">{res.source}</span>
-                                    {res.size && <span>{res.size}</span>}
-                                    {res.peers && <span>{res.peers} peers</span>}
-                                </div>
-                            </div>
+            <div className="discovery-view">
+                <div className="card">
+                    <h3>Global & Archive Search</h3>
+                    <form onSubmit={handleSearch} className="search-form">
+                        <input 
+                            type="text" 
+                            className="input search-input" 
+                            placeholder="Search for content..." 
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                        />
+                        <div className="search-options">
+                            <label>
+                                <input 
+                                    type="checkbox" 
+                                    checked={archiveMode} 
+                                    onChange={e => setArchiveMode(e.target.checked)} 
+                                />
+                                Search Internet Archive (Anna's Archive)
+                            </label>
                             <button 
-                                className="btn btn-sm btn-primary"
-                                onClick={() => {
-                                    setMagnetInput(res.magnet)
-                                    setActiveTab('create') // Switch to create/add tab to confirm
-                                }}
+                                type="button" 
+                                className="btn btn-secondary btn-sm ml-4"
+                                onClick={handleDiscoverNetwork}
+                                disabled={searching}
+                                style={{ marginLeft: 'auto' }}
                             >
-                                ⇩ Download
+                                📡 Discover Network Relays
                             </button>
                         </div>
-                    ))}
-                    {searchResults.length === 0 && !searching && (
-                        <p className="no-results">No results found. Try a different query.</p>
+                        <button type="submit" className="btn btn-primary" disabled={searching}>
+                            {searching ? 'Searching...' : 'Search'}
+                        </button>
+                    </form>
+
+                    <div className="search-results">
+                        {searchResults.map((res, i) => (
+                            <div key={i} className="search-result-item">
+                                <div className="result-info">
+                                    <div className="result-title">{res.title}</div>
+                                    <div className="result-meta">
+                                        <span className="source-tag">{res.source}</span>
+                                        {res.size && <span>{res.size}</span>}
+                                        {res.peers && <span>{res.peers} peers</span>}
+                                    </div>
+                                </div>
+                                <button 
+                                    className="btn btn-sm btn-primary"
+                                    onClick={() => {
+                                        setMagnetInput(res.magnet)
+                                        setActiveTab('create') // Switch to create/add tab to confirm
+                                    }}
+                                >
+                                    ⇩ Download
+                                </button>
+                            </div>
+                        ))}
+                        {searchResults.length === 0 && !searching && (
+                            <p className="no-results">No results found. Try a different query.</p>
+                        )}
+                    </div>
+                </div>
+
+                {/* Bulk Fetch from Anna's Archive */}
+                <div className="card mt-4">
+                    <h3>📥 Bulk Fetch Anna's Archive</h3>
+                    <p className="text-secondary mb-2">Automatically fetch and seed torrents from Anna's Archive up to a storage limit.</p>
+                    
+                    <div className="bulk-fetch-controls">
+                        <div className="input-group">
+                            <label>Max Storage (TB)</label>
+                            <select 
+                                className="input" 
+                                value={maxTb} 
+                                onChange={e => setMaxTb(e.target.value)}
+                                style={{ width: '100px' }}
+                            >
+                                <option value="0.1">0.1 TB</option>
+                                <option value="0.5">0.5 TB</option>
+                                <option value="1">1 TB</option>
+                                <option value="2">2 TB</option>
+                                <option value="5">5 TB</option>
+                                <option value="10">10 TB</option>
+                                <option value="20">20 TB</option>
+                            </select>
+                            <button 
+                                className="btn btn-primary" 
+                                onClick={handleBulkFetch}
+                                disabled={fetchingBulk}
+                            >
+                                {fetchingBulk ? 'Fetching...' : '📥 Start Fetch Sequence'}
+                            </button>
+                        </div>
+                    </div>
+                    {bulkFetchStatus && (
+                        <div className={`status-msg mt-2 ${bulkFetchStatus.includes('✅') ? 'text-success' : 'text-error'}`}>
+                            {bulkFetchStatus}
+                        </div>
                     )}
                 </div>
             </div>
