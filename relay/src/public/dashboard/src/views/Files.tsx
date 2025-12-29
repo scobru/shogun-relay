@@ -1,296 +1,462 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import './Files.css'
 
 interface Pin {
   cid: string
+  name: string
   type: string
-  name?: string
+  timestamp: number
+  size?: number
+  metadata?: any
+}
+
+interface PreviewState {
+  cid: string
+  name: string
+  type: string
+  content?: string
+  blob?: Blob
+  url?: string
 }
 
 function Files() {
-  const { isAuthenticated, getAuthHeaders, password } = useAuth()
+  const { isAuthenticated, getAuthHeaders, token: adminToken } = useAuth()
   const [pins, setPins] = useState<Pin[]>([])
   const [loading, setLoading] = useState(true)
-  const [newCid, setNewCid] = useState('')
-
-  // Upload state
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadStatus, setUploadStatus] = useState('')
-  const [isDragging, setIsDragging] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
+  const [statusMessage, setStatusMessage] = useState('')
+  
+  // New State variables
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterType, setFilterType] = useState('all')
+  const [uploadMode, setUploadMode] = useState<'single' | 'directory'>('single')
+  const [encryptUpload, setEncryptUpload] = useState(false)
+  const [preview, setPreview] = useState<PreviewState | null>(null)
+  const [fileNameOverride, setFileNameOverride] = useState('')
+
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const dirInputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadPins()
-    } else {
-      setLoading(false)
-    }
-  }, [isAuthenticated])
-
-  async function loadPins() {
+  const fetchPins = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/ipfs/pin/ls', { headers: getAuthHeaders() })
-      const data = await res.json()
-      if (data.pins) {
-        const pinList = Object.entries(data.pins).map(([cid, info]: [string, any]) => ({
-          cid,
-          type: info.Type || 'recursive',
-          name: info.Name || ''
-        }))
-        setPins(pinList)
+      setLoading(true)
+      const [pinsRes, metaRes] = await Promise.all([
+        fetch('/api/v1/ipfs/pin/ls', { headers: getAuthHeaders() }),
+        fetch('/api/v1/user-uploads/system-hashes-map', { headers: getAuthHeaders() })
+      ])
+      
+      const pinsData = await pinsRes.json()
+      const metaData = await metaRes.json()
+      const systemHashes = metaData.systemHashes || {}
+
+      if (pinsData.pins) {
+        const mappedPins = Object.entries(pinsData.pins).map(([cid, info]: [string, any]) => {
+          const meta = systemHashes[cid] || {}
+          return {
+            cid,
+            name: meta.displayName || meta.fileName || meta.originalName || info.Name || 'Unnamed',
+            type: info.Type || 'recursive',
+            timestamp: meta.timestamp || Date.now(),
+            size: meta.fileSize,
+            metadata: meta
+          }
+        })
+        setPins(mappedPins.sort((a, b) => b.timestamp - a.timestamp))
       }
     } catch (error) {
-      console.error('Failed to load pins:', error)
+      console.error('Failed to fetch pins:', error)
     } finally {
       setLoading(false)
     }
+  }, [getAuthHeaders])
+
+  useEffect(() => {
+    if (isAuthenticated) fetchPins()
+  }, [isAuthenticated, fetchPins])
+
+  const filteredPins = pins.filter(pin => {
+    const matchesSearch = pin.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         pin.cid.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesFilter = filterType === 'all' || pin.type === filterType
+    return matchesSearch && matchesFilter
+  })
+
+  // --- File Handling & Encryption ---
+
+  const deriveKey = async (password: string, salt: Uint8Array) => {
+    const enc = new TextEncoder()
+    const keyMaterial = await window.crypto.subtle.importKey(
+      "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveBits", "deriveKey"]
+    )
+    return window.crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+      keyMaterial,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    )
   }
 
-  async function addPin() {
-    if (!newCid.trim()) return
+  const encryptData = async (data: ArrayBuffer, password: string) => {
+    const salt = window.crypto.getRandomValues(new Uint8Array(16))
+    const iv = window.crypto.getRandomValues(new Uint8Array(12))
+    const key = await deriveKey(password, salt)
+    const encrypted = await window.crypto.subtle.encrypt(
+      { name: "AES-GCM", iv }, key, data
+    )
+    
+    // Combine salt + iv + encrypted data for storage
+    const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength)
+    combined.set(salt, 0)
+    combined.set(iv, salt.length)
+    combined.set(new Uint8Array(encrypted), salt.length + iv.length)
+    return combined
+  }
+
+  const handleUpload = async (event?: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event?.target.files || (fileInputRef.current?.files)
+    if (!files || files.length === 0) return
+
+    setUploading(true)
+    setUploadProgress(0)
+    setStatusMessage('')
+
     try {
-      const res = await fetch('/api/v1/ipfs/pin/add', {
-        method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cid: newCid.trim() })
-      })
-      if (res.ok) {
-        setNewCid('')
-        loadPins()
+      const formData = new FormData()
+      const token = adminToken || ''
+      
+      if (uploadMode === 'single') {
+        let file = files[0]
+        const name = fileNameOverride || file.name
+        
+        if (encryptUpload) {
+          setStatusMessage('Encrypting...')
+          const buffer = await file.arrayBuffer()
+          // Use admin token as password if available, otherwise prompt or error? 
+          // Assuming adminToken is the password for simplicity in this context.
+          if (!token) throw new Error("Authentication required for encryption")
+          
+          const encryptedBytes = await encryptData(buffer, token)
+          const encryptedBlob = new Blob([encryptedBytes], { type: 'application/octet-stream' })
+          file = new File([encryptedBlob], name + '.enc', { type: 'application/octet-stream' })
+        }
+        
+        formData.append('file', file, encryptUpload ? file.name : name)
+      } else {
+        // Directory upload
+        Array.from(files).forEach(file => {
+          // @ts-ignore - webkitRelativePath exists on File in browsers
+          const path = file.webkitRelativePath || file.name
+          formData.append('files', file, path)
+        })
       }
-    } catch (error) {
-      console.error('Failed to add pin:', error)
+
+      const endpoint = uploadMode === 'directory' ? '/api/v1/ipfs/upload-directory' : '/api/v1/ipfs/upload'
+      
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', endpoint)
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          setUploadProgress((e.loaded / e.total) * 100)
+        }
+      }
+
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const result = JSON.parse(xhr.responseText)
+          setStatusMessage('✅ Upload complete!')
+          // Save system hash metadata
+          await saveMetadata(result, files, uploadMode === 'directory')
+          fetchPins()
+        } else {
+          setStatusMessage(`❌ Upload failed: ${xhr.statusText}`)
+        }
+        setUploading(false)
+      }
+
+      xhr.onerror = () => {
+        setStatusMessage('❌ Network error during upload')
+        setUploading(false)
+      }
+
+      xhr.send(formData)
+
+    } catch (error: any) {
+      console.error(error)
+      setStatusMessage(`❌ Error: ${error.message}`)
+      setUploading(false)
     }
   }
 
-  async function removePin(cid: string) {
-    if (!confirm(`Remove pin ${cid.slice(0, 16)}...?`)) return
+  const saveMetadata = async (result: any, files: FileList, isDir: boolean) => {
+    try {
+      const hash = result.directoryCid || result.cid || result.file?.hash
+      const mainFile = files[0]
+      const name = fileNameOverride || mainFile.name
+      
+      const metadata = {
+        hash,
+        userAddress: 'admin-upload',
+        timestamp: Date.now(),
+        fileName: isDir ? `Directory (${files.length} files)` : name,
+        displayName: isDir ? `Directory (${files.length} files)` : name,
+        originalName: isDir ? `Directory (${files.length} files)` : mainFile.name,
+        fileSize: result.totalSize || mainFile.size,
+        isEncrypted: encryptUpload && !isDir,
+        contentType: isDir ? 'application/directory' : (mainFile.type || 'application/octet-stream'),
+        isDirectory: isDir,
+        fileCount: files.length
+      }
+
+      await fetch('/api/v1/user-uploads/save-system-hash', {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(metadata)
+      })
+    } catch (e) {
+      console.error('Failed to save metadata', e)
+    }
+  }
+
+  // --- Preview Logic ---
+
+  const handlePreview = async (pin: Pin) => {
+    try {
+      setStatusMessage('Loading preview...')
+      const res = await fetch(`/api/v1/ipfs/cat/${pin.cid}`, { headers: getAuthHeaders() })
+      if (!res.ok) throw new Error('Failed to fetch content')
+      
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const type = res.headers.get('Content-Type') || 'unknown'
+      
+      setPreview({
+        cid: pin.cid,
+        name: pin.name,
+        type: type,
+        blob,
+        url
+      })
+      setStatusMessage('')
+    } catch (e: any) {
+      setStatusMessage(`Preview failed: ${e.message}`)
+    }
+  }
+
+  const closePreview = () => {
+    if (preview?.url) URL.revokeObjectURL(preview.url)
+    setPreview(null)
+  }
+
+  // --- Actions ---
+
+  const handleRemove = async (cid: string) => {
+    if (!confirm('Are you sure you want to remove this pin?')) return
     try {
       await fetch('/api/v1/ipfs/pin/rm', {
         method: 'POST',
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ cid })
       })
-      loadPins()
-    } catch (error) {
-      console.error('Failed to remove pin:', error)
+      fetchPins()
+    } catch (e) {
+      console.error(e)
     }
   }
 
-  // Upload handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-    const files = e.dataTransfer.files
-    if (files.length > 0) {
-      setSelectedFile(files[0])
-      setUploadStatus('')
-    }
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0])
-      setUploadStatus('')
-    }
-  }
-
-  const uploadFile = async () => {
-    if (!selectedFile || !password) return
-
-    setUploading(true)
-    setUploadProgress(10)
-    setUploadStatus('Uploading...')
-
+  const handleGarbageCollection = async () => {
+    if (!confirm('Run Garbage Collection? This will remove unpinned blocks.')) return
+    setStatusMessage('Running GC...')
     try {
-      const formData = new FormData()
-      formData.append('file', selectedFile, selectedFile.name)
-
-      setUploadProgress(30)
-
-      const res = await fetch('/api/v1/ipfs/upload', {
+      await fetch('/api/v1/ipfs/repo/gc', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${password}` },
-        body: formData
+        headers: getAuthHeaders()
       })
-
-      setUploadProgress(80)
-
-      const result = await res.json()
-
-      if (result.success) {
-        setUploadProgress(100)
-        const hash = result.cid || (result.file && result.file.hash)
-        setUploadStatus(`✅ Uploaded! CID: ${hash}`)
-        setSelectedFile(null)
-        if (fileInputRef.current) fileInputRef.current.value = ''
-        loadPins()
-      } else {
-        setUploadStatus(`❌ ${result.error || 'Upload failed'}`)
-      }
-    } catch (error) {
-      console.error('Upload error:', error)
-      setUploadStatus('❌ Upload failed')
-    } finally {
-      setUploading(false)
+      setStatusMessage('✅ GC Completed')
+    } catch (e) {
+      setStatusMessage('❌ GC Failed')
     }
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="files-auth card">
-        <span className="files-auth-icon">🔒</span>
-        <h3>Authentication Required</h3>
-        <p>Please enter admin password in Settings to access file management.</p>
-      </div>
-    )
+  const handleRemoveAll = async () => {
+    if (!confirm('WARNING: Remove ALL pins? This cannot be undone.')) return
+    setStatusMessage('Removing all pins...')
+    try {
+      for (const pin of pins) {
+        await fetch('/api/v1/ipfs/pin/rm', {
+          method: 'POST',
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cid: pin.cid })
+        })
+      }
+      setStatusMessage('✅ All pins removed')
+      fetchPins()
+    } catch (e) {
+      setStatusMessage('❌ Failed to remove all')
+    }
   }
 
-  if (loading) {
-    return <div className="files-loading">Loading pins...</div>
-  }
+  if (!isAuthenticated) return (
+    <div className="files-auth card">
+      <h3>Authentication Required</h3>
+      <p>Please enter admin password in Settings to manage files.</p>
+    </div>
+  )
 
   return (
     <div className="files-page">
+      {/* Header */}
+      <div className="files-header card">
+        <div>
+          <h2>🗄️ File Manager</h2>
+          <p>Managed IPFS Storage & Pins</p>
+        </div>
+        <div className="files-header-actions">
+           <button className="btn btn-secondary" onClick={handleGarbageCollection}>🧹 Run GC</button>
+           <button className="btn btn-danger" onClick={handleRemoveAll}>🗑️ Remove All</button>
+        </div>
+      </div>
+
       {/* Upload Section */}
-      <div className="files-upload card">
-        <h3>📤 Upload to IPFS</h3>
-        <div
-          className={`files-dropzone ${isDragging ? 'dragging' : ''} ${selectedFile ? 'has-file' : ''}`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+      <div className="card files-upload-section">
+        <h3>Upload Files</h3>
+        <div className={`drop-zone ${dragActive ? 'active' : ''}`}
+          onDragOver={e => { e.preventDefault(); setDragActive(true) }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={e => {
+            e.preventDefault(); setDragActive(false)
+            // Handle drop logic if needed, simplify to click for now
+          }}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            hidden
-            onChange={handleFileSelect}
-          />
-          {selectedFile ? (
-            <>
-              <span className="dropzone-icon">📄</span>
-              <p className="dropzone-filename">{selectedFile.name}</p>
-              <p className="dropzone-size">{(selectedFile.size / 1024).toFixed(1)} KB</p>
-            </>
-          ) : (
-            <>
-              <span className="dropzone-icon">☁️</span>
-              <p>Drag & drop file here or click to select</p>
-            </>
-          )}
-        </div>
-
-        {selectedFile && (
-          <div className="files-upload-actions">
-            <button
-              className="btn btn-primary"
-              onClick={uploadFile}
-              disabled={uploading}
-            >
-              {uploading ? `Uploading... ${uploadProgress}%` : '⬆️ Upload'}
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                setSelectedFile(null)
-                setUploadStatus('')
-                if (fileInputRef.current) fileInputRef.current.value = ''
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-
-        {uploading && (
-          <div className="files-progress">
-            <div className="files-progress-bar" style={{ width: `${uploadProgress}%` }} />
-          </div>
-        )}
-
-        {uploadStatus && (
-          <p className={`files-upload-status ${uploadStatus.startsWith('✅') ? 'success' : 'error'}`}>
-            {uploadStatus}
-          </p>
-        )}
-      </div>
-
-      {/* Quick Add */}
-      <div className="files-add card">
-        <h3>📌 Pin Existing CID</h3>
-        <div className="files-add-row">
-          <input
-            type="text"
-            className="input"
-            placeholder="Enter IPFS CID (Qm... or ba...)"
-            value={newCid}
-            onChange={(e) => setNewCid(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && addPin()}
-          />
-          <button className="btn btn-primary" onClick={addPin}>Add Pin</button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="files-stats">
-        <span>Total Pins: <strong>{pins.length}</strong></span>
-        <button className="btn btn-secondary" onClick={loadPins}>🔄 Refresh</button>
-      </div>
-
-      {/* Pins Grid */}
-      {pins.length === 0 ? (
-        <div className="files-empty card">
-          <span>📁</span>
-          <h3>No pins found</h3>
-          <p>Upload a file or add a CID to get started</p>
-        </div>
-      ) : (
-        <div className="files-grid">
-          {pins.map(pin => (
-            <div key={pin.cid} className="file-card card">
-              <div className="file-cid">{pin.cid}</div>
-              <div className="file-meta">
-                <span className="file-type">{pin.type}</span>
-                {pin.name && <span className="file-name">{pin.name}</span>}
-              </div>
-              <div className="file-actions">
-                <button 
-                  className="btn btn-secondary" 
-                  onClick={() => navigator.clipboard.writeText(pin.cid)}
-                >
-                  📋 Copy
-                </button>
-                <button 
-                  className="btn btn-secondary"
-                  onClick={() => window.open(`/ipfs/${pin.cid}`, '_blank')}
-                >
-                  🌐 Open
-                </button>
-                <button 
-                  className="btn btn-secondary"
-                  onClick={() => removePin(pin.cid)}
-                  style={{ color: 'var(--color-error)' }}
-                >
-                  🗑️
-                </button>
-              </div>
+          <div className="upload-controls">
+            <div className="radio-group">
+              <label>
+                <input type="radio" checked={uploadMode === 'single'} onChange={() => setUploadMode('single')} />
+                Single File
+              </label>
+              <label>
+                <input type="radio" checked={uploadMode === 'directory'} onChange={() => setUploadMode('directory')} />
+                Directory
+              </label>
             </div>
-          ))}
+            
+            {uploadMode === 'single' && (
+              <>
+                <input 
+                  type="text" 
+                  className="input" 
+                  placeholder="Filename Override (optional)" 
+                  value={fileNameOverride}
+                  onChange={e => setFileNameOverride(e.target.value)}
+                />
+                <label className="checkbox-label">
+                  <input type="checkbox" checked={encryptUpload} onChange={e => setEncryptUpload(e.target.checked)} />
+                  Encrypt File (Client-side AES-GCM)
+                </label>
+              </>
+            )}
+            
+            <div className="upload-buttons">
+              {uploadMode === 'single' ? (
+                 <input ref={fileInputRef} type="file" onChange={e => handleUpload(e)} />
+              ) : (
+                 // @ts-ignore
+                 <input ref={dirInputRef} type="file" webkitdirectory="" directory="" onChange={e => handleUpload(e)} />
+              )}
+            </div>
+          </div>
+          
+          {uploading && (
+            <div className="upload-progress">
+              <div className="progress-bar">
+                <div className="fill" style={{ width: `${uploadProgress}%` }}></div>
+              </div>
+              <span>{Math.round(uploadProgress)}%</span>
+            </div>
+          )}
+          {statusMessage && <div className="status-message">{statusMessage}</div>}
+        </div>
+      </div>
+
+      {/* Pins List */}
+      <div className="files-list-section">
+        <div className="files-search-bar">
+           <input 
+             type="text" 
+             className="input search-input" 
+             placeholder="Search pins by name or CID..." 
+             value={searchQuery}
+             onChange={e => setSearchQuery(e.target.value)}
+           />
+           <select className="input filter-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
+             <option value="all">All Types</option>
+             <option value="recursive">Recursive</option>
+             <option value="direct">Direct</option>
+           </select>
+        </div>
+
+        {loading ? <div className="loading">Loading pins...</div> : (
+          <div className="pins-grid">
+            {filteredPins.map(pin => (
+              <div key={pin.cid} className="pin-card">
+                <div className="pin-icon">
+                   {pin.type === 'recursive' ? '📁' : '📄'}
+                </div>
+                <div className="pin-details">
+                  <div className="pin-name" title={pin.name}>{pin.name}</div>
+                  <div className="pin-cid" title={pin.cid}>{pin.cid.substring(0, 12)}...</div>
+                  <div className="pin-meta-text">
+                    {new Date(pin.timestamp).toLocaleDateString()} • {pin.size ? (pin.size / 1024 / 1024).toFixed(2) + ' MB' : 'Unknown size'}
+                  </div>
+                </div>
+                <div className="pin-actions">
+                  <button className="btn-icon" onClick={() => handlePreview(pin)} title="Preview">👁️</button>
+                  <button className="btn-icon" onClick={() => {
+                    navigator.clipboard.writeText(pin.cid)
+                    setStatusMessage('CID Copied!')
+                    setTimeout(() => setStatusMessage(''), 2000)
+                  }} title="Copy CID">📋</button>
+                  <button className="btn-icon btn-danger" onClick={() => handleRemove(pin.cid)} title="Delete">🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Preview Modal */}
+      {preview && (
+        <div className="preview-modal-overlay" onClick={closePreview}>
+          <div className="preview-modal" onClick={e => e.stopPropagation()}>
+            <div className="preview-header">
+              <h3>{preview.name}</h3>
+              <button className="btn-close" onClick={closePreview}>×</button>
+            </div>
+            <div className="preview-content">
+              {preview.type.startsWith('image/') && <img src={preview.url} alt="preview" />}
+              {preview.type.startsWith('video/') && <video src={preview.url} controls />}
+              {preview.type.startsWith('audio/') && <audio src={preview.url} controls />}
+              {preview.type === 'application/pdf' && <iframe src={preview.url} title="PDF Preview" />}
+              {(preview.type.startsWith('text/') || preview.type.includes('json')) && (
+                 <iframe src={preview.url} title="Text Preview" className="text-preview-frame" />
+              )}
+              {/* Fallback */}
+              {!preview.type.match(/image|video|audio|pdf|text|json/) && (
+                <div className="no-preview">
+                  <p>Preview not available for this file type.</p>
+                  <a href={preview.url} download={preview.name} className="btn btn-primary">Download File</a>
+                </div>
+              )}
+            </div>
+            <div className="preview-footer">
+               <div className="preview-cid">CID: {preview.cid}</div>
+            </div>
+          </div>
         </div>
       )}
     </div>

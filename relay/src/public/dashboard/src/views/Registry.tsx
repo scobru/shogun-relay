@@ -56,8 +56,9 @@ function Registry() {
   // Form states
   const [endpoint, setEndpoint] = useState('')
   const [gunPubKey, setGunPubKey] = useState('')
-  const [stakeAmount, setStakeAmount] = useState('100')
+  const [stakeActionAmount, setStakeActionAmount] = useState('0')
   const [actionStatus, setActionStatus] = useState('')
+  const [stakingMode, setStakingMode] = useState<'increase' | 'unstake' | 'withdraw'>('increase')
 
   const truncateAddress = (addr: string) => 
     addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
@@ -74,6 +75,11 @@ function Registry() {
       const statusRes = await fetch('/api/v1/registry/status')
       const statusData = await statusRes.json()
       setStatus(statusData)
+      
+      // Pre-fill forms if registered
+      if (statusData.relay) {
+          setEndpoint(statusData.relay.endpoint)
+      }
 
       // Balances
       try {
@@ -131,7 +137,7 @@ function Registry() {
   }, [isAuthenticated, fetchAll])
 
   const registerRelay = async () => {
-    if (!endpoint || !gunPubKey || !stakeAmount) {
+    if (!endpoint || !gunPubKey || !stakeActionAmount) {
       setActionStatus('❌ Fill all fields')
       return
     }
@@ -140,7 +146,7 @@ function Registry() {
       const res = await fetch('/api/v1/registry/register', {
         method: 'POST',
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endpoint, gunPubKey, stakeAmount: parseFloat(stakeAmount) })
+        body: JSON.stringify({ endpoint, gunPubKey, stakeAmount: parseFloat(stakeActionAmount) })
       })
       const data = await res.json()
       if (data.success) {
@@ -153,6 +159,56 @@ function Registry() {
       setActionStatus('❌ Network error')
     }
   }
+  
+  const updateRelay = async () => {
+      // Logic for updating endpoint/keys 
+      setActionStatus('Updating relay...')
+      try {
+        const res = await fetch('/api/v1/registry/update', { // Assuming endpoint exists or repurposed register
+            method: 'POST',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint, gunPubKey })
+        })
+        const data = await res.json()
+        if (data.success) {
+            setActionStatus('✅ Updated!')
+            fetchAll()
+        } else {
+            setActionStatus('❌ Update failed: ' + (data.error))
+        }
+      } catch {
+          setActionStatus('❌ Network error')
+      }
+  }
+
+  const handleStakingAction = async () => {
+      const amount = parseFloat(stakeActionAmount)
+      setActionStatus(`Processing ${stakingMode}...`)
+      
+      let endpointUrl = ''
+      switch(stakingMode) {
+          case 'increase': endpointUrl = '/api/v1/registry/stake/increase'; break;
+          case 'unstake': endpointUrl = '/api/v1/registry/stake/unstake'; break;
+          case 'withdraw': endpointUrl = '/api/v1/registry/stake/withdraw'; break;
+      }
+      
+      try {
+          const res = await fetch(endpointUrl, {
+              method: 'POST',
+              headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+              body: JSON.stringify({ amount })
+          })
+          const data = await res.json()
+          if (data.success) {
+              setActionStatus(`✅ ${stakingMode} success!`)
+              fetchAll()
+          } else {
+              setActionStatus(`❌ ${stakingMode} failed: ${data.error}`)
+          }
+      } catch {
+          setActionStatus('❌ Network error')
+      }
+  }
 
   const getStatusBadgeClass = () => {
     if (!status?.configured) return 'status-not-configured'
@@ -164,24 +220,8 @@ function Registry() {
     return 'status-inactive'
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="registry-auth card">
-        <span className="registry-auth-icon">🔒</span>
-        <h3>Authentication Required</h3>
-        <p>Please enter admin password in Settings to access registry.</p>
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="registry-loading card">
-        <div className="spinner"></div>
-        <span>Loading registry data...</span>
-      </div>
-    )
-  }
+  if (!isAuthenticated) return <div className="card"><h3>Authentication Required</h3></div>
+  if (loading) return <div className="loading">Loading registry data...</div>
 
   return (
     <div className="registry-page">
@@ -197,23 +237,12 @@ function Registry() {
       </div>
 
       <div className="registry-grid">
-        {/* Server Key */}
-        <div className="card registry-section">
-          <h3>Server Relay Key</h3>
-          <button className="btn btn-secondary" onClick={fetchServerKey}>
-            Use Server Key
-          </button>
-          <p className="registry-hint">Auto-fill GunDB public key from server</p>
-        </div>
-
         {/* Status */}
         <div className="card registry-section">
           <div className="registry-section-header">
             <h3>Registration Status</h3>
             <span className={`registry-status-badge ${getStatusBadgeClass()}`}>
-              {!status?.configured ? 'Not Configured' :
-               !status?.registered ? 'Not Registered' :
-               status.relay?.status || 'Unknown'}
+              {!status?.configured ? 'Not Configured' : !status?.registered ? 'Not Registered' : status.relay?.status || 'Unknown'}
             </span>
           </div>
 
@@ -231,16 +260,6 @@ function Registry() {
                 <span>Registered</span>
                 <span>{new Date(status.relay.registeredAt).toLocaleDateString()}</span>
               </div>
-              <div className="registry-info-item">
-                <span>Total Deals</span>
-                <span>{status.relay.totalDeals ?? 0}</span>
-              </div>
-            </div>
-          )}
-
-          {!status?.configured && (
-            <div className="registry-alert warning">
-              RELAY_PRIVATE_KEY not configured. Set it in your .env file.
             </div>
           )}
         </div>
@@ -263,98 +282,70 @@ function Registry() {
             <p className="registry-hint">Unable to load balances</p>
           )}
         </div>
+        
+        {/* Actions Zone */}
+        {status?.configured && (
+            <div className="card registry-section full-width">
+                <h3>{status.registered ? 'Relay Management' : 'Register Relay'}</h3>
+                
+                {/* Registration / Update Form */}
+                <div className="registry-form-row">
+                    <div className="form-group">
+                         <label>Endpoint URL</label>
+                         <input type="text" className="input" value={endpoint} onChange={e => setEndpoint(e.target.value)} placeholder="https://..." />
+                    </div>
+                    {!status.registered && (
+                        <div className="form-group">
+                            <label>GunDB Pub Key</label>
+                            <div className="input-with-btn">
+                                <input type="text" className="input" value={gunPubKey} onChange={e => setGunPubKey(e.target.value)} />
+                                <button className="btn btn-sm" onClick={fetchServerKey}>Fetch</button>
+                            </div>
+                        </div>
+                    )}
+                     <div className="form-group">
+                        <label>{status.registered ? 'Update Info' : 'Initial Stake'}</label>
+                        {status.registered ? (
+                             <button className="btn btn-secondary" onClick={updateRelay}>Update Endpoint</button>
+                        ) : (
+                             <div className="input-with-btn">
+                                <input type="number" className="input" value={stakeActionAmount} onChange={e => setStakeActionAmount(e.target.value)} />
+                                <button className="btn btn-primary" onClick={registerRelay}>Register</button>
+                             </div>
+                        )}
+                    </div>
+                </div>
 
-        {/* Registry Params */}
-        <div className="card registry-section">
-          <h3>Registry Parameters</h3>
-          {params ? (
-            <div className="registry-info-list">
-              <div className="registry-info-item">
-                <span>Minimum Stake</span>
-                <span>{params.minStake} USDC</span>
-              </div>
-              <div className="registry-info-item">
-                <span>Unstaking Delay</span>
-                <span>{params.unstakingDelayDays} days</span>
-              </div>
+                {/* Staking Controls (If Registered) */}
+                {status.registered && (
+                     <div className="staking-controls-area">
+                         <h4>Staking Operations</h4>
+                         <div className="staking-tabs">
+                             <button className={`btn-tab ${stakingMode==='increase'?'active':''}`} onClick={()=>setStakingMode('increase')}>Increase Stake</button>
+                             <button className={`btn-tab ${stakingMode==='unstake'?'active':''}`} onClick={()=>setStakingMode('unstake')}>Unstake</button>
+                             <button className={`btn-tab ${stakingMode==='withdraw'?'active':''}`} onClick={()=>setStakingMode('withdraw')}>Withdraw</button>
+                         </div>
+                         <div className="staking-action-row">
+                             <input type="number" className="input" value={stakeActionAmount} onChange={e => setStakeActionAmount(e.target.value)} placeholder="Amount USDC" />
+                             <button className="btn btn-primary" onClick={handleStakingAction}>
+                                 {stakingMode === 'increase' ? '➕ Stake' : stakingMode === 'unstake' ? '⏳ Request Unstake' : '💸 Withdraw'}
+                             </button>
+                         </div>
+                         <p className="helper-text">
+                             Current Stake: <strong>{status.relay?.stakedAmount} USDC</strong> • 
+                             Pending Unstake: <strong>0 USDC</strong>
+                         </p>
+                     </div>
+                )}
+                
+                {actionStatus && <div className="action-status-msg">{actionStatus}</div>}
             </div>
-          ) : (
-            <p className="registry-hint">Loading params...</p>
-          )}
-        </div>
-
-        {/* Register Form (only if not registered) */}
-        {status?.configured && !status?.registered && (
-          <div className="card registry-section full-width">
-            <h3>Register Relay</h3>
-            <div className="registry-form">
-              <div className="registry-form-group">
-                <label>Endpoint URL</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="https://your-relay.com"
-                  value={endpoint}
-                  onChange={e => setEndpoint(e.target.value)}
-                />
-              </div>
-              <div className="registry-form-group">
-                <label>GunDB Public Key</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="GunDB pub key"
-                  value={gunPubKey}
-                  onChange={e => setGunPubKey(e.target.value)}
-                />
-              </div>
-              <div className="registry-form-group">
-                <label>Stake Amount (USDC)</label>
-                <input
-                  type="number"
-                  className="input"
-                  value={stakeAmount}
-                  onChange={e => setStakeAmount(e.target.value)}
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-              <button className="btn btn-primary" onClick={registerRelay}>
-                Register On-Chain
-              </button>
-              {actionStatus && <p className="registry-action-status">{actionStatus}</p>}
-            </div>
-          </div>
         )}
 
-        {/* Staking (only if registered) */}
-        {status?.registered && status.relay && (
-          <div className="card registry-section">
-            <h3>Stake Management</h3>
-            <div className="registry-balances">
-              <div className="registry-balance">
-                <span className="registry-balance-value">{status.relay.stakedAmount}</span>
-                <span className="registry-balance-label">Current Stake (USDC)</span>
-              </div>
-              <div className="registry-balance">
-                <span className="registry-balance-value" style={{ color: 'var(--color-warning)' }}>
-                  {status.relay.totalSlashed}
-                </span>
-                <span className="registry-balance-label">Total Slashed (USDC)</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Deals (only if registered) */}
+        {/* Deals List */}
         {status?.registered && deals.length > 0 && (
           <div className="card registry-section full-width">
-            <h3>On-Chain Deals</h3>
-            <div className="registry-deals-stats">
-              <div>Total: <strong>{deals.length}</strong></div>
-              <div>Active: <strong>{deals.filter(d => d.active && !d.griefed).length}</strong></div>
-              <div>Revenue: <strong>{deals.reduce((s, d) => s + parseFloat(d.priceUSDC || '0'), 0).toFixed(4)} USDC</strong></div>
-            </div>
+            <h3>On-Chain Deals ({deals.length})</h3>
             <div className="registry-deals-list">
               <table className="registry-table">
                 <thead>

@@ -1,16 +1,9 @@
+/* Services.css */
 .services-page {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
-  max-width: 1200px;
-}
-
-.services-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 200px;
-  color: var(--color-text-secondary);
+  gap: 1.5rem;
+  height: 100%;
 }
 
 .services-header {
@@ -19,37 +12,44 @@
   align-items: center;
 }
 
-.services-header h2 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
+.services-layout {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+  min-height: 0; /* Enable scrolling in children */
+}
+
+.services-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+  flex: 2;
+  overflow-y: auto;
+  align-content: start;
 }
 
 .service-card {
-  padding: var(--spacing-lg);
-}
-
-.service-header {
   display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border-left: 4px solid var(--border-color);
+}
+
+.service-card.online { border-left-color: var(--color-success); }
+.service-card.offline { border-left-color: var(--color-error); }
+.service-card.maintenance { border-left-color: var(--color-warning); }
+
+.service-name-row {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-sm);
 }
 
-.service-name {
-  font-weight: 600;
-  flex: 1;
-}
-
-.service-status {
-  font-size: 12px;
-  font-weight: 500;
+.status-badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 1rem;
   text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-}
-
-.service-status.online {
   background: var(--color-success-container);
   color: var(--color-success);
 }
