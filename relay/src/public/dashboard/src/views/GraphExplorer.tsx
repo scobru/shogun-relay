@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 
-
 interface NodeData {
   [key: string]: any
 }
 
 function GraphExplorer() {
-  const { isAuthenticated, getAuthHeaders, token: adminToken } = useAuth()
+  const { isAuthenticated, getAuthHeaders } = useAuth()
   const [currentPath, setCurrentPath] = useState('shogun')
   const [data, setData] = useState<NodeData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -138,141 +137,175 @@ function GraphExplorer() {
   }
 
   const renderValue = (value: any) => {
-    if (value === null) return <span className="value-null">null</span>
+    if (value === null) return <span className="opacity-50 italic">null</span>
     if (typeof value === 'object') {
         if (value && '#' in value) {
-             return <span className="value-link">Link to: {value['#']}</span>
+             return <span className="text-primary cursor-pointer hover:underline">Link to: {value['#']}</span>
         }
-        return <span className="value-object" title={JSON.stringify(value, null, 2)}>{JSON.stringify(value)}</span>
+        return <span className="font-mono text-xs" title={JSON.stringify(value, null, 2)}>{JSON.stringify(value).substring(0, 50) + (JSON.stringify(value).length > 50 ? '...' : '')}</span>
     }
-    return <span className="value-primitive">{String(value)}</span>
+    return <span className="font-mono text-secondary">{String(value)}</span>
   }
 
   return (
-    <div className="graph-explorer-page">
-      <div className="explorer-header card">
-        <div className="header-content">
-            <div>
-                <h2>🔍 Graph Explorer</h2>
-                <p>Inspect GunDB nodes and properties</p>
+    <div className="flex flex-col gap-6 max-w-6xl">
+      {/* Header & Path */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+            <div className="flex justify-between items-center mb-4">
+                <div>
+                    <h2 className="card-title text-2xl">🔍 Graph Explorer</h2>
+                    <p className="text-base-content/70">Inspect GunDB nodes and properties</p>
+                </div>
+                <div className="flex gap-2">
+                    <button className="btn btn-neutral btn-sm" onClick={handleBack} disabled={currentPath === 'shogun'}>
+                        ⬅ Back
+                    </button>
+                    <button className="btn btn-neutral btn-sm" onClick={handleJumpToRoot}>
+                        🏠 Root
+                    </button>
+                </div>
             </div>
-            <div className="path-controls">
-                <button className="btn btn-neutral btn-sm" onClick={handleBack} disabled={currentPath === 'shogun'}>
-                    ⬅ Back
-                </button>
-                 <button className="btn btn-neutral btn-sm" onClick={handleJumpToRoot}>
-                    🏠 Root
-                </button>
+            
+            <div className="flex items-center gap-4 bg-base-200 p-4 rounded-lg">
+                <span className="font-bold">Path:</span>
+                <form 
+                    className="flex-1 flex gap-2"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        fetchNodeData(currentPath);
+                    }}
+                >
+                    <input 
+                        type="text" 
+                        className="input input-bordered input-sm flex-1 font-mono" 
+                        value={currentPath} 
+                        onChange={(e) => setCurrentPath(e.target.value)} 
+                    />
+                    <button type="submit" className="btn btn-primary btn-sm">Go</button>
+                </form>
             </div>
-        </div>
-        
-        <div className="current-path-bar">
-            <span className="label">Path:</span>
-            <form 
-                className="path-form"
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    fetchNodeData(currentPath);
-                }}
-            >
-                <input 
-                    type="text" 
-                    className="input path-input" 
-                    value={currentPath} 
-                    onChange={(e) => setCurrentPath(e.target.value)} 
-                />
-                <button type="submit" className="btn btn-primary btn-sm">Go</button>
-            </form>
         </div>
       </div>
       
       {/* Controls Row */}
-      <div className="card controls-row">
-          <div className="control-group">
-              <input 
-                 type="text" 
-                 className="input input-sm" 
-                 placeholder="Add Gun Relay Peer (wss://...)" 
-                 value={newPeer} 
-                 onChange={e => setNewPeer(e.target.value)}
-              />
-              <button className="btn btn-sm btn-secondary" onClick={handleAddPeer}>Add Peer</button>
-          </div>
-          <div className="control-group">
-               <button className="btn btn-sm btn-secondary" onClick={handleSnapshot}>⬇ Export Snapshot</button>
+      <div className="card bg-base-100 shadow">
+          <div className="card-body flex-row justify-between items-center flex-wrap gap-4">
+              <div className="flex gap-2 flex-wrap items-center">
+                  <input 
+                     type="text" 
+                     className="input input-bordered input-sm w-full max-w-xs" 
+                     placeholder="Add Gun Relay Peer (wss://...)" 
+                     value={newPeer} 
+                     onChange={e => setNewPeer(e.target.value)}
+                  />
+                  <button className="btn btn-sm btn-secondary" onClick={handleAddPeer}>Add Peer</button>
+                  {peerStatus && <span className="text-sm ml-2">{peerStatus}</span>}
+              </div>
+              <div>
+                   <button className="btn btn-sm btn-outline" onClick={handleSnapshot}>⬇ Export Snapshot</button>
+              </div>
           </div>
       </div>
-      {peerStatus && <div className="status-text">{peerStatus}</div>}
 
-      <div className="explorer-content card">
-        {loading ? (
-            <div className="loading-state">Loading...</div>
-        ) : error ? (
-            <div className="error-state">{error}</div>
-        ) : !data || Object.keys(data).length === 0 ? (
-            <div className="empty-state">This node is empty or not found.</div>
-        ) : (
-            <ul className="property-list">
-                {Object.entries(data)
-                    .filter(([key]) => key !== '_')
-                    .sort()
-                    .map(([key, value]) => {
-                        const isObject = typeof value === 'object' && value !== null
-                        return (
-                            <li key={key} className="property-item">
-                                <div className="property-key">
-                                    {key}
-                                </div>
-                                <div className="property-value">
-                                    {renderValue(value)}
-                                </div>
-                                <div className="property-actions">
-                                    {isObject && !value['#'] && (
-                                        <button 
-                                            className="btn btn-xs btn-primary"
-                                            onClick={() => handleNavigate(key)}
-                                        >
-                                            Explore ➡
-                                        </button>
-                                    )}
-                                </div>
-                            </li>
-                        )
-                    })}
-            </ul>
-        )}
+      {/* Content Explorer */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+            {loading ? (
+                <div className="flex justify-center p-8">
+                    <span className="loading loading-spinner loading-lg"></span>
+                </div>
+            ) : error ? (
+                <div className="alert alert-error">
+                    <span>{error}</span>
+                </div>
+            ) : !data || Object.keys(data).length === 0 ? (
+                <div className="text-center p-8 text-base-content/50">
+                    <p>This node is empty or not found.</p>
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="table table-zebra table-sm">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Value</th>
+                                <th className="w-20">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Object.entries(data)
+                                .filter(([key]) => key !== '_')
+                                .sort()
+                                .map(([key, value]) => {
+                                    const isObject = typeof value === 'object' && value !== null
+                                    return (
+                                        <tr key={key}>
+                                            <td className="font-bold font-mono text-primary">{key}</td>
+                                            <td className="max-w-md truncate">{renderValue(value)}</td>
+                                            <td>
+                                                {isObject && !value['#'] && (
+                                                    <button 
+                                                        className="btn btn-xs btn-ghost"
+                                                        onClick={() => handleNavigate(key)}
+                                                    >
+                                                        Explore ➡
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
       </div>
 
-      <div className="write-panel card">
-        <h3>✏ Write Operations</h3>
-        <form onSubmit={handleWrite} className="write-form">
-            <div className="form-group">
-                <input 
-                    type="text" 
-                    placeholder="Key"
-                    value={newKey}
-                    onChange={e => setNewKey(e.target.value)}
-                    className="input input-sm"
-                />
-            </div>
-            <div className="form-group">
-                <input 
-                    type="text" 
-                    placeholder="Value (JSON or string)"
-                    value={newValue}
-                    onChange={e => setNewValue(e.target.value)}
-                    className="input input-sm"
-                />
-            </div>
-            <button 
-                type="submit" 
-                className="btn btn-primary btn-sm"
-                disabled={writing || !isAuthenticated}
-            >
-                {writing ? 'Writing...' : 'Update Node'}
-            </button>
-        </form>
-        {!isAuthenticated && <p className="auth-warning">Authentication required to write.</p>}
+      {/* Write Panel */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+            <h3 className="card-title text-lg">✏ Write Operations</h3>
+            <form onSubmit={handleWrite} className="flex flex-wrap gap-4 items-end mt-2">
+                <div className="form-control flex-1 min-w-[200px]">
+                    <label className="label">
+                        <span className="label-text">Key</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        placeholder="Key"
+                        value={newKey}
+                        onChange={e => setNewKey(e.target.value)}
+                        className="input input-bordered input-sm"
+                    />
+                </div>
+                <div className="form-control flex-[2] min-w-[300px]">
+                    <label className="label">
+                        <span className="label-text">Value (JSON or string)</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        placeholder='Value ("string" or {"json": true})'
+                        value={newValue}
+                        onChange={e => setNewValue(e.target.value)}
+                        className="input input-bordered input-sm font-mono"
+                    />
+                </div>
+                <button 
+                    type="submit" 
+                    className="btn btn-primary btn-sm mb-1"
+                    disabled={writing || !isAuthenticated}
+                >
+                    {writing ? <span className="loading loading-spinner loading-xs"></span> : 'Update Node'}
+                </button>
+            </form>
+            {!isAuthenticated && (
+                <div className="alert alert-warning mt-4 py-2">
+                    <span className="text-sm">Authentication required to write.</span>
+                </div>
+            )}
+        </div>
       </div>
     </div>
   )

@@ -166,67 +166,75 @@ function VisualGraph() {
   }, [])
 
   return (
-    <div className="visual-graph-page">
-      <div className="graph-header card">
-        <div className="header-content">
-            <div>
-                <h2>🕸️ Visual Graph Explorer</h2>
-                <p>Visualize and explore GunDB nodes interactively</p>
+    <div className="flex flex-col gap-6 max-w-6xl">
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 className="card-title text-2xl">🕸️ Visual Graph Explorer</h2>
+                    <p className="text-base-content/70">Visualize and explore GunDB nodes interactively</p>
+                </div>
+                
+                <div className="flex flex-col items-end gap-2">
+                    <div className="flex gap-2">
+                        <span className="badge badge-lg">Nodes: {nodeCount}</span>
+                        <span className="badge badge-lg badge-outline">Path: {path}</span>
+                    </div>
+                </div>
             </div>
             
-            <div className="graph-controls">
-                <form onSubmit={handleSearch} className="search-form">
+            <div className="divider my-2"></div>
+            
+            <div className="flex flex-wrap gap-4 justify-between items-end">
+                <form onSubmit={handleSearch} className="join w-full max-w-md">
                     <input 
                         type="text" 
                         value={path} 
                         onChange={(e) => setPath(e.target.value)}
                         placeholder="Enter GunDB path (e.g. shogun/relays)"
-                        className="search-input"
+                        className="input input-bordered join-item w-full"
                     />
-                    <button type="submit" className="btn btn-primary" disabled={loading}>
-                        {loading ? 'Loading...' : '🔍 Explore'}
+                    <button type="submit" className="btn btn-primary join-item" disabled={loading}>
+                        {loading ? <span className="loading loading-spinner loading-xs"></span> : 'Explore'}
                     </button>
                 </form>
 
-                <form onSubmit={handleAddPeer} className="peer-form">
+                <form onSubmit={handleAddPeer} className="join">
                     <input 
                         type="text" 
                         value={peerUrl} 
                         onChange={(e) => setPeerUrl(e.target.value)}
                         placeholder="Add Peer URL"
-                        className="peer-input"
+                        className="input input-bordered join-item"
                     />
-                    <button type="submit" className="btn btn-secondary">
-                        ➕ Add Peer
+                    <button type="submit" className="btn btn-secondary join-item">
+                        ➕ Add
                     </button>
                 </form>
             </div>
         </div>
-        
-        <div className="graph-stats">
-            <span className="badge">Nodes: {nodeCount}</span>
-            <span className="badge">Path: {path}</span>
-        </div>
       </div>
 
-      <div className="graph-container card">
-        <Graph
-          graph={graphData}
-          options={options}
-          events={{
-            select: (event: any) => {
-              const { nodes } = event;
-              if (nodes.length > 0) {
-                  const nodeId = nodes[0];
-                  // If clicking a child node that is effectively a path, explore it
-                  if (nodeId.includes('/') && nodeId !== path) {
-                      setPath(nodeId)
-                      exploreData(nodeId)
-                  }
-              }
-            }
-          }}
-        />
+      <div className="card bg-base-100 shadow h-[650px]">
+        <div className="card-body p-0 overflow-hidden rounded-xl">
+            <Graph
+            graph={graphData}
+            options={options}
+            events={{
+                select: (event: any) => {
+                const { nodes } = event;
+                if (nodes.length > 0) {
+                    const nodeId = nodes[0];
+                    // If clicking a child node that is effectively a path, explore it
+                    if (nodeId.includes('/') && nodeId !== path) {
+                        setPath(nodeId)
+                        exploreData(nodeId)
+                    }
+                }
+                }
+            }}
+            />
+        </div>
       </div>
     </div>
   )
