@@ -181,6 +181,7 @@ function Registry() {
   }
 
   const handleStakingAction = async () => {
+    console.log('handleStakingAction called', stakingMode)
     if (!stakeActionAmount || parseFloat(stakeActionAmount) <= 0) {
         setActionStatus('❌ Invalid amount')
         return

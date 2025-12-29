@@ -143,7 +143,7 @@ function GraphExplorer() {
         if (value && '#' in value) {
              return <span className="value-link">Link to: {value['#']}</span>
         }
-        return <span className="value-object">{'{Object}'}</span>
+        return <span className="value-object" title={JSON.stringify(value, null, 2)}>{JSON.stringify(value)}</span>
     }
     return <span className="value-primitive">{String(value)}</span>
   }

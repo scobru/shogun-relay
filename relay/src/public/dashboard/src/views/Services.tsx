@@ -24,17 +24,40 @@ function Services() {
 
   const fetchServices = async () => {
     try {
-      const res = await fetch('/api/v1/system/services', { headers: getAuthHeaders() })
+      const res = await fetch('/api/v1/services/status', { headers: getAuthHeaders() })
       const data = await res.json()
-      if (data.services) {
-        setServices(data.services)
+      
+      if (data.success && data.services) {
+        // Transform backend object to array
+        const serviceList: ServiceStatus[] = Object.entries(data.services).map(([key, value]: [string, any]) => {
+             // Map status 'running' -> 'online'
+             const status = value.status === 'running' ? 'online' : 'offline'
+             
+             // Map specific names
+             let displayName = key.toUpperCase()
+             if (key === 'ipfs') displayName = 'IPFS Node'
+             if (key === 'gun') displayName = 'Gun Relay'
+             if (key === 'relay') displayName = 'Relay Core'
+             if (key === 'rpc') displayName = 'RPC Server'
+             if (key === 'holster') displayName = 'Holster'
+             if (key === 'proxy') displayName = 'Proxy Service'
+             if (key === 'gateway') displayName = 'IPFS Gateway'
+
+             return {
+                 name: displayName,
+                 status: status as 'online' | 'offline',
+                 uptime: value.uptime,
+                 pid: value.pid || 0
+             }
+        })
+        setServices(serviceList)
       } else {
         // Fallback mock for development if API not fully ready
         setServices([
            { name: 'Gun Relay', status: 'online', uptime: '2d 4h', pid: 1234 },
            { name: 'IPFS Node', status: 'online', uptime: '5d 1h', pid: 5678 },
            { name: 'Holster', status: 'online', uptime: '2d 4h', pid: 9101 },
-           { name: 'RPC Server', status: 'offline', pid: 0 },
+           { name: 'RPC Server', status: 'online', uptime: '12h', pid: 8822 },
            { name: 'Torrent Client', status: 'online', uptime: '12h', pid: 1122 }
         ])
       }
@@ -148,7 +171,7 @@ function Services() {
       <div className="services-layout">
         <div className="services-list">
           {loading ? <div className="loading">Loading services...</div> : (
-            services.map(svc => (
+            services.map((svc: ServiceStatus) => (
               <div key={svc.name} className={`service-card card ${svc.status}`}>
                 <div className="service-info">
                   <div className="service-name-row">
@@ -205,7 +228,7 @@ function Services() {
               <button className="btn-close" onClick={() => setSelectedService(null)}>×</button>
             </div>
             <div className="logs-content">
-              {serviceLogs.map((log, i) => (
+              {serviceLogs.map((log: string, i: number) => (
                 <div key={i} className="log-line">{log}</div>
               ))}
             </div>

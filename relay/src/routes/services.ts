@@ -96,6 +96,11 @@ router.get("/status", async (req: Request, res: Response) => {
         uptime: "2h 15m",
         served: 567,
       },
+      rpc: {
+        status: "running",
+        uptime: "2h 15m",
+        requests: 2341,
+      }
     };
 
     loggers.services.info("Returning services status");

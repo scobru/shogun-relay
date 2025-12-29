@@ -42,7 +42,7 @@ function VisualGraph() {
       size: 10,
       font: {
         size: 12,
-        color: "#ffffff"
+        color: "#333333"
       },
       borderWidth: 2
     },
