@@ -183,7 +183,43 @@ function Registry() {
   // ... (rest of code)
   
   return (
-    // ...
+    <div className="registry-dashboard">
+        <div className="registry-header">
+            <h2>Registry Management</h2>
+            <div className="header-actions">
+                <button className="btn btn-secondary btn-sm" onClick={fetchAll}>🔄 Refresh</button>
+            </div>
+        </div>
+        
+        {/* Overview Stats */}
+        <div className="stats-bar card">
+            <div className="stat-item">
+                <span className="label">Status:</span>
+                <span className={`value ${status?.registered ? 'success' : 'warning'}`}>
+                    {status?.registered ? '✅ Registered' : '⚠️ Not Registered'}
+                </span>
+            </div>
+            {balances && (
+                <>
+                    <div className="stat-item">
+                        <span className="label">ETH:</span>
+                        <span className="value">{parseFloat(balances.eth).toFixed(4)}</span>
+                    </div>
+                    <div className="stat-item">
+                        <span className="label">USDC:</span>
+                        <span className="value">{parseFloat(balances.usdc).toFixed(2)}</span>
+                    </div>
+                </>
+            )}
+            {status?.relay && (
+                <div className="stat-item">
+                    <span className="label">Stake:</span>
+                    <span className="value">{status.relay.stakedAmount} USDC</span>
+                </div>
+            )}
+        </div>
+
+        <div className="registry-content">
         {/* Actions Zone */}
         {status?.configured && (
             <div className="card registry-section full-width">
