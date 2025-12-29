@@ -106,19 +106,6 @@ function GraphExplorer() {
       if (!newPeer) return
       setPeerStatus('Adding peer...')
       try {
-          // In a real Gun app we would gun.opt({ peers: [url] })
-          // Here we are talking to a Relay API that talks to Gun
-          // For now, we'll assume the API supports adding peers via an endpoint, 
-          // or we just simulate it locally since the dashboard might have its own Gun instance (deprecated).
-          // But looking at the legacy code, it did `gun.opt`. 
-          // Since this is a React app consuming an API, we probably just want to tell the SERVER to add a peer.
-          // IF that endpoint exists. If not, this might be a pure client-side Gun thing in the legacy code.
-          // Legacy code: `gun.opt({ peers: [trimmed] });` mixed with API calls?
-          // Actually legacy code used `gun` client-side heavily.
-          // For this migration, we are moving to API-first. 
-          // So we will try to call the server to add a peer if possible, or just note it's not fully supported via API yet.
-          // Let's assume there is an endpoint or we mock success for UI parity.
-          
           await fetch('/api/v1/system/peers/add', {
              method: 'POST',
              headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -133,12 +120,11 @@ function GraphExplorer() {
   }
 
   const handleSnapshot = () => {
-      // Trigger download
       const element = document.createElement("a");
       const file = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
       element.href = URL.createObjectURL(file);
       element.download = `shogun-relay-snapshot-${Date.now()}.json`;
-      document.body.appendChild(element); // Required for this to work in FireFox
+      document.body.appendChild(element); 
       element.click();
       document.body.removeChild(element);
   }
@@ -180,9 +166,23 @@ function GraphExplorer() {
             </div>
         </div>
         
-        <div className="current-path">
-            <span className="label">Current Path:</span>
-            <code className="path-display">{currentPath}</code>
+        <div className="current-path-bar">
+            <span className="label">Path:</span>
+            <form 
+                className="path-form"
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    fetchNodeData(currentPath);
+                }}
+            >
+                <input 
+                    type="text" 
+                    className="input path-input" 
+                    value={currentPath} 
+                    onChange={(e) => setCurrentPath(e.target.value)} 
+                />
+                <button type="submit" className="btn btn-primary btn-sm">Go</button>
+            </form>
         </div>
       </div>
       
