@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anna's Archive - Shogun Relay</title>
+    <title>Torrent Manager - Shogun Relay</title>
     <link rel="stylesheet" href="styles/google-md3.css">
     <script src="lib/admin-auth.js"></script>
     <style>
@@ -308,36 +308,22 @@
         <div class="md-card md-card-outlined md-mb-lg" style="padding: 24px;">
             <h2 class="md-title-medium md-mb-md">🌍 Archive Search</h2>
             <p class="md-body-small md-text-secondary md-mb-md">
-                Search torrents from Internet Archive and PirateBay
+                Search torrents from Internet Archive
             </p>
 
             <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
                 <input type="text" id="archiveSearchQuery" placeholder="Search archives..." class="md-input"
                     style="flex: 2; min-width: 200px;" onkeyup="if(event.key === 'Enter') searchArchives()">
 
-                <select id="archiveSourceSelect"
-                    style="padding: 12px; border: 1px solid var(--md-outline); border-radius: 8px; background: var(--md-surface); color: var(--md-on-surface); min-width: 150px;">
-                    <option value="all">All Sources</option>
-                    <option value="internet-archive">Internet Archive</option>
-                    <option value="piratebay">PirateBay</option>
-                </select>
+                <!-- Source dropdown removed - only Internet Archive available -->
 
                 <select id="archiveCategorySelect"
                     style="padding: 12px; border: 1px solid var(--md-outline); border-radius: 8px; background: var(--md-surface); color: var(--md-on-surface); min-width: 120px;">
                     <option value="">All Categories</option>
-                    <optgroup label="Internet Archive">
-                        <option value="audio">Audio</option>
-                        <option value="video">Video</option>
-                        <option value="texts">Texts</option>
-                        <option value="software">Software</option>
-                    </optgroup>
-                    <optgroup label="PirateBay">
-                        <option value="100">TPB: Audio</option>
-                        <option value="200">TPB: Video</option>
-                        <option value="300">TPB: Applications</option>
-                        <option value="400">TPB: Games</option>
-                        <option value="600">TPB: Other/E-books</option>
-                    </optgroup>
+                    <option value="audio">Audio</option>
+                    <option value="video">Video</option>
+                    <option value="texts">Texts</option>
+                    <option value="software">Software</option>
                 </select>
 
                 <button onclick="searchArchives()" class="md-btn md-btn-filled">
@@ -346,7 +332,7 @@
             </div>
 
             <div id="archiveSearchResults" class="md-body-small">
-                Enter a search query to find torrents from Internet Archive or PirateBay
+                Enter a search query to find torrents from Internet Archive
             </div>
         </div>
 
@@ -1014,12 +1000,11 @@
         }
 
         // ============================================================================
-        // ARCHIVE SEARCH (Internet Archive + PirateBay)
+        // ARCHIVE SEARCH (Internet Archive only)
         // ============================================================================
 
         async function searchArchives() {
             const query = document.getElementById('archiveSearchQuery').value.trim();
-            const source = document.getElementById('archiveSourceSelect').value;
             const category = document.getElementById('archiveCategorySelect').value;
             const resultsDiv = document.getElementById('archiveSearchResults');
 
@@ -1028,25 +1013,16 @@
                 return;
             }
 
-            resultsDiv.innerHTML = '<div class="md-text-center">🔍 Searching archives...</div>';
+            resultsDiv.innerHTML = '<div class="md-text-center">🔍 Searching Internet Archive...</div>';
 
             try {
-                let url = `/api/v1/torrent/search?q=${encodeURIComponent(query)}&limit=30`;
+                let url = `/api/v1/torrent/search?q=${encodeURIComponent(query)}&sources=internet-archive&limit=30`;
 
-                // Add source filter
-                if (source !== 'all') {
-                    url += `&sources=${source}`;
-                }
-
-                // Add category filter
+                // Add category filter (mediaType for Internet Archive)
                 if (category) {
-                    // Check if it's a TPB category (numeric) or IA mediaType (string)
-                    if (/^\d+$/.test(category)) {
-                        url += `&category=${category}`;
-                    } else {
-                        url += `&mediaType=${category}`;
-                    }
+                    url += `&mediaType=${category}`;
                 }
+
 
                 const response = await fetch(url);
                 const json = await response.json();
