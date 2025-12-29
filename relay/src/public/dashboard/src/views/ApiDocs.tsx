@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
-import './ApiDocs.css'
+
 
 // Add RapiDoc element type definition
 declare global {

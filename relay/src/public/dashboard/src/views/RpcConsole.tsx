@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import './RpcConsole.css'
+
 
 const RPC_METHODS = [
   { name: 'eth_blockNumber', desc: 'Get latest block number', params: [] },

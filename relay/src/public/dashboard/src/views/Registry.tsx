@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-import './Registry.css'
+
 
 interface RegistryConfig {
   chainId: string

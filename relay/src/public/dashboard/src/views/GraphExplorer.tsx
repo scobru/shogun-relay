@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import './GraphExplorer.css'
+
 
 interface NodeData {
   [key: string]: any

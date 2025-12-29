@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import './Status.css'
+import { Link } from 'react-router-dom'
 
 interface HealthData {
   status: string
@@ -52,82 +52,98 @@ function Status() {
   }
 
   if (loading) {
-    return <div className="status-loading">Loading...</div>
+    return (
+      <div className="flex items-center justify-center min-h-64">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    )
   }
 
   return (
-    <div className="status-page">
+    <div className="flex flex-col gap-6 max-w-6xl">
       {/* Welcome Card */}
-      <div className="status-welcome card">
-        <div className="status-welcome-header">
-          <div className="status-welcome-icon">⚡</div>
-          <div>
-            <h2 className="status-welcome-title">{health?.relayName || 'Shogun Relay'}</h2>
-            <p className="status-welcome-subtitle">Decentralized infrastructure powered by GunDB & IPFS</p>
+      <div className="card bg-gradient-to-r from-primary to-secondary text-primary-content">
+        <div className="card-body flex-row items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="text-5xl">⚡</div>
+            <div>
+              <h2 className="card-title text-2xl">{health?.relayName || 'Shogun Relay'}</h2>
+              <p className="opacity-80">Decentralized infrastructure powered by GunDB & IPFS</p>
+            </div>
           </div>
-        </div>
-        <div className="status-welcome-badge">
-          <span className="status-dot online"></span>
-          <span>Relay Online</span>
+          <div className="badge badge-lg gap-2 bg-white/20 border-0">
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+            Relay Online
+          </div>
         </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="status-stats grid grid-4">
-        <div className="status-stat card">
-          <div className="status-stat-icon">🌐</div>
-          <div className="status-stat-value">{stats?.peers?.count || 0}</div>
-          <div className="status-stat-label">Connected Peers</div>
+      <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
+        <div className="stat">
+          <div className="stat-figure text-primary text-3xl">🌐</div>
+          <div className="stat-title">Connected Peers</div>
+          <div className="stat-value text-primary">{stats?.peers?.count || 0}</div>
         </div>
-        <div className="status-stat card">
-          <div className="status-stat-icon">💾</div>
-          <div className="status-stat-value">
+        <div className="stat">
+          <div className="stat-figure text-secondary text-3xl">💾</div>
+          <div className="stat-title">Memory</div>
+          <div className="stat-value text-secondary">
             {stats?.memory?.heapUsed ? Math.round(stats.memory.heapUsed / 1024 / 1024) : 0}
           </div>
-          <div className="status-stat-label">Memory (MB)</div>
+          <div className="stat-desc">MB used</div>
         </div>
-        <div className="status-stat card">
-          <div className="status-stat-icon">⏱️</div>
-          <div className="status-stat-value">{health?.uptime ? formatUptime(health.uptime * 1000) : '--'}</div>
-          <div className="status-stat-label">Uptime</div>
+        <div className="stat">
+          <div className="stat-figure text-accent text-3xl">⏱️</div>
+          <div className="stat-title">Uptime</div>
+          <div className="stat-value text-accent">{health?.uptime ? formatUptime(health.uptime * 1000) : '--'}</div>
         </div>
-        <div className="status-stat card">
-          <div className="status-stat-icon">📦</div>
-          <div className="status-stat-value">{health?.version || '--'}</div>
-          <div className="status-stat-label">Version</div>
+        <div className="stat">
+          <div className="stat-figure text-info text-3xl">📦</div>
+          <div className="stat-title">Version</div>
+          <div className="stat-value text-info text-xl">{health?.version || '--'}</div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="status-actions">
-        <h3 className="status-section-title">Quick Actions</h3>
-        <div className="status-actions-grid grid grid-3">
-          <a href="/dashboard/files" className="status-action card">
-            <span className="status-action-icon">📁</span>
-            <span className="status-action-title">Upload Files</span>
-            <span className="status-action-desc">Pin files to IPFS</span>
-          </a>
-          <a href="/dashboard/services" className="status-action card">
-            <span className="status-action-icon">⚡</span>
-            <span className="status-action-title">Services</span>
-            <span className="status-action-desc">Manage services</span>
-          </a>
-          <a href="/dashboard/explore" className="status-action card">
-            <span className="status-action-icon">🔍</span>
-            <span className="status-action-title">Explore</span>
-            <span className="status-action-desc">Browse GunDB</span>
-          </a>
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Link to="/files" className="card bg-base-100 shadow hover:shadow-lg transition-shadow cursor-pointer">
+            <div className="card-body items-center text-center">
+              <span className="text-4xl mb-2">📁</span>
+              <h4 className="card-title">Upload Files</h4>
+              <p className="text-base-content/60 text-sm">Pin files to IPFS</p>
+            </div>
+          </Link>
+          <Link to="/services" className="card bg-base-100 shadow hover:shadow-lg transition-shadow cursor-pointer">
+            <div className="card-body items-center text-center">
+              <span className="text-4xl mb-2">⚡</span>
+              <h4 className="card-title">Services</h4>
+              <p className="text-base-content/60 text-sm">Manage services</p>
+            </div>
+          </Link>
+          <Link to="/explore" className="card bg-base-100 shadow hover:shadow-lg transition-shadow cursor-pointer">
+            <div className="card-body items-center text-center">
+              <span className="text-4xl mb-2">🔍</span>
+              <h4 className="card-title">Explore</h4>
+              <p className="text-base-content/60 text-sm">Browse GunDB</p>
+            </div>
+          </Link>
         </div>
       </div>
 
-      {/* Auth Status */}
+      {/* Auth Warning */}
       {!isAuthenticated && (
-        <div className="status-auth-warning card">
-          <span className="status-auth-icon">🔒</span>
+        <div role="alert" className="alert alert-warning">
+          <span className="text-2xl">🔒</span>
           <div>
-            <strong>Limited Access Mode</strong>
-            <p>Enter admin password in Settings to unlock all features.</p>
+            <h3 className="font-bold">Limited Access Mode</h3>
+            <div className="text-sm">Enter admin password in Settings to unlock all features.</div>
           </div>
+          <Link to="/settings" className="btn btn-sm">
+            Go to Settings
+          </Link>
         </div>
       )}
     </div>

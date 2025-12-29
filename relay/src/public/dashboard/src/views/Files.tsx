@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
-import './Files.css'
+
 
 interface Pin {
   cid: string

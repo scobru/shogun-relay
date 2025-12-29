@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-import './Network.css'
+
 
 interface NetworkStats {
   totalRelays?: number

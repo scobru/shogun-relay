@@ -1,6 +1,4 @@
-import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import './Sidebar.css'
 
 interface NavItem {
   path: string
@@ -30,84 +28,66 @@ const navItems: NavItem[] = [
   { path: '/settings', icon: '⚙️', label: 'Settings', group: 'system' },
 ]
 
-function Sidebar() {
-  const [isExpanded, setIsExpanded] = useState(false)
+const groupLabels: Record<string, string> = {
+  main: 'Dashboard',
+  storage: 'Storage',
+  blockchain: 'Blockchain',
+  tools: 'Tools',
+  system: 'System'
+}
 
-  const renderNavGroup = (groupName: string) => {
-    const items = navItems.filter(item => item.group === groupName)
-    return items.map((item) => (
-      <NavLink
-        key={item.path}
-        to={item.path}
-        className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-        title={item.label}
-        end={item.path === '/'}
-      >
-        <span className="sidebar-icon">{item.icon}</span>
-        <span className="sidebar-label">{item.label}</span>
-      </NavLink>
-    ))
-  }
+function Sidebar() {
+  const groups = ['main', 'storage', 'blockchain', 'tools', 'system']
 
   return (
-    <aside 
-      className={`sidebar ${isExpanded ? 'expanded' : ''}`}
-      onMouseEnter={() => setIsExpanded(true)}
-      onMouseLeave={() => setIsExpanded(false)}
-    >
-      {/* Logo */}
-      <div className="sidebar-header">
-        <div className="sidebar-logo">
-          <span className="sidebar-logo-icon">⚡</span>
-          <span className="sidebar-logo-text">SHOGUN</span>
+    <div className="drawer-side z-40">
+      <label htmlFor="main-drawer" aria-label="close sidebar" className="drawer-overlay"></label>
+      <aside className="bg-base-300 min-h-screen w-64 flex flex-col">
+        {/* Logo */}
+        <div className="p-4 flex items-center gap-2 border-b border-base-content/10">
+          <span className="text-2xl">⚡</span>
+          <span className="font-bold text-xl">SHOGUN</span>
         </div>
-      </div>
 
-      {/* Navigation */}
-      <nav className="sidebar-nav">
-        <div className="sidebar-group">
-          {renderNavGroup('main')}
-        </div>
-        
-        <div className="sidebar-divider"></div>
-        
-        <div className="sidebar-group">
-          {renderNavGroup('storage')}
-        </div>
-        
-        <div className="sidebar-divider"></div>
-        
-        <div className="sidebar-group">
-          {renderNavGroup('blockchain')}
-        </div>
-        
-        <div className="sidebar-divider"></div>
-        
-        <div className="sidebar-group">
-          {renderNavGroup('tools')}
-        </div>
-        
-        <div className="sidebar-divider"></div>
-        
-        <div className="sidebar-group">
-          {renderNavGroup('system')}
-        </div>
-      </nav>
+        {/* Navigation */}
+        <ul className="menu menu-md flex-1 p-2 overflow-y-auto">
+          {groups.map((group) => (
+            <li key={group}>
+              <h2 className="menu-title">{groupLabels[group]}</h2>
+              <ul>
+                {navItems
+                  .filter((item) => item.group === group)
+                  .map((item) => (
+                    <li key={item.path}>
+                      <NavLink
+                        to={item.path}
+                        className={({ isActive }) => isActive ? 'active' : ''}
+                        end={item.path === '/'}
+                      >
+                        <span>{item.icon}</span>
+                        {item.label}
+                      </NavLink>
+                    </li>
+                  ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
 
-      {/* Footer */}
-      <div className="sidebar-footer">
-        <a 
-          href="https://github.com/scobru/shogun" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="sidebar-link"
-          title="GitHub"
-        >
-          <span className="sidebar-icon">📦</span>
-          <span className="sidebar-label">GitHub</span>
-        </a>
-      </div>
-    </aside>
+        {/* Footer */}
+        <div className="p-4 border-t border-base-content/10">
+          <a
+            href="https://github.com/scobru/shogun"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost btn-sm w-full justify-start gap-2"
+          >
+            <span>📦</span>
+            GitHub
+          </a>
+        </div>
+      </aside>
+    </div>
   )
 }
 

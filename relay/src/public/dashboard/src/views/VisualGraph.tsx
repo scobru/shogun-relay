@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Graph from 'react-vis-network-graph'
 import { useAuth } from '../context/AuthContext'
-import './VisualGraph.css'
+
 
 interface GraphNode {
   id: string
