@@ -21,6 +21,8 @@ const navItems: NavItem[] = [
   { path: '/torrents', icon: '📥', label: 'Torrents', group: 'blockchain' },
   { path: '/api-keys', icon: '🔑', label: 'API Keys', group: 'tools' },
   { path: '/charts', icon: '📉', label: 'Charts', group: 'tools' },
+  { path: '/visual-graph', icon: '🕸️', label: 'Visual Graph', group: 'tools' },
+  { path: '/graph-explorer', icon: '🔍', label: 'Graph Explorer', group: 'tools' },
   { path: '/rpc-console', icon: '💻', label: 'RPC Console', group: 'tools' },
   { path: '/api-docs', icon: '📄', label: 'API Docs', group: 'tools' },
   { path: '/settings', icon: '⚙️', label: 'Settings', group: 'system' },

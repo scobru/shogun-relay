@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import './Charts.css'
 
 interface ChartData {
@@ -13,40 +14,36 @@ function Charts() {
   const { isAuthenticated, getAuthHeaders } = useAuth()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<Record<string, any>>({})
+  const [history, setHistory] = useState<any[]>([])
 
   useEffect(() => {
     loadStats()
-    const interval = setInterval(loadStats, 30000)
+    const interval = setInterval(loadStats, 5000) // Poll every 5 seconds for live charts
     return () => clearInterval(interval)
   }, [])
 
   const loadStats = async () => {
     try {
-      // Load multiple stat sources
-      const [healthRes, networkRes, ipfsRes] = await Promise.allSettled([
-        fetch('/health'),
-        fetch('/api/v1/network/stats'),
-        fetch('/api/v1/ipfs/stats')
-      ])
-
-      const newStats: Record<string, any> = {}
-
-      if (healthRes.status === 'fulfilled') {
-        const data = await healthRes.value.json()
-        newStats.health = data
-      }
-
-      if (networkRes.status === 'fulfilled') {
-        const data = await networkRes.value.json()
-        if (data.success) newStats.network = data.stats
-      }
-
-      if (ipfsRes.status === 'fulfilled') {
-        const data = await ipfsRes.value.json()
-        if (data.success) newStats.ipfs = data
-      }
-
-      setStats(newStats)
+        // Use system/stats.json as the primary reliable source
+        const response = await fetch('/api/v1/system/stats.json')
+        if (response.ok) {
+            const data = await response.json()
+            setStats(data)
+            
+            // Update history for charts
+            setHistory(prev => {
+                const now = new Date().toLocaleTimeString()
+                const newPoint = {
+                    time: now,
+                    memory: (data.memory?.heapUsed || 0) / 1024 / 1024, // MB
+                    peers: data.peers?.count || 0,
+                    damIn: data.dam?.in?.count || 0,
+                    damOut: data.dam?.out?.count || 0
+                }
+                const newHistory = [...prev, newPoint]
+                return newHistory.slice(-20) // Keep last 20 points
+            })
+        }
     } catch (error) {
       console.error('Failed to load stats:', error)
     } finally {
@@ -70,7 +67,7 @@ function Charts() {
     return `${days}d ${hours}h ${mins}m`
   }
 
-  if (loading) {
+  if (loading && history.length === 0) {
     return <div className="charts-loading">Loading metrics...</div>
   }
 
@@ -79,110 +76,98 @@ function Charts() {
       <div className="charts-header card">
         <div>
           <h2>📊 Charts & Metrics</h2>
-          <p>Performance visualization and system metrics</p>
+          <p>Real-time system performance monitoring</p>
         </div>
-        <button className="btn btn-secondary" onClick={loadStats}>🔄 Refresh</button>
+        <div className="header-stats">
+            <span className="stat-badge">
+                Ping: {new Date().toLocaleTimeString()}
+            </span>
+            <span className="stat-badge success">
+                Status: Online
+            </span>
+        </div>
       </div>
 
-      {/* Health Stats */}
-      {stats.health && (
-        <div className="charts-section">
-          <h3>🏥 System Health</h3>
-          <div className="charts-grid">
-            <div className="chart-card card">
-              <div className="chart-card-value">{stats.health.status || 'Unknown'}</div>
-              <div className="chart-card-label">Status</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{formatUptime(stats.health.uptime)}</div>
-              <div className="chart-card-label">Uptime</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{stats.health.connections?.gun || 0}</div>
-              <div className="chart-card-label">Gun Connections</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{stats.health.version || '-'}</div>
-              <div className="chart-card-label">Version</div>
-            </div>
+      <div className="charts-grid-layout">
+          {/* Memory Usage Chart */}
+          <div className="chart-container card">
+              <h3>🧠 Memory Usage (MB)</h3>
+              <div className="chart-wrapper">
+                  <ResponsiveContainer width="100%" height={300}>
+                      <AreaChart data={history}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                          <XAxis dataKey="time" stroke="#888" />
+                          <YAxis stroke="#888" />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#2a2a2a', border: 'none' }}
+                            itemStyle={{ color: '#fff' }}
+                          />
+                          <Area type="monotone" dataKey="memory" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
+                      </AreaChart>
+                  </ResponsiveContainer>
+              </div>
           </div>
-        </div>
-      )}
 
-      {/* Network Stats */}
-      {stats.network && (
-        <div className="charts-section">
-          <h3>🌐 Network Stats</h3>
-          <div className="charts-grid">
-            <div className="chart-card card">
-              <div className="chart-card-value">{stats.network.totalRelays || 0}</div>
-              <div className="chart-card-label">Total Relays</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{stats.network.activeRelays || 0}</div>
-              <div className="chart-card-label">Active Relays</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{stats.network.totalDeals || 0}</div>
-              <div className="chart-card-label">Total Deals</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{formatBytes(stats.network.totalStorage || 0)}</div>
-              <div className="chart-card-label">Total Storage</div>
-            </div>
+          {/* Peers Chart */}
+          <div className="chart-container card">
+              <h3>👥 Connected Peers</h3>
+              <div className="chart-wrapper">
+                  <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={history}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                          <XAxis dataKey="time" stroke="#888" />
+                          <YAxis allowDecimals={false} stroke="#888" />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#2a2a2a', border: 'none' }}
+                            itemStyle={{ color: '#fff' }}
+                          />
+                          <Line type="step" dataKey="peers" stroke="#82ca9d" strokeWidth={2} />
+                      </LineChart>
+                  </ResponsiveContainer>
+              </div>
           </div>
-        </div>
-      )}
 
-      {/* IPFS Stats */}
-      {stats.ipfs && (
-        <div className="charts-section">
-          <h3>📦 IPFS Stats</h3>
-          <div className="charts-grid">
-            <div className="chart-card card">
-              <div className="chart-card-value">{stats.ipfs.numPins || 0}</div>
-              <div className="chart-card-label">Pinned Objects</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{formatBytes(stats.ipfs.repoSize || 0)}</div>
-              <div className="chart-card-label">Repo Size</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{stats.ipfs.peers || 0}</div>
-              <div className="chart-card-label">Connected Peers</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{stats.ipfs.id ? stats.ipfs.id.slice(0, 12) + '...' : '-'}</div>
-              <div className="chart-card-label">Node ID</div>
-            </div>
+          {/* Request Metrics */}
+           <div className="chart-container card full-width">
+              <h3>📡 DAM Request Traffic</h3>
+              <div className="chart-wrapper">
+                  <ResponsiveContainer width="100%" height={300}>
+                      <AreaChart data={history}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                          <XAxis dataKey="time" stroke="#888" />
+                          <YAxis stroke="#888" />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#2a2a2a', border: 'none' }}
+                            itemStyle={{ color: '#fff' }}
+                          />
+                          <Legend />
+                          <Area type="monotone" dataKey="damIn" name="Incoming (In)" stroke="#ffc658" fill="#ffc658" stackId="1" />
+                          <Area type="monotone" dataKey="damOut" name="Outgoing (Out)" stroke="#ff7300" fill="#ff7300" stackId="1" />
+                      </AreaChart>
+                  </ResponsiveContainer>
+              </div>
           </div>
-        </div>
-      )}
+      </div>
 
-      {/* Memory Stats from health */}
-      {stats.health?.memory && (
-        <div className="charts-section">
-          <h3>💾 Memory Usage</h3>
-          <div className="charts-grid">
-            <div className="chart-card card">
-              <div className="chart-card-value">{formatBytes(stats.health.memory.heapUsed)}</div>
-              <div className="chart-card-label">Heap Used</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{formatBytes(stats.health.memory.heapTotal)}</div>
-              <div className="chart-card-label">Heap Total</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{formatBytes(stats.health.memory.rss)}</div>
-              <div className="chart-card-label">RSS</div>
-            </div>
-            <div className="chart-card card">
-              <div className="chart-card-value">{formatBytes(stats.health.memory.external)}</div>
-              <div className="chart-card-label">External</div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Raw Stats Grid */}
+      <div className="stats-cards-grid">
+           <div className="stat-card card">
+               <div className="value">{formatUptime(stats.up?.time / 1000)}</div>
+               <div className="label">Uptime</div>
+           </div>
+           <div className="stat-card card">
+               <div className="value">{formatBytes(stats.memory?.heapUsed)}</div>
+               <div className="label">Heap Used</div>
+           </div>
+            <div className="stat-card card">
+               <div className="value">{stats.cpu?.user ? (stats.cpu.user / 1000000).toFixed(2) + 's' : '-'}</div>
+               <div className="label">CPU User</div>
+           </div>
+           <div className="stat-card card">
+               <div className="value">{stats.version || '1.0.0'}</div>
+               <div className="label">Version</div>
+           </div>
+      </div>
     </div>
   )
 }

@@ -1000,8 +1000,16 @@ export class TorrentManager {
     }
     
     // Remove from WebTorrent
-    torrent.destroy({ destroyStore: deleteFiles });
-    loggers.server.info(`📚 Removed torrent: ${torrentName} (deleteFiles: ${deleteFiles})`);
+    try {
+      torrent.destroy({ destroyStore: deleteFiles }, (err) => {
+        if (err) {
+           loggers.server.error({ err }, `📚 Error destroying torrent ${torrentName}`);
+        }
+      });
+      loggers.server.info(`📚 Removed torrent: ${torrentName} (deleteFiles: ${deleteFiles})`);
+    } catch (error) {
+      loggers.server.error({ err: error }, `📚 Exception destroying torrent ${torrentName}`);
+    }
 
     // Remove from torrents.json persistence
     try {

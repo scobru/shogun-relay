@@ -14,6 +14,8 @@ import ApiKeys from './views/ApiKeys'
 import Charts from './views/Charts'
 import RpcConsole from './views/RpcConsole'
 import ApiDocs from './views/ApiDocs'
+import VisualGraph from './views/VisualGraph'
+import GraphExplorer from './views/GraphExplorer'
 
 function App() {
   return (
@@ -30,6 +32,8 @@ function App() {
         <Route path="torrents" element={<Torrents />} />
         <Route path="api-keys" element={<ApiKeys />} />
         <Route path="charts" element={<Charts />} />
+        <Route path="visual-graph" element={<VisualGraph />} />
+        <Route path="graph-explorer" element={<GraphExplorer />} />
         <Route path="rpc-console" element={<RpcConsole />} />
         <Route path="api-docs" element={<ApiDocs />} />
         <Route path="settings" element={<Settings />} />
