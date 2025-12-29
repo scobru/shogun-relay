@@ -189,7 +189,9 @@ RUN dos2unix /app/docker/init-ipfs.sh \
 COPY relay/package*.json /app/relay/
 COPY relay/scripts/ /app/relay/scripts/
 WORKDIR /app/relay
-RUN npm install --omit=dev
+
+# Install ALL dependencies first (including devDependencies for dashboard build)
+RUN npm install
 
 # Build shogun-contracts SDK if needed (for local installations)
 # This ensures the SDK is compiled even if shogun-contracts is installed locally
@@ -203,7 +205,14 @@ RUN if [ -d "node_modules/shogun-contracts/sdk" ] && [ ! -f "node_modules/shogun
 COPY relay/ /app/relay/
 
 # Build React Dashboard (SPA) using relay's package.json
-RUN npm run build:dashboard || echo "⏭️ Dashboard build skipped (source may not exist)"
+# Vite and TypeScript are in devDependencies, so we need them installed
+RUN echo "🔨 Building React Dashboard..." && \
+    npm run build:dashboard && \
+    echo "✅ Dashboard built successfully" || \
+    echo "⚠️ Dashboard build failed - check logs"
+
+# Prune devDependencies to reduce image size
+RUN npm prune --omit=dev
 
 # Optionally generate relay SEA keypair if requested
 # This creates the keypair during build time
