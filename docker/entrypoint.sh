@@ -67,9 +67,13 @@ KEYPAIR_FILE="${RELAY_SEA_KEYPAIR_PATH:-/app/keys/relay-keypair.json}"
 if [ -n "$RELAY_SEA_KEYPAIR_PATH" ] && [ -d "$RELAY_SEA_KEYPAIR_PATH" ]; then
     echo "📁 RELAY_SEA_KEYPAIR_PATH is a directory, using default filename"
     KEYPAIR_FILE="${RELAY_SEA_KEYPAIR_PATH}/relay-keypair.json"
-elif [ -n "$RELAY_SEA_KEYPAIR_PATH" ] && [ "${RELAY_SEA_KEYPAIR_PATH: -1}" = "/" ]; then
-    # Handle case where path ends with / (directory notation)
-    KEYPAIR_FILE="${RELAY_SEA_KEYPAIR_PATH}relay-keypair.json"
+elif [ -n "$RELAY_SEA_KEYPAIR_PATH" ]; then
+    # Handle case where path ends with / (directory notation) - POSIX compliant
+    case "$RELAY_SEA_KEYPAIR_PATH" in
+        */)
+            KEYPAIR_FILE="${RELAY_SEA_KEYPAIR_PATH}relay-keypair.json"
+            ;;
+    esac
 fi
 
 if [ -z "$RELAY_SEA_KEYPAIR" ] && [ ! -f "$KEYPAIR_FILE" ]; then
