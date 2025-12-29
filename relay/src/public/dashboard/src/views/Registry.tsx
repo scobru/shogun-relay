@@ -76,7 +76,6 @@ function Registry() {
       const statusData = await statusRes.json()
       setStatus(statusData)
       
-      // Pre-fill forms if registered
       if (statusData.relay) {
           setEndpoint(statusData.relay.endpoint)
       }
@@ -181,7 +180,6 @@ function Registry() {
   }
 
   const handleStakingAction = async () => {
-    console.log('handleStakingAction called', stakingMode)
     if (!stakeActionAmount || parseFloat(stakeActionAmount) <= 0) {
         setActionStatus('❌ Invalid amount')
         return
@@ -209,112 +207,164 @@ function Registry() {
     }
   }
 
-  // ... (rest of code)
+  if (!isAuthenticated) return (
+    <div className="alert alert-warning">
+      <span className="text-2xl">🔒</span>
+      <span>Authentication required to access Registry.</span>
+    </div>
+  )
   
   return (
-    <div className="registry-dashboard">
-        <div className="registry-header">
-            <h2>Registry Management</h2>
-            <div className="header-actions">
-                <button className="btn btn-secondary btn-sm" onClick={fetchAll}>🔄 Refresh</button>
-            </div>
+    <div className="flex flex-col gap-6 max-w-6xl">
+      {/* Header */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body flex-row items-center justify-between flex-wrap gap-4">
+          <div>
+            <h2 className="card-title text-2xl">📋 Registry Management</h2>
+            <p className="text-base-content/70">On-chain relay registration & staking</p>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={fetchAll}>
+            🔄 Refresh
+          </button>
         </div>
-        
-        {/* Overview Stats */}
-        <div className="stats-bar card">
-            <div className="stat-item">
-                <span className="label">Status:</span>
-                <span className={`value ${status?.registered ? 'success' : 'warning'}`}>
-                    {status?.registered ? '✅ Registered' : '⚠️ Not Registered'}
-                </span>
-            </div>
-            {balances && (
-                <>
-                    <div className="stat-item">
-                        <span className="label">ETH:</span>
-                        <span className="value">{parseFloat(balances.eth).toFixed(4)}</span>
-                    </div>
-                    <div className="stat-item">
-                        <span className="label">USDC:</span>
-                        <span className="value">{parseFloat(balances.usdc).toFixed(2)}</span>
-                    </div>
-                </>
-            )}
-            {status?.relay && (
-                <div className="stat-item">
-                    <span className="label">Stake:</span>
-                    <span className="value">{status.relay.stakedAmount} USDC</span>
-                </div>
-            )}
+      </div>
+
+      {/* Stats Bar */}
+      <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
+        <div className="stat">
+          <div className="stat-title">Status</div>
+          <div className={`stat-value text-lg ${status?.registered ? 'text-success' : 'text-warning'}`}>
+            {status?.registered ? '✅ Registered' : '⚠️ Not Registered'}
+          </div>
         </div>
-
-        <div className="registry-content">
-        {/* Actions Zone */}
-        {status?.configured && (
-            <div className="card registry-section full-width">
-                <h3>{status.registered ? 'Relay Management' : 'Register Relay'}</h3>
-                
-                {/* Registration / Update Form */}
-                <div className="registry-form-row">
-                    <div className="form-group">
-                         <label>Endpoint URL</label>
-                         <input type="text" className="input" value={endpoint} onChange={e => setEndpoint(e.target.value)} placeholder="https://..." />
-                    </div>
-                    
-                    <div className="form-group">
-                        <label>GunDB Pub Key</label>
-                        <div className="input-with-btn">
-                            <input type="text" className="input" value={gunPubKey} onChange={e => setGunPubKey(e.target.value)} />
-                            <button className="btn btn-sm" onClick={fetchServerKey}>Fetch</button>
-                        </div>
-                    </div>
-
-                     <div className="form-group">
-                        <label>{status.registered ? 'Update Info' : 'Initial Stake'}</label>
-                        {status.registered ? (
-                             <button className="btn btn-secondary" onClick={updateRelay}>Update Info</button>
-                        ) : (
-
-                             <div className="input-with-btn">
-                                <input type="number" className="input" value={stakeActionAmount} onChange={e => setStakeActionAmount(e.target.value)} />
-                                <button className="btn btn-primary" onClick={registerRelay}>Register</button>
-                             </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Staking Controls (If Registered) */}
-                {status.registered && (
-                     <div className="staking-controls-area">
-                         <h4>Staking Operations</h4>
-                         <div className="staking-tabs">
-                             <button className={`btn-tab ${stakingMode==='increase'?'active':''}`} onClick={()=>setStakingMode('increase')}>Increase Stake</button>
-                             <button className={`btn-tab ${stakingMode==='unstake'?'active':''}`} onClick={()=>setStakingMode('unstake')}>Unstake</button>
-                             <button className={`btn-tab ${stakingMode==='withdraw'?'active':''}`} onClick={()=>setStakingMode('withdraw')}>Withdraw</button>
-                         </div>
-                         <div className="staking-action-row">
-                             <input type="number" className="input" value={stakeActionAmount} onChange={e => setStakeActionAmount(e.target.value)} placeholder="Amount USDC" />
-                             <button className="btn btn-primary" onClick={handleStakingAction}>
-                                 {stakingMode === 'increase' ? '➕ Stake' : stakingMode === 'unstake' ? '⏳ Request Unstake' : '💸 Withdraw'}
-                             </button>
-                         </div>
-                         <p className="helper-text">
-                             Current Stake: <strong>{status.relay?.stakedAmount} USDC</strong> • 
-                             Pending Unstake: <strong>0 USDC</strong>
-                         </p>
-                     </div>
-                )}
-                
-                {actionStatus && <div className="action-status-msg">{actionStatus}</div>}
+        {balances && (
+          <>
+            <div className="stat">
+              <div className="stat-title">ETH Balance</div>
+              <div className="stat-value">{parseFloat(balances.eth).toFixed(4)}</div>
             </div>
+            <div className="stat">
+              <div className="stat-title">USDC Balance</div>
+              <div className="stat-value">{parseFloat(balances.usdc).toFixed(2)}</div>
+            </div>
+          </>
         )}
+        {status?.relay && (
+          <div className="stat">
+            <div className="stat-title">Staked</div>
+            <div className="stat-value text-primary">{status.relay.stakedAmount} USDC</div>
+          </div>
+        )}
+      </div>
 
-        {/* Deals List */}
-        {status?.registered && deals.length > 0 && (
-          <div className="card registry-section full-width">
-            <h3>On-Chain Deals ({deals.length})</h3>
-            <div className="registry-deals-list">
-              <table className="registry-table">
+      {/* Actions */}
+      {status?.configured && (
+        <div className="card bg-base-100 shadow">
+          <div className="card-body">
+            <h3 className="card-title">{status.registered ? 'Relay Management' : 'Register Relay'}</h3>
+            
+            {/* Registration / Update Form */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="form-control">
+                <label className="label"><span className="label-text">Endpoint URL</span></label>
+                <input 
+                  type="text" 
+                  className="input input-bordered" 
+                  value={endpoint} 
+                  onChange={e => setEndpoint(e.target.value)} 
+                  placeholder="https://..." 
+                />
+              </div>
+              
+              <div className="form-control">
+                <label className="label"><span className="label-text">GunDB Pub Key</span></label>
+                <div className="join">
+                  <input 
+                    type="text" 
+                    className="input input-bordered join-item flex-1" 
+                    value={gunPubKey} 
+                    onChange={e => setGunPubKey(e.target.value)} 
+                  />
+                  <button className="btn join-item" onClick={fetchServerKey}>Fetch</button>
+                </div>
+              </div>
+
+              <div className="form-control">
+                <label className="label"><span className="label-text">{status.registered ? 'Update Info' : 'Initial Stake'}</span></label>
+                {status.registered ? (
+                  <button className="btn btn-secondary" onClick={updateRelay}>Update Info</button>
+                ) : (
+                  <div className="join">
+                    <input 
+                      type="number" 
+                      className="input input-bordered join-item w-24" 
+                      value={stakeActionAmount} 
+                      onChange={e => setStakeActionAmount(e.target.value)} 
+                    />
+                    <button className="btn btn-primary join-item" onClick={registerRelay}>Register</button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Staking Controls */}
+            {status.registered && (
+              <div className="mt-6 pt-6 border-t border-base-300">
+                <h4 className="font-bold mb-4">Staking Operations</h4>
+                <div className="tabs tabs-boxed mb-4">
+                  <button 
+                    className={`tab ${stakingMode === 'increase' ? 'tab-active' : ''}`} 
+                    onClick={() => setStakingMode('increase')}
+                  >
+                    Increase Stake
+                  </button>
+                  <button 
+                    className={`tab ${stakingMode === 'unstake' ? 'tab-active' : ''}`} 
+                    onClick={() => setStakingMode('unstake')}
+                  >
+                    Unstake
+                  </button>
+                  <button 
+                    className={`tab ${stakingMode === 'withdraw' ? 'tab-active' : ''}`} 
+                    onClick={() => setStakingMode('withdraw')}
+                  >
+                    Withdraw
+                  </button>
+                </div>
+                <div className="flex items-center gap-4">
+                  <input 
+                    type="number" 
+                    className="input input-bordered w-32" 
+                    value={stakeActionAmount} 
+                    onChange={e => setStakeActionAmount(e.target.value)} 
+                    placeholder="Amount USDC" 
+                  />
+                  <button className="btn btn-primary" onClick={handleStakingAction}>
+                    {stakingMode === 'increase' ? '➕ Stake' : stakingMode === 'unstake' ? '⏳ Request Unstake' : '💸 Withdraw'}
+                  </button>
+                </div>
+                <p className="text-sm text-base-content/60 mt-2">
+                  Current Stake: <strong>{status.relay?.stakedAmount} USDC</strong> • Pending Unstake: <strong>0 USDC</strong>
+                </p>
+              </div>
+            )}
+            
+            {actionStatus && (
+              <div className={`alert mt-4 ${actionStatus.includes('✅') ? 'alert-success' : actionStatus.includes('❌') ? 'alert-error' : 'alert-info'}`}>
+                <span>{actionStatus}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Deals List */}
+      {status?.registered && deals.length > 0 && (
+        <div className="card bg-base-100 shadow">
+          <div className="card-body">
+            <h3 className="card-title">On-Chain Deals ({deals.length})</h3>
+            <div className="overflow-x-auto">
+              <table className="table table-zebra">
                 <thead>
                   <tr>
                     <th>CID</th>
@@ -327,14 +377,14 @@ function Registry() {
                 <tbody>
                   {deals.slice(0, 10).map((d: Deal) => (
                     <tr key={d.dealId}>
-                      <td className="mono" title={d.cid}>{d.cid.slice(0, 10)}...</td>
-                      <td className="mono">{truncateAddress(d.client)}</td>
+                      <td className="font-mono text-xs" title={d.cid}>{d.cid.slice(0, 10)}...</td>
+                      <td className="font-mono text-xs">{truncateAddress(d.client)}</td>
                       <td>{d.sizeMB} MB</td>
                       <td><strong>{d.priceUSDC} USDC</strong></td>
                       <td>
-                        {d.griefed ? <span className="text-error">⚠️ Griefed</span> :
-                         d.active ? <span className="text-success">✅ Active</span> :
-                         <span className="text-muted">⏸️ Inactive</span>}
+                        {d.griefed ? <span className="badge badge-error">⚠️ Griefed</span> :
+                         d.active ? <span className="badge badge-success">✅ Active</span> :
+                         <span className="badge badge-ghost">⏸️ Inactive</span>}
                       </td>
                     </tr>
                   ))}
@@ -342,8 +392,8 @@ function Registry() {
               </table>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

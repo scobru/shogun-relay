@@ -108,7 +108,6 @@ function Files() {
       { name: "AES-GCM", iv }, key, data
     )
     
-    // Combine salt + iv + encrypted data for storage
     const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength)
     combined.set(salt, 0)
     combined.set(iv, salt.length)
@@ -135,8 +134,6 @@ function Files() {
         if (encryptUpload) {
           setStatusMessage('Encrypting...')
           const buffer = await file.arrayBuffer()
-          // Use admin token as password if available, otherwise prompt or error? 
-          // Assuming adminToken is the password for simplicity in this context.
           if (!token) throw new Error("Authentication required for encryption")
           
           const encryptedBytes = await encryptData(buffer, token)
@@ -146,9 +143,8 @@ function Files() {
         
         formData.append('file', file, encryptUpload ? file.name : name)
       } else {
-        // Directory upload
         Array.from(files).forEach(file => {
-          // @ts-ignore - webkitRelativePath exists on File in browsers
+          // @ts-ignore
           const path = file.webkitRelativePath || file.name
           formData.append('files', file, path)
         })
@@ -170,7 +166,6 @@ function Files() {
         if (xhr.status >= 200 && xhr.status < 300) {
           const result = JSON.parse(xhr.responseText)
           setStatusMessage('✅ Upload complete!')
-          // Save system hash metadata
           await saveMetadata(result, files, uploadMode === 'directory')
           fetchPins()
         } else {
@@ -301,163 +296,217 @@ function Files() {
     }
   }
 
+  const formatBytes = (bytes: number) => {
+    if (!bytes) return 'Unknown size'
+    if (bytes < 1024) return bytes + ' B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
   if (!isAuthenticated) return (
-    <div className="files-auth card">
-      <h3>Authentication Required</h3>
-      <p>Please enter admin password in Settings to manage files.</p>
+    <div className="alert alert-warning">
+      <span className="text-2xl">🔒</span>
+      <span>Authentication required to access Files. Please enter admin password in Settings.</span>
     </div>
   )
 
   return (
-    <div className="files-page">
+    <div className="flex flex-col gap-6 max-w-6xl">
       {/* Header */}
-      <div className="files-header card">
-        <div>
-          <h2>🗄️ File Manager</h2>
-          <p>Managed IPFS Storage & Pins</p>
-        </div>
-        <div className="files-header-actions">
-           <button className="btn btn-secondary" onClick={handleGarbageCollection}>🧹 Run GC</button>
-           <button className="btn btn-danger" onClick={handleRemoveAll}>🗑️ Remove All</button>
+      <div className="card bg-base-100 shadow">
+        <div className="card-body flex-row items-center justify-between flex-wrap gap-4">
+          <div>
+            <h2 className="card-title text-2xl">🗄️ File Manager</h2>
+            <p className="text-base-content/70">Managed IPFS Storage & Pins</p>
+          </div>
+          <div className="flex gap-2">
+            <button className="btn btn-ghost btn-sm" onClick={handleGarbageCollection}>🧹 Run GC</button>
+            <button className="btn btn-error btn-sm" onClick={handleRemoveAll}>🗑️ Remove All</button>
+          </div>
         </div>
       </div>
 
       {/* Upload Section */}
-      <div className="card files-upload-section">
-        <h3>Upload Files</h3>
-        <div className={`drop-zone ${dragActive ? 'active' : ''}`}
-          onDragOver={e => { e.preventDefault(); setDragActive(true) }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={e => {
-            e.preventDefault(); setDragActive(false)
-            // Handle drop logic if needed, simplify to click for now
-          }}
-        >
-          <div className="upload-controls">
-            <div className="radio-group">
-              <label>
-                <input type="radio" checked={uploadMode === 'single'} onChange={() => setUploadMode('single')} />
-                Single File
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+          <h3 className="font-bold text-lg mb-4">Upload Files</h3>
+          
+          <div 
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${dragActive ? 'border-primary bg-primary/5' : 'border-base-300'}`}
+            onDragOver={e => { e.preventDefault(); setDragActive(true) }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={e => { e.preventDefault(); setDragActive(false) }}
+          >
+            {/* Upload Mode Selection */}
+            <div className="flex flex-wrap justify-center gap-4 mb-4">
+              <label className="label cursor-pointer gap-2">
+                <input 
+                  type="radio" 
+                  className="radio radio-primary" 
+                  checked={uploadMode === 'single'} 
+                  onChange={() => setUploadMode('single')} 
+                />
+                <span>Single File</span>
               </label>
-              <label>
-                <input type="radio" checked={uploadMode === 'directory'} onChange={() => setUploadMode('directory')} />
-                Directory
+              <label className="label cursor-pointer gap-2">
+                <input 
+                  type="radio" 
+                  className="radio radio-primary" 
+                  checked={uploadMode === 'directory'} 
+                  onChange={() => setUploadMode('directory')} 
+                />
+                <span>Directory</span>
               </label>
             </div>
             
             {uploadMode === 'single' && (
-              <>
+              <div className="flex flex-wrap justify-center gap-4 mb-4">
                 <input 
                   type="text" 
-                  className="input" 
+                  className="input input-bordered input-sm" 
                   placeholder="Filename Override (optional)" 
                   value={fileNameOverride}
                   onChange={e => setFileNameOverride(e.target.value)}
                 />
-                <label className="checkbox-label">
-                  <input type="checkbox" checked={encryptUpload} onChange={e => setEncryptUpload(e.target.checked)} />
-                  Encrypt File (Client-side AES-GCM)
+                <label className="label cursor-pointer gap-2">
+                  <input 
+                    type="checkbox" 
+                    className="checkbox checkbox-primary checkbox-sm" 
+                    checked={encryptUpload} 
+                    onChange={e => setEncryptUpload(e.target.checked)} 
+                  />
+                  <span className="text-sm">Encrypt (AES-GCM)</span>
                 </label>
-              </>
+              </div>
             )}
             
-            <div className="upload-buttons">
-              {uploadMode === 'single' ? (
-                 <input ref={fileInputRef} type="file" onChange={e => handleUpload(e)} />
-              ) : (
-                 // @ts-ignore
-                 <input ref={dirInputRef} type="file" webkitdirectory="" directory="" onChange={e => handleUpload(e)} />
-              )}
-            </div>
-          </div>
-          
-          {uploading && (
-            <div className="upload-progress">
-              <div className="progress-bar">
-                <div className="fill" style={{ width: `${uploadProgress}%` }}></div>
+            {uploadMode === 'single' ? (
+              <input 
+                ref={fileInputRef} 
+                type="file" 
+                className="file-input file-input-bordered file-input-primary w-full max-w-xs"
+                onChange={e => handleUpload(e)} 
+              />
+            ) : (
+              <input 
+                ref={dirInputRef} 
+                type="file" 
+                className="file-input file-input-bordered file-input-primary w-full max-w-xs"
+                // @ts-ignore
+                webkitdirectory="" 
+                directory="" 
+                onChange={e => handleUpload(e)} 
+              />
+            )}
+            
+            {uploading && (
+              <div className="mt-4">
+                <progress className="progress progress-primary w-full" value={uploadProgress} max="100"></progress>
+                <p className="text-sm mt-1">{Math.round(uploadProgress)}%</p>
               </div>
-              <span>{Math.round(uploadProgress)}%</span>
-            </div>
-          )}
-          {statusMessage && <div className="status-message">{statusMessage}</div>}
+            )}
+            {statusMessage && <p className="mt-2 text-sm">{statusMessage}</p>}
+          </div>
         </div>
       </div>
 
       {/* Pins List */}
-      <div className="files-list-section">
-        <div className="files-search-bar">
-           <input 
-             type="text" 
-             className="input search-input" 
-             placeholder="Search pins by name or CID..." 
-             value={searchQuery}
-             onChange={e => setSearchQuery(e.target.value)}
-           />
-           <select className="input filter-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
-             <option value="all">All Types</option>
-             <option value="recursive">Recursive</option>
-             <option value="direct">Direct</option>
-           </select>
-        </div>
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+          {/* Search & Filter */}
+          <div className="flex flex-wrap gap-4 mb-4">
+            <input 
+              type="text" 
+              className="input input-bordered flex-1 min-w-[200px]" 
+              placeholder="Search pins by name or CID..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            <select 
+              className="select select-bordered" 
+              value={filterType} 
+              onChange={e => setFilterType(e.target.value)}
+            >
+              <option value="all">All Types</option>
+              <option value="recursive">Recursive</option>
+              <option value="direct">Direct</option>
+            </select>
+          </div>
 
-        {loading ? <div className="loading">Loading pins...</div> : (
-          <div className="pins-grid">
-            {filteredPins.map(pin => (
-              <div key={pin.cid} className="pin-card">
-                <div className="pin-icon">
-                   {pin.type === 'recursive' ? '📁' : '📄'}
-                </div>
-                <div className="pin-details">
-                  <div className="pin-name" title={pin.name}>{pin.name}</div>
-                  <div className="pin-cid" title={pin.cid}>{pin.cid.substring(0, 12)}...</div>
-                  <div className="pin-meta-text">
-                    {new Date(pin.timestamp).toLocaleDateString()} • {pin.size ? (pin.size / 1024 / 1024).toFixed(2) + ' MB' : 'Unknown size'}
+          {loading ? (
+            <div className="flex justify-center p-8">
+              <span className="loading loading-spinner loading-lg"></span>
+            </div>
+          ) : filteredPins.length === 0 ? (
+            <div className="text-center p-8 text-base-content/50">
+              <span className="text-4xl block mb-2">📭</span>
+              <p>No pins found</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredPins.map(pin => (
+                <div key={pin.cid} className="card card-compact bg-base-200">
+                  <div className="card-body">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">{pin.type === 'recursive' ? '📁' : '📄'}</span>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium truncate" title={pin.name}>{pin.name}</h4>
+                        <p className="text-xs text-base-content/60 font-mono truncate" title={pin.cid}>{pin.cid.substring(0, 16)}...</p>
+                        <p className="text-xs text-base-content/50">
+                          {new Date(pin.timestamp).toLocaleDateString()} • {formatBytes(pin.size || 0)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="card-actions justify-end mt-2">
+                      <button className="btn btn-ghost btn-xs" onClick={() => handlePreview(pin)} title="Preview">👁️</button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => {
+                        navigator.clipboard.writeText(pin.cid)
+                        setStatusMessage('CID Copied!')
+                        setTimeout(() => setStatusMessage(''), 2000)
+                      }} title="Copy CID">📋</button>
+                      <button className="btn btn-ghost btn-xs text-error" onClick={() => handleRemove(pin.cid)} title="Delete">🗑️</button>
+                    </div>
                   </div>
                 </div>
-                <div className="pin-actions">
-                  <button className="btn-icon" onClick={() => handlePreview(pin)} title="Preview">👁️</button>
-                  <button className="btn-icon" onClick={() => {
-                    navigator.clipboard.writeText(pin.cid)
-                    setStatusMessage('CID Copied!')
-                    setTimeout(() => setStatusMessage(''), 2000)
-                  }} title="Copy CID">📋</button>
-                  <button className="btn-icon btn-danger" onClick={() => handleRemove(pin.cid)} title="Delete">🗑️</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Preview Modal */}
       {preview && (
-        <div className="preview-modal-overlay" onClick={closePreview}>
-          <div className="preview-modal" onClick={e => e.stopPropagation()}>
-            <div className="preview-header">
-              <h3>{preview.name}</h3>
-              <button className="btn-close" onClick={closePreview}>×</button>
+        <dialog className="modal modal-open">
+          <div className="modal-box max-w-3xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-lg truncate">{preview.name}</h3>
+              <button className="btn btn-sm btn-circle btn-ghost" onClick={closePreview}>✕</button>
             </div>
-            <div className="preview-content">
-              {preview.type.startsWith('image/') && <img src={preview.url} alt="preview" />}
-              {preview.type.startsWith('video/') && <video src={preview.url} controls />}
-              {preview.type.startsWith('audio/') && <audio src={preview.url} controls />}
-              {preview.type === 'application/pdf' && <iframe src={preview.url} title="PDF Preview" />}
+            
+            <div className="max-h-96 overflow-auto">
+              {preview.type.startsWith('image/') && <img src={preview.url} alt="preview" className="max-w-full" />}
+              {preview.type.startsWith('video/') && <video src={preview.url} controls className="max-w-full" />}
+              {preview.type.startsWith('audio/') && <audio src={preview.url} controls className="w-full" />}
+              {preview.type === 'application/pdf' && <iframe src={preview.url} title="PDF Preview" className="w-full h-96" />}
               {(preview.type.startsWith('text/') || preview.type.includes('json')) && (
-                 <iframe src={preview.url} title="Text Preview" className="text-preview-frame" />
+                <iframe src={preview.url} title="Text Preview" className="w-full h-96" />
               )}
-              {/* Fallback */}
               {!preview.type.match(/image|video|audio|pdf|text|json/) && (
-                <div className="no-preview">
-                  <p>Preview not available for this file type.</p>
+                <div className="text-center p-8">
+                  <p className="mb-4">Preview not available for this file type.</p>
                   <a href={preview.url} download={preview.name} className="btn btn-primary">Download File</a>
                 </div>
               )}
             </div>
-            <div className="preview-footer">
-               <div className="preview-cid">CID: {preview.cid}</div>
-            </div>
+            
+            <div className="mt-4 text-xs text-base-content/60 font-mono">CID: {preview.cid}</div>
           </div>
-        </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={closePreview}>close</button>
+          </form>
+        </dialog>
       )}
     </div>
   )
