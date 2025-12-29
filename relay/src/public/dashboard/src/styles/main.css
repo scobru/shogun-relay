@@ -1,4 +1,8 @@
 /* Shogun Dashboard - CSS Variables & Global Styles */
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: all;
+}
 
 :root {
   /* Colors - Light Mode */
