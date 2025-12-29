@@ -19,6 +19,10 @@ const navItems: NavItem[] = [
   { path: '/network', icon: '🌐', label: 'Network', group: 'blockchain' },
   { path: '/registry', icon: '🖥️', label: 'Registry', group: 'blockchain' },
   { path: '/torrents', icon: '📥', label: 'Torrents', group: 'blockchain' },
+  { path: '/api-keys', icon: '🔑', label: 'API Keys', group: 'tools' },
+  { path: '/charts', icon: '📉', label: 'Charts', group: 'tools' },
+  { path: '/rpc-console', icon: '💻', label: 'RPC Console', group: 'tools' },
+  { path: '/api-docs', icon: '📄', label: 'API Docs', group: 'tools' },
   { path: '/settings', icon: '⚙️', label: 'Settings', group: 'system' },
 ]
 
@@ -71,6 +75,12 @@ function Sidebar() {
         
         <div className="sidebar-group">
           {renderNavGroup('blockchain')}
+        </div>
+        
+        <div className="sidebar-divider"></div>
+        
+        <div className="sidebar-group">
+          {renderNavGroup('tools')}
         </div>
         
         <div className="sidebar-divider"></div>

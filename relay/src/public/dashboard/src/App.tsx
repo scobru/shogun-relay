@@ -10,6 +10,10 @@ import Network from './views/Network'
 import Registry from './views/Registry'
 import Torrents from './views/Torrents'
 import Settings from './views/Settings'
+import ApiKeys from './views/ApiKeys'
+import Charts from './views/Charts'
+import RpcConsole from './views/RpcConsole'
+import ApiDocs from './views/ApiDocs'
 
 function App() {
   return (
@@ -24,6 +28,10 @@ function App() {
         <Route path="network" element={<Network />} />
         <Route path="registry" element={<Registry />} />
         <Route path="torrents" element={<Torrents />} />
+        <Route path="api-keys" element={<ApiKeys />} />
+        <Route path="charts" element={<Charts />} />
+        <Route path="rpc-console" element={<RpcConsole />} />
+        <Route path="api-docs" element={<ApiDocs />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
@@ -32,3 +40,4 @@ function App() {
 }
 
 export default App
+

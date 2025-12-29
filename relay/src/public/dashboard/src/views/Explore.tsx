@@ -1,127 +1,109 @@
 import { useState, useCallback } from 'react'
+import { useAuth } from '../context/AuthContext'
 import './Explore.css'
 
-interface GraphNode {
-  [key: string]: any
+interface ExploreResult {
+  keys?: string[]
+  stats?: Record<string, any>
+  error?: string
 }
 
 function Explore() {
-  const [path, setPath] = useState('')
-  const [currentPath, setCurrentPath] = useState('')
-  const [data, setData] = useState<GraphNode | null>(null)
+  const { isAuthenticated, getAuthHeaders } = useAuth()
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
+  const [exploreData, setExploreData] = useState<ExploreResult | null>(null)
 
-  const explorePath = useCallback(async (pathToExplore: string) => {
-    if (!pathToExplore.trim()) {
-      setStatus('Enter a path to explore')
-      return
-    }
-    
+  // Use available API endpoints instead of non-existent graph/get
+  const fetchNetworkStats = useCallback(async () => {
     setLoading(true)
-    setStatus('Loading...')
-    setCurrentPath(pathToExplore)
-    
+    setStatus('Loading network data...')
     try {
-      // Use the admin API to explore Gun data
-      const res = await fetch(`/api/v1/admin/graph/get?path=${encodeURIComponent(pathToExplore)}`)
-      const result = await res.json()
-      
-      if (result.success && result.data) {
-        setData(result.data)
+      const res = await fetch('/api/v1/network/stats')
+      const data = await res.json()
+      if (data.success) {
+        setExploreData({ stats: data.stats })
         setStatus('')
       } else {
-        // Try a simpler approach - just show that the path was set
-        setData(null)
-        setStatus('Path set. Use Gun client to explore live data.')
+        setStatus('No data available')
       }
     } catch (error) {
-      console.error('Failed to explore path:', error)
-      setStatus('Note: Graph API not available. Use the browser console with window.gun to explore.')
-      setData(null)
+      console.error('Failed:', error)
+      setStatus('Failed to load data')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  const navigateToKey = (key: string) => {
-    const newPath = currentPath ? `${currentPath}.${key}` : key
-    setPath(newPath)
-    explorePath(newPath)
-  }
+  const fetchSystemInfo = useCallback(async () => {
+    setLoading(true)
+    setStatus('Loading system info...')
+    try {
+      const res = await fetch('/health')
+      const data = await res.json()
+      setExploreData({ stats: data })
+      setStatus('')
+    } catch (error) {
+      setStatus('Failed to load system info')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-  const goToRoot = () => {
-    setPath('')
-    setCurrentPath('')
-    setData(null)
-    setStatus('')
-  }
-
-  const renderValue = (key: string, value: any): JSX.Element => {
-    if (value === null) {
-      return <span className="explore-value null">null</span>
+  const fetchIPFSPins = useCallback(async () => {
+    if (!isAuthenticated) {
+      setStatus('Authentication required')
+      return
     }
-    
-    if (typeof value === 'object') {
-      // Check for Gun reference
-      if (value['#']) {
-        return (
-          <span 
-            className="explore-value link" 
-            onClick={() => navigateToKey(key)}
-            title={`Follow link: ${value['#']}`}
-          >
-            🔗 {value['#'].slice(0, 20)}...
-          </span>
-        )
+    setLoading(true)
+    setStatus('Loading IPFS pins...')
+    try {
+      const res = await fetch('/api/v1/ipfs/pin/ls', { headers: getAuthHeaders() })
+      const data = await res.json()
+      if (data.pins) {
+        const keys = Object.keys(data.pins)
+        setExploreData({ keys, stats: { totalPins: keys.length } })
+        setStatus('')
       }
-      return (
-        <span 
-          className="explore-value object"
-          onClick={() => navigateToKey(key)}
-        >
-          📁 {Object.keys(value).filter(k => k !== '_').length} properties
-        </span>
-      )
+    } catch (error) {
+      setStatus('Failed to load pins')
+    } finally {
+      setLoading(false)
     }
-    
-    if (typeof value === 'string') {
-      if (value.length > 50) {
-        return <span className="explore-value string" title={value}>{value.slice(0, 50)}...</span>
-      }
-      return <span className="explore-value string">"{value}"</span>
-    }
-    
-    if (typeof value === 'number') {
-      return <span className="explore-value number">{value}</span>
-    }
-    
-    if (typeof value === 'boolean') {
-      return <span className="explore-value boolean">{value.toString()}</span>
-    }
-    
-    return <span className="explore-value">{String(value)}</span>
-  }
+  }, [isAuthenticated, getAuthHeaders])
 
   const renderData = () => {
-    if (!data) return null
-    
-    const keys = Object.keys(data).filter(k => k !== '_' && k !== '#')
-    
-    if (keys.length === 0) {
-      return <div className="explore-empty">No properties found at this path</div>
-    }
-    
+    if (!exploreData) return null
+
     return (
-      <div className="explore-properties">
-        {keys.sort().map(key => (
-          <div key={key} className="explore-property">
-            <div className="explore-key">{key}</div>
-            <div className="explore-value-container">
-              {renderValue(key, data[key])}
+      <div className="explore-data">
+        {exploreData.stats && (
+          <div className="explore-stats">
+            {Object.entries(exploreData.stats).map(([key, value]) => (
+              <div key={key} className="explore-stat-item">
+                <span className="explore-stat-key">{key}</span>
+                <span className="explore-stat-value">
+                  {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {exploreData.keys && exploreData.keys.length > 0 && (
+          <div className="explore-keys">
+            <h4>Keys ({exploreData.keys.length})</h4>
+            <div className="explore-keys-list">
+              {exploreData.keys.slice(0, 20).map(key => (
+                <div key={key} className="explore-key-item">
+                  <code>{key}</code>
+                </div>
+              ))}
+              {exploreData.keys.length > 20 && (
+                <p className="explore-more">...and {exploreData.keys.length - 20} more</p>
+              )}
             </div>
           </div>
-        ))}
+        )}
       </div>
     )
   }
@@ -130,104 +112,49 @@ function Explore() {
     <div className="explore-page">
       {/* Header */}
       <div className="card explore-header">
-        <h2>🌐 GunDB Graph Explorer</h2>
-        <p>Inspect GunDB data and traverse linked nodes</p>
+        <h2>🌐 System Explorer</h2>
+        <p>Inspect relay data, network stats, and IPFS content</p>
       </div>
 
-      {/* Path Input */}
+      {/* Quick Actions */}
       <div className="card explore-section">
-        <h3>Graph Console</h3>
+        <h3>Quick Explore</h3>
         <p className="explore-hint">
-          Enter a Gun path (e.g., <code>shogun-relay.logs</code> or <code>users.alice</code>)
+          Select a data source to explore available information
         </p>
-        <div className="explore-input-row">
-          <input
-            type="text"
-            className="input"
-            placeholder="Enter Gun path to explore..."
-            value={path}
-            onChange={e => setPath(e.target.value)}
-            onKeyPress={e => e.key === 'Enter' && explorePath(path)}
-          />
-          <button className="btn btn-primary" onClick={() => explorePath(path)} disabled={loading}>
-            {loading ? 'Loading...' : 'Explore'}
+        <div className="explore-actions">
+          <button className="btn btn-primary" onClick={fetchSystemInfo} disabled={loading}>
+            🔍 Health Status
+          </button>
+          <button className="btn btn-primary" onClick={fetchNetworkStats} disabled={loading}>
+            📊 Network Stats
+          </button>
+          <button className="btn btn-primary" onClick={fetchIPFSPins} disabled={loading}>
+            📁 IPFS Pins
           </button>
         </div>
         {status && <p className="explore-status">{status}</p>}
       </div>
 
-      {/* Current Path */}
-      {currentPath && (
+      {/* Results */}
+      {exploreData && (
         <div className="card explore-section">
-          <div className="explore-path-header">
-            <button className="btn btn-secondary btn-sm" onClick={goToRoot}>
-              ⬅️ Root
-            </button>
-            <span className="explore-current-path">
-              <strong>Path:</strong> <code>{currentPath}</code>
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Data Display */}
-      {(data || currentPath) && (
-        <div className="card explore-section">
-          <h3>Node Data</h3>
+          <h3>Results</h3>
           {loading ? (
             <div className="explore-loading">Loading...</div>
-          ) : data ? (
-            renderData()
           ) : (
-            <div className="explore-empty">
-              <p>No data loaded. The Graph API may need authentication.</p>
-              <p className="explore-hint">
-                For direct exploration, open browser console and use:
-                <code>gun.get('{currentPath}').once(console.log)</code>
-              </p>
-            </div>
+            renderData()
           )}
         </div>
       )}
 
-      {/* Quick Links */}
-      <div className="card explore-section">
-        <h3>Quick Explore</h3>
-        <div className="explore-quick-links">
-          <button className="btn btn-secondary" onClick={() => { setPath('shogun-relay'); explorePath('shogun-relay'); }}>
-            shogun-relay
-          </button>
-          <button className="btn btn-secondary" onClick={() => { setPath('relays'); explorePath('relays'); }}>
-            relays
-          </button>
-          <button className="btn btn-secondary" onClick={() => { setPath('users'); explorePath('users'); }}>
-            users
-          </button>
-          <button className="btn btn-secondary" onClick={() => { setPath('deals'); explorePath('deals'); }}>
-            deals
-          </button>
-        </div>
-      </div>
-
-      {/* Tools Links */}
-      <div className="card explore-section">
-        <h3>Advanced Tools</h3>
-        <div className="explore-tools">
-          <a href="/graph.html" target="_blank" className="explore-tool-link">
-            <span>🔍</span>
-            <div>
-              <strong>Full Graph Explorer</strong>
-              <p>Original graph explorer with auth and write support</p>
-            </div>
-          </a>
-          <a href="/visualGraph.html" target="_blank" className="explore-tool-link">
-            <span>🎨</span>
-            <div>
-              <strong>Visual Graph</strong>
-              <p>Interactive visual graph representation</p>
-            </div>
-          </a>
-        </div>
+      {/* Info */}
+      <div className="card explore-section explore-info">
+        <h3>ℹ️ About</h3>
+        <p>
+          This explorer provides access to relay data through available API endpoints.
+          For direct GunDB graph exploration, use the browser console with <code>window.gun</code>.
+        </p>
       </div>
     </div>
   )

@@ -73,40 +73,6 @@ function Settings() {
         </div>
       </div>
 
-      {/* Quick Links */}
-      <div className="settings-section card">
-        <h3>🔗 Quick Links</h3>
-        <div className="settings-links">
-          <a href="/api-keys.html" target="_blank" className="settings-link">
-            <span>🔑</span>
-            <div>
-              <strong>API Keys</strong>
-              <p>Manage API keys for programmatic access</p>
-            </div>
-          </a>
-          <a href="/charts.html" target="_blank" className="settings-link">
-            <span>📊</span>
-            <div>
-              <strong>Charts & Metrics</strong>
-              <p>Performance visualization</p>
-            </div>
-          </a>
-          <a href="/rpc-console.html" target="_blank" className="settings-link">
-            <span>💻</span>
-            <div>
-              <strong>RPC Console</strong>
-              <p>Execute blockchain RPC calls</p>
-            </div>
-          </a>
-          <a href="/endpoints.html" target="_blank" className="settings-link">
-            <span>📄</span>
-            <div>
-              <strong>API Documentation</strong>
-              <p>View all available endpoints</p>
-            </div>
-          </a>
-        </div>
-      </div>
 
       {/* About */}
       <div className="settings-section card">
