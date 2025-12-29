@@ -136,11 +136,18 @@ function GraphExplorer() {
     }
   }
 
-  const renderValue = (value: any) => {
+  const renderValue = (value: any, onNavigateToLink?: (path: string) => void) => {
     if (value === null) return <span className="opacity-50 italic">null</span>
     if (typeof value === 'object') {
         if (value && '#' in value) {
-             return <span className="text-primary cursor-pointer hover:underline">Link to: {value['#']}</span>
+             return (
+               <span 
+                 className="text-primary cursor-pointer hover:underline"
+                 onClick={() => onNavigateToLink && onNavigateToLink(value['#'])}
+               >
+                 Link to: {value['#']}
+               </span>
+             )
         }
         return <span className="font-mono text-xs" title={JSON.stringify(value, null, 2)}>{JSON.stringify(value).substring(0, 50) + (JSON.stringify(value).length > 50 ? '...' : '')}</span>
     }
@@ -242,7 +249,7 @@ function GraphExplorer() {
                                     return (
                                         <tr key={key}>
                                             <td className="font-bold font-mono text-primary">{key}</td>
-                                            <td className="max-w-md truncate">{renderValue(value)}</td>
+                                            <td className="max-w-md truncate">{renderValue(value, (path) => setCurrentPath(path))}</td>
                                             <td>
                                                 {isObject && !value['#'] && (
                                                     <button 
