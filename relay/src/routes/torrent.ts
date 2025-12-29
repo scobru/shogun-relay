@@ -45,6 +45,27 @@ router.get("/status", async (req, res) => {
 });
 
 /**
+ * GET /list
+ * Alias for /status - Get the current status of the Torrent service
+ * Used by dashboard for backwards compatibility
+ */
+router.get("/list", async (req, res) => {
+  try {
+    const status = torrentManager.getStatus();
+    res.json({
+      success: true,
+      data: status,
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to get Torrent list");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
  * GET /stats
  * Get statistics about torrent storage and usage
  */
