@@ -250,22 +250,33 @@ async function initializeServer() {
     }
   });
 
-  // Route specifica per /admin (DEFINITA PRIMA DEL MIDDLEWARE DI AUTENTICAZIONE)
+  // Route specifica per /admin - redirect to new dashboard
   app.get("/admin", (req, res) => {
-    const adminPath = path.resolve(publicPath, "admin.html");
-    if (fs.existsSync(adminPath)) {
-      // Aggiungi header per prevenire il caching
+    res.redirect("/dashboard/");
+  });
+
+  // Serve React Dashboard SPA (built files from public/dashboard/dist)
+  const dashboardPath = path.resolve(publicPath, "dashboard", "dist");
+  app.use("/dashboard", express.static(dashboardPath, {
+    setHeaders: (res) => {
       res.set({
         "Cache-Control": "no-cache, no-store, must-revalidate",
         Pragma: "no-cache",
         Expires: "0",
       });
-      res.sendFile(adminPath);
+    }
+  }));
+
+  // SPA fallback for React Router - serve index.html for non-asset routes
+  app.get("/dashboard/*", (req, res) => {
+    const indexPath = path.resolve(dashboardPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
     } else {
       res.status(404).json({
         success: false,
-        error: "Admin panel not found",
-        message: "Admin panel file not available",
+        error: "Dashboard not found",
+        message: "Dashboard has not been built yet. Run 'npm run build' in the dashboard directory.",
       });
     }
   });

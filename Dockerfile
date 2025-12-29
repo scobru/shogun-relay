@@ -202,6 +202,9 @@ RUN if [ -d "node_modules/shogun-contracts/sdk" ] && [ ! -f "node_modules/shogun
 # Copy the rest of the application
 COPY relay/ /app/relay/
 
+# Build React Dashboard (SPA) using relay's package.json
+RUN npm run build:dashboard || echo "⏭️ Dashboard build skipped (source may not exist)"
+
 # Optionally generate relay SEA keypair if requested
 # This creates the keypair during build time
 RUN if [ "$GENERATE_RELAY_KEYS" = "true" ] && [ -z "$RELAY_SEA_KEYPAIR" ] && [ -z "$RELAY_SEA_KEYPAIR_PATH" ]; then \

@@ -17,7 +17,8 @@
     "lint": "eslint src --max-warnings 0",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\""
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "build:dashboard": "cd src/public/dashboard && npx vite build"
   },
   "keywords": [
     "gun",
@@ -57,7 +58,10 @@
     "short-uuid": "^6.0.3",
     "tsx": "^4.19.2",
     "viem": "^2.21.0",
-    "webtorrent": "^2.8.5"
+    "webtorrent": "^2.8.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
@@ -73,7 +77,11 @@
     "nodemon": "^3.0.2",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.15.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.8"
   },
   "engines": {
     "node": ">=16.0.0"
