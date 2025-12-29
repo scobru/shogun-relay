@@ -21,7 +21,7 @@ interface PreviewState {
 }
 
 function Files() {
-  const { isAuthenticated, getAuthHeaders, token: adminToken } = useAuth()
+  const { isAuthenticated, getAuthHeaders, password: adminToken } = useAuth()
   const [pins, setPins] = useState<Pin[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)

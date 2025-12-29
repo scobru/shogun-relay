@@ -258,6 +258,29 @@ export class TorrentManager {
   }
 
   /**
+   * Helper to persist a torrent magnet to torrents.json
+   */
+  private persistTorrent(magnetOrPath: string): void {
+      try {
+          const torrentsFile = path.join(this.dataDir, 'torrents.json');
+          let existingTorrents: string[] = [];
+          
+          if (fs.existsSync(torrentsFile)) {
+              const fileContent = fs.readFileSync(torrentsFile, 'utf8');
+              existingTorrents = JSON.parse(fileContent);
+          }
+          
+          if (!existingTorrents.includes(magnetOrPath)) {
+              existingTorrents.push(magnetOrPath);
+              fs.writeFileSync(torrentsFile, JSON.stringify(existingTorrents, null, 2));
+              loggers.server.info(`📚 Persisted new torrent to configuration: ${magnetOrPath.substring(0, 50)}...`);
+          }
+      } catch (error) {
+          loggers.server.error({ err: error }, "📚 Failed to persist new torrent");
+      }
+  }
+
+  /**
    * Re-fetch and add dynamic torrents from Anna's Archive
    * @param maxTb Optional: Override the max TB parameter
    */
@@ -299,6 +322,9 @@ export class TorrentManager {
           this.onTorrentComplete(torrent);
         });
       });
+      
+      // Persist the torrent so it survives restarts
+      this.persistTorrent(magnet);
       
       added++;
     }
@@ -357,21 +383,7 @@ export class TorrentManager {
       });
 
       // Persist to torrents.json
-      try {
-          const torrentsFile = path.join(this.dataDir, 'torrents.json');
-          if (fs.existsSync(torrentsFile)) {
-              const fileContent = fs.readFileSync(torrentsFile, 'utf8');
-              let existingTorrents: string[] = JSON.parse(fileContent);
-              
-              if (!existingTorrents.includes(magnetOrPath)) {
-                  existingTorrents.push(magnetOrPath);
-                  fs.writeFileSync(torrentsFile, JSON.stringify(existingTorrents, null, 2));
-                  loggers.server.info("📚 Persisted new torrent to configuration");
-              }
-          }
-      } catch (error) {
-          loggers.server.error({ err: error }, "📚 Failed to persist new torrent");
-      }
+      this.persistTorrent(magnetOrPath);
   }
 
   /**
