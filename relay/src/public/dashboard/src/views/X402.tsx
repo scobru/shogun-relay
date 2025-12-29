@@ -29,21 +29,24 @@ function X402() {
     setLoading(true)
     setStatus('checking')
     try {
-      const healthRes = await fetch('/health')
-      const healthData = await healthRes.json()
-      const isEnabled = healthData.success && healthData.data?.modules?.x402
-      if (!isEnabled) { setStatus('disabled'); setLoading(false); return }
-
+      // Directly check x402 config endpoint instead of health modules
       const configRes = await fetch('/api/v1/x402/config')
       const configData = await configRes.json()
-      if (configData.success) { setConfig(configData.config); setStatus('active') }
-
-      const tiersRes = await fetch('/api/v1/x402/tiers')
-      const tiersData = await tiersRes.json()
-      if (tiersData.success) setTiers(tiersData.tiers || [])
+      
+      if (configData.success && configData.config) {
+        setConfig(configData.config)
+        setStatus('active')
+        
+        // Also fetch tiers
+        const tiersRes = await fetch('/api/v1/x402/tiers')
+        const tiersData = await tiersRes.json()
+        if (tiersData.success) setTiers(tiersData.tiers || [])
+      } else {
+        setStatus('disabled')
+      }
     } catch (error) {
       console.error('Failed to fetch x402 status:', error)
-      setStatus('error')
+      setStatus('disabled') // If endpoint fails, x402 is likely disabled
     } finally { setLoading(false) }
   }
 
