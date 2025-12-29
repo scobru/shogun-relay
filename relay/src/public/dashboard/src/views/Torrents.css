@@ -282,3 +282,144 @@
   padding: 6px 12px;
   font-size: 12px;
 }
+.torrents-.file-actions .btn-icon.btn-danger:hover {
+  background: var(--color-error-container);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+/* Discovery Search Sources */
+.search-sources {
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-md);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.source-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.source-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.source-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.source-option:hover {
+  border-color: var(--color-primary-dim);
+  background: var(--color-bg-hover);
+}
+
+.source-option input[type="radio"] {
+  cursor: pointer;
+}
+
+.source-option input[type="radio"]:checked + .source-icon {
+  transform: scale(1.1);
+}
+
+.source-option:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-container);
+}
+
+.source-icon {
+  font-size: 24px;
+  transition: transform 0.2s;
+}
+
+.source-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+.source-desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.search-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.search-actions .btn {
+  flex: 1;
+}
+
+.status-message {
+  padding: var(--spacing-md);
+  margin: var(--spacing-md) 0;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  text-align: center;
+}
+
+.no-results {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--color-text-muted);
+}
+
+.no-results span {
+  font-size: 48px;
+  display: block;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.5;
+}
+
+.no-results p {
+  margin: var(--spacing-sm) 0;
+}
+
+.no-results .hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.source-tag.dht,
+.source-tag.piratebay {
+  background: var(--color-primary-container);
+  color: var(--color-primary);
+}
+
+.source-tag.archive,
+.source-tag.internet-archive {
+  background: var(--color-success-container);
+  color: var(--color-success);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.mb-4 {
+  margin-bottom: var(--spacing-lg);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}

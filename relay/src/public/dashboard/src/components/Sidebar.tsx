@@ -18,6 +18,8 @@ const navItems: NavItem[] = [
   { path: '/explore', icon: '🔍', label: 'Explore', group: 'storage' },
   { path: '/network', icon: '🌐', label: 'Network', group: 'blockchain' },
   { path: '/registry', icon: '🖥️', label: 'Registry', group: 'blockchain' },
+  { path: '/deals', icon: '💼', label: 'Deals', group: 'blockchain' },
+  { path: '/x402', icon: '💳', label: 'x402', group: 'blockchain' },
   { path: '/torrents', icon: '📥', label: 'Torrents', group: 'blockchain' },
   { path: '/api-keys', icon: '🔑', label: 'API Keys', group: 'tools' },
   { path: '/charts', icon: '📉', label: 'Charts', group: 'tools' },

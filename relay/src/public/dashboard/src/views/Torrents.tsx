@@ -255,7 +255,7 @@ function Torrents() {
       
       try {
           const res = await fetch('/api/v1/torrent/network', { headers: getAuthHeaders() })
-          constdata = await res.json()
+          const data = await res.json()
           
           if (data.success && data.network) {
               // Transform network relay data into "search results" for display
@@ -373,38 +373,66 @@ function Torrents() {
         {activeTab === 'discovery' && (
             <div className="discovery-view">
                 <div className="card">
-                    <h3>Global & Archive Search</h3>
+                    <h3>🔍 Torrent Discovery</h3>
+                    <p className="text-secondary mb-4">Search across multiple sources for torrents</p>
+                    
                     <form onSubmit={handleSearch} className="search-form">
                         <input 
                             type="text" 
                             className="input search-input" 
-                            placeholder="Search for content..." 
+                            placeholder="Search for movies, books, software, etc..." 
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                         />
-                        <div className="search-options">
-                            <label>
-                                <input 
-                                    type="checkbox" 
-                                    checked={archiveMode} 
-                                    onChange={e => setArchiveMode(e.target.checked)} 
-                                />
-                                Search Internet Archive (Anna's Archive)
-                            </label>
+                        
+                        <div className="search-sources">
+                            <div className="source-label">Search in:</div>
+                            <div className="source-options">
+                                <label className="source-option">
+                                    <input 
+                                        type="radio" 
+                                        name="searchSource"
+                                        checked={!archiveMode} 
+                                        onChange={() => setArchiveMode(false)} 
+                                    />
+                                    <span className="source-icon">🌐</span>
+                                    <div>
+                                        <div className="source-name">PirateBay (DHT)</div>
+                                        <div className="source-desc">General torrents, movies, software</div>
+                                    </div>
+                                </label>
+                                <label className="source-option">
+                                    <input 
+                                        type="radio" 
+                                        name="searchSource"
+                                        checked={archiveMode} 
+                                        onChange={() => setArchiveMode(true)} 
+                                    />
+                                    <span className="source-icon">📚</span>
+                                    <div>
+                                        <div className="source-name">Internet Archive</div>
+                                        <div className="source-desc">Books, documents, archives</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div className="search-actions">
+                            <button type="submit" className="btn btn-primary" disabled={searching}>
+                                {searching ? '🔄 Searching...' : '🔍 Search'}
+                            </button>
                             <button 
                                 type="button" 
-                                className="btn btn-secondary btn-sm ml-4"
+                                className="btn btn-secondary"
                                 onClick={handleDiscoverNetwork}
                                 disabled={searching}
-                                style={{ marginLeft: 'auto' }}
                             >
                                 📡 Discover Network Relays
                             </button>
                         </div>
-                        <button type="submit" className="btn btn-primary" disabled={searching}>
-                            {searching ? 'Searching...' : 'Search'}
-                        </button>
                     </form>
+
+                    {statusMsg && <div className="status-message">{statusMsg}</div>}
 
                     <div className="search-results">
                         {searchResults.map((res, i) => (
@@ -412,9 +440,9 @@ function Torrents() {
                                 <div className="result-info">
                                     <div className="result-title">{res.title}</div>
                                     <div className="result-meta">
-                                        <span className="source-tag">{res.source}</span>
-                                        {res.size && <span>{res.size}</span>}
-                                        {res.peers && <span>{res.peers} peers</span>}
+                                        <span className={`source-tag ${res.source}`}>{res.source}</span>
+                                        {res.size && <span>📦 {res.size}</span>}
+                                        {res.peers && <span>👥 {res.peers} peers</span>}
                                     </div>
                                 </div>
                                 <button 
@@ -428,8 +456,18 @@ function Torrents() {
                                 </button>
                             </div>
                         ))}
-                        {searchResults.length === 0 && !searching && (
-                            <p className="no-results">No results found. Try a different query.</p>
+                        {searchResults.length === 0 && !searching && searchQuery && (
+                            <div className="no-results">
+                                <span>🔍</span>
+                                <p>No results found for "{searchQuery}"</p>
+                                <p className="hint">Try a different search term or switch sources</p>
+                            </div>
+                        )}
+                        {searchResults.length === 0 && !searching && !searchQuery && (
+                            <div className="no-results">
+                                <span>💡</span>
+                                <p>Enter a search term to find torrents</p>
+                            </div>
                         )}
                     </div>
                 </div>

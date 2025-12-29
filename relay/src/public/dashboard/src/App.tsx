@@ -16,6 +16,8 @@ import RpcConsole from './views/RpcConsole'
 import ApiDocs from './views/ApiDocs'
 import VisualGraph from './views/VisualGraph'
 import GraphExplorer from './views/GraphExplorer'
+import Deals from './views/Deals'
+import X402 from './views/X402'
 
 function App() {
   return (
@@ -36,6 +38,8 @@ function App() {
         <Route path="graph-explorer" element={<GraphExplorer />} />
         <Route path="rpc-console" element={<RpcConsole />} />
         <Route path="api-docs" element={<ApiDocs />} />
+        <Route path="deals" element={<Deals />} />
+        <Route path="x402" element={<X402 />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

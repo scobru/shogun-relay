@@ -57,10 +57,41 @@ function LiveStats() {
 
         // Fetch Network Relays (if auth)
         if (isAuthenticated) {
-            const relaysRes = await fetch('/api/v1/network/relays', { headers: getAuthHeaders() })
-            const relaysData = await relaysRes.json()
-            if (relaysData.success && relaysData.relays) {
-                setRelays(relaysData.relays)
+            // First, get configured peers from health endpoint
+            const healthRes = await fetch('/health')
+            const healthData = await healthRes.json()
+            const configuredPeers = healthData.data?.peers || []
+            
+            // Convert configured peers to RelayInfo format
+            const configuredRelays: RelayInfo[] = configuredPeers.map((peer: string) => ({
+                host: peer,
+                endpoint: peer,
+                lastSeen: Date.now(),
+                uptime: 0,
+                connections: { active: 0 },
+                ipfs: undefined
+            }))
+            
+            // Then try to get discovered relays
+            try {
+                const relaysRes = await fetch('/api/v1/network/relays', { headers: getAuthHeaders() })
+                const relaysData = await relaysRes.json()
+                if (relaysData.success && relaysData.relays) {
+                    // Merge configured and discovered, removing duplicates
+                    const allRelays = [...configuredRelays]
+                    for (const discovered of relaysData.relays) {
+                        if (!allRelays.some(r => r.host === discovered.host)) {
+                            allRelays.push(discovered)
+                        }
+                    }
+                    setRelays(allRelays)
+                } else {
+                    // If no discovered relays, just show configured ones
+                    setRelays(configuredRelays)
+                }
+            } catch (e) {
+                // If network/relays endpoint fails, just show configured peers
+                setRelays(configuredRelays)
             }
         }
 
