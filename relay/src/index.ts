@@ -1715,13 +1715,22 @@ See docs/RELAY_KEYS.md for more information.
         lastUpdated: Date.now(),
       };
 
+      // Warn if host is localhost (common discovery issue)
+      if (host.includes('localhost') || host.includes('127.0.0.1')) {
+        // Only warn once every ~100 pulses to avoid spam, or warn at startup (but this is a loop)
+        // Check random chance or just debug log
+        if (Math.random() < 0.05) {
+             loggers.server.warn({ host }, "⚠️  Relay host is configured as localhost. External relays will not be able to connect to you. Set RELAY_HOST in .env");
+        }
+      }
+
       gun.get("relays").get(host).put(relayData);
 
       // Also save to a separate pulse namespace for easier querying
       gun.get("relays").get(host).get("pulse").put(pulse);
 
       if (loggingConfig.debug) {
-        loggers.server.debug(
+        loggers.server.info(
           {
             host,
             connections: activeWires,

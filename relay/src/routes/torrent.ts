@@ -109,11 +109,19 @@ router.post("/add", express.json(), async (req, res) => {
         });
     }
 
-    torrentManager.addTorrent(magnet);
+    loggers.server.info(`📚 Adding torrent via API: ${magnet.substring(0, 50)}...`);
+
+    const torrent = torrentManager.addTorrent(magnet);
     
+    if (!torrent) {
+        throw new Error("Failed to add torrent - internal error");
+    }
+
     res.json({
       success: true,
-      message: "Torrent added successfully"
+      message: "Torrent added successfully",
+      name: torrent.name,
+      infoHash: torrent.infoHash
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to add torrent");

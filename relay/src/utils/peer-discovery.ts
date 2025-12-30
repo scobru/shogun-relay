@@ -157,6 +157,7 @@ export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): voi
 
     // Validate endpoint (basic check)
     if (typeof data.endpoint !== 'string' || !data.endpoint.startsWith('http')) {
+      log.warn({ pubKey, data }, "Invalid endpoint in peer discovery");
       return;
     }
 
@@ -178,15 +179,10 @@ export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): voi
       gunPeerUrl = `${peerEndpoint}/gun`;
     }
 
-    // Check if we already have this peer (simple check, Gun handles dedupe internally too)
-    // But we want to log only new ones if possible. Gun doesn't expose easy "hasPeer" check 
-    // without accessing internal state. We'll rely on Gun's opt for deduplication.
-    
     // Add as peer
     gun.opt({ peers: [gunPeerUrl] });
     
-    // Log is spammy with on(), so maybe debug only or check if new
-    log.debug({ peer: gunPeerUrl, pubKey }, "Discovered peer via GunDB");
+    log.info({ peer: gunPeerUrl, pubKey }, "Discovered peer via GunDB");
   });
 }
 

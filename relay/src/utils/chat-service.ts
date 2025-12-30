@@ -101,6 +101,19 @@ class ChatService {
                           const decrypted = await Gun.SEA.decrypt(encrypted, secret);
                           
                           if (decrypted) {
+                              // Check for ChatOps commands
+                              const { chatCommands } = await import("./chat-commands");
+                              const commandResponse = await chatCommands.handleCommand(decrypted, peerPub, this.sendMessage.bind(this));
+
+                              if (commandResponse) {
+                                  log.info(`🤖 ChatOps executed for ${peerPub}`);
+                                  // Send response back
+                                  await this.sendMessage(peerPub, commandResponse);
+                                  
+                                  // Don't show the command itself in the UI history (optional, but cleaner)
+                                  // But for now, let's keep it so user sees their own command history if looking at logs
+                              }
+
                               const msg: ChatMessage = {
                                   id,
                                   from: peerPub,

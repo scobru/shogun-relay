@@ -349,42 +349,56 @@ export class TorrentManager {
   /**
    * Add a magnet link or torrent file manually
    */
-  public addTorrent(magnetOrPath: string): void {
-      if (!this.enabled || !this.client) {
-          throw new Error("Torrent integration is not enabled");
+  public addTorrent(magnetOrPath: string): any {
+    if (!this.enabled || !this.client) {
+      throw new Error("Torrent integration is not enabled");
+    }
+
+    try {
+      // Check if already added (simple check for magnet string in torrents)
+      const existing = this.client.torrents.find(t => t.magnetURI === magnetOrPath || t.infoHash === magnetOrPath);
+      if (existing) {
+        loggers.server.info(`📚 Torrent already active: ${existing.name}`);
+        return existing;
       }
 
-      this.client.add(magnetOrPath, { path: this.dataDir }, (torrent) => {
-          loggers.server.info(`📚 Manually added torrent: ${torrent.name}`);
+      const torrent = this.client.add(magnetOrPath, { path: this.dataDir }, (torrent) => {
+        loggers.server.info(`📚 Manually added torrent: ${torrent.name}`);
+        
+        // Register done event to catalog torrent when complete
+        torrent.on('done', () => {
+          loggers.server.info(`📚 Torrent download complete: ${torrent.name}`);
+          // Add files to catalog
+          this.onTorrentComplete(torrent);
           
-          // Register done event to catalog torrent when complete
-          torrent.on('done', () => {
-              loggers.server.info(`📚 Torrent download complete: ${torrent.name}`);
-              // Add files to catalog
-              this.onTorrentComplete(torrent);
-              
-              // Publish to global registry for network discovery
-              this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
-                size: torrent.length,
-                files: torrent.files?.length || 0
-              });
+          // Publish to global registry for network discovery
+          this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
+            size: torrent.length,
+            files: torrent.files?.length || 0
           });
+        });
+        
+        // If already done (e.g., seeding or instant resume), catalog immediately
+        if (torrent.done) {
+          loggers.server.info(`📚 Torrent already complete, cataloging: ${torrent.name}`);
+          this.onTorrentComplete(torrent);
           
-          // If already done (e.g., seeding or instant resume), catalog immediately
-          if (torrent.done) {
-              loggers.server.info(`📚 Torrent already complete, cataloging: ${torrent.name}`);
-              this.onTorrentComplete(torrent);
-              
-              // Publish to global registry
-              this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
-                size: torrent.length,
-                files: torrent.files?.length || 0
-              });
-          }
+          // Publish to global registry
+          this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
+            size: torrent.length,
+            files: torrent.files?.length || 0
+          });
+        }
       });
 
       // Persist to torrents.json
       this.persistTorrent(magnetOrPath);
+
+      return torrent;
+    } catch (error) {
+      loggers.server.error({ err: error }, `📚 Failed to add torrent: ${magnetOrPath}`);
+      throw error;
+    }
   }
 
   /**
