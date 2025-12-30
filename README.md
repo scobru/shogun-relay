@@ -13,11 +13,13 @@
 
 - **GunDB Relay** — WebSocket relay with SQLite/RADISK persistence and WebRTC support
 - **IPFS Integration** — Upload, pin, manage, and preview IPFS content via REST API
-- **Admin Dashboards** — Real-time monitoring, visual graph explorer, and pin manager
+- **Torrent Manager** — Download, seed, and stream torrents; built-in search (Internet Archive)
+- **Admin Dashboards** — Real-time monitoring, visual graph explorer, file manager, and config editor
 - **x402 Subscriptions** — Paid storage subscriptions via USDC (EIP-3009)
 - **L2 Bridge** — Trustless ETH bridge between L1 and GunDB L2
 - **Network Federation** — Relay discovery, storage proofs, and reputation system
 - **On-Chain Registry** — Staking and slashing on Base blockchain
+- **Anna's Archive** — Automated mirroring and indexing of scientific/cultural content
 
 ---
 
@@ -66,10 +68,14 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 |------|-------------|
 | `/admin` | Main control panel |
 | `/stats` | Live metrics & charts |
+| `/torrents` | Torrent manager & search |
 | `/services-dashboard` | Service health overview |
+| `/config` | Runtime configuration editor |
 | `/pin-manager` | IPFS pin manager |
 | `/upload` | IPFS uploads |
+| `/drive` | Admin file browser |
 | `/visualGraph` | GunDB explorer |
+| `/graphExplorer` | Advanced graph navigator |
 | `/registry-dashboard` | On-chain registry |
 | `/endpoints` | API documentation |
 
@@ -110,6 +116,16 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 | `GET /api/v1/ipfs/cat/:cid` | Stream content |
 | `POST /api/v1/ipfs/pin/add` | Pin content |
 | `GET /api/v1/ipfs/pin/ls` | List pins |
+
+### Torrents
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/torrent/status` | List active torrents |
+| `POST /api/v1/torrent/add` | Add magnet/torrent |
+| `POST /api/v1/torrent/control` | Pause/Resume/Remove |
+| `GET /api/v1/torrent/search/internet-archive` | Search Internet Archive |
+| `GET /api/v1/torrent/search` | Unified search |
 
 ### User Uploads & Metadata
 

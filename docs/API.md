@@ -618,6 +618,119 @@ Get reputation score for a relay.
 }
 ```
 
+### Torrents
+
+#### GET `/api/v1/torrent/status`
+
+List all active torrents managed by the relay.
+
+**Headers:**
+- `Authorization: Bearer <ADMIN_TOKEN>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "activeTorrents": 2,
+    "downloadSpeed": 1024000,
+    "uploadSpeed": 512000,
+    "ratio": 1.5,
+    "torrents": [
+      {
+        "infoHash": "...",
+        "name": "Ubuntu 22.04",
+        "progress": 1.0,
+        "state": "seeding",
+        "downloadSpeed": 0,
+        "uploadSpeed": 10240,
+        "numPeers": 50,
+        "files": [
+          {
+            "name": "ubuntu.iso",
+            "path": "ubuntu.iso",
+            "length": 1000000000
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### POST `/api/v1/torrent/add`
+
+Add a torrent to the manager via magnet link or torrent file URL.
+
+**Headers:**
+- `Authorization: Bearer <ADMIN_TOKEN>`
+- `Content-Type: application/json`
+
+**Body:**
+
+```json
+{
+  "magnet": "magnet:?xt=urn:btih:..."
+}
+```
+
+#### POST `/api/v1/torrent/control`
+
+Control a torrent (pause, resume, remove).
+
+**Headers:**
+- `Authorization: Bearer <ADMIN_TOKEN>`
+- `Content-Type: application/json`
+
+**Body:**
+
+```json
+{
+  "infoHash": "...",
+  "action": "pause" | "resume" | "remove",
+  "deleteFiles": false
+}
+```
+
+#### GET `/api/v1/torrent/search`
+
+Search for content across configured sources (Internet Archive).
+
+**Query Parameters:**
+- `q`: Search query
+- `sources`: `internet-archive` (default)
+- `limit`: Number of results (default 25)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "source": "internet-archive",
+      "identifier": "...",
+      "title": "...",
+      "size": 1048576,
+      "seeders": 10,
+      "magnetUri": "magnet:?..."
+    }
+  ]
+}
+```
+
+#### GET `/api/v1/torrent/search/internet-archive`
+
+Direct search to Internet Archive.
+
+**Query Parameters:**
+- `q`: Search query
+- `mediaType`: Filter by media type (audio, video, texts, software, etc.)
+- `rows`: Number of results
+
+---
+
 ## Error Responses
 
 All endpoints return errors in this format:

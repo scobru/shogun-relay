@@ -587,7 +587,6 @@ router.get("/registry/check/:infoHash", async (req, res) => {
 
 import { 
   searchInternetArchive, 
-  searchPirateBay, 
   searchArchives,
   getTorrentForItem 
 } from "../utils/archive-search";
@@ -599,10 +598,9 @@ import {
 router.get("/search", async (req, res) => {
   try {
     const query = req.query.q as string;
-    const sources = req.query.sources as string; // comma-separated: 'internet-archive,piratebay'
+    const sources = req.query.sources as string; // comma-separated: 'internet-archive'
     const limit = parseInt(req.query.limit as string) || 25;
     const mediaType = req.query.mediaType as string; // For Internet Archive
-    const category = req.query.category ? parseInt(req.query.category as string) : undefined; // For PirateBay
 
     if (!query || query.length < 2) {
       return res.status(400).json({
@@ -611,17 +609,16 @@ router.get("/search", async (req, res) => {
       });
     }
 
-    const validSources = ['internet-archive', 'piratebay'] as const;
-    const sourceList: ('internet-archive' | 'piratebay')[] = sources 
-      ? sources.split(',').map(s => s.trim()).filter((s): s is 'internet-archive' | 'piratebay' => 
+    const validSources = ['internet-archive'] as const;
+    const sourceList: ('internet-archive')[] = sources 
+      ? sources.split(',').map(s => s.trim()).filter((s): s is 'internet-archive' => 
           validSources.includes(s as any))
-      : ['internet-archive', 'piratebay'];
+      : ['internet-archive'];
 
     const results = await searchArchives(query, {
       sources: sourceList,
       rows: limit,
-      mediaType,
-      category
+      mediaType
     });
 
     res.json({
@@ -678,41 +675,7 @@ router.get("/search/internet-archive", async (req, res) => {
   }
 });
 
-/**
- * GET /search/piratebay
- * Search PirateBay via apibay.org
- */
-router.get("/search/piratebay", async (req, res) => {
-  try {
-    const query = req.query.q as string;
-    const category = req.query.category ? parseInt(req.query.category as string) : undefined;
-    const rows = parseInt(req.query.rows as string) || 50;
 
-    if (!query || query.length < 2) {
-      return res.status(400).json({
-        success: false,
-        error: "Query (q) must be at least 2 characters"
-      });
-    }
-
-    const results = await searchPirateBay(query, { category, rows });
-
-    res.json({
-      success: true,
-      source: 'piratebay',
-      query,
-      category: category || 'all',
-      count: results.length,
-      results
-    });
-  } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to search PirateBay");
-    res.status(500).json({
-      success: false,
-      error: error.message || "Internal Server Error",
-    });
-  }
-});
 
 /**
  * POST /add-from-search
