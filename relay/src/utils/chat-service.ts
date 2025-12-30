@@ -32,6 +32,10 @@ class ChatService {
   // Cache for decrypted messages
   // peerPub -> messageId -> message
   private messageCache = new Map<string, Map<string, ChatMessage>>();
+  
+  // Synchronous lock to prevent parallel GunDB callback spam
+  // Format: "peerPub:messageId"
+  private processingMessages = new Set<string>();
 
   initialize(gunInstance: any) {
     this.gun = gunInstance;
@@ -53,6 +57,9 @@ class ChatService {
     }, 1000);
   }
 
+  // Track last sync time per peer to avoid spam
+  private lastSyncTime = new Map<string, number>();
+  
   private startSignalListener() {
     if (!this.active || !this.myPub) return;
 
@@ -64,6 +71,11 @@ class ChatService {
         const timestamp = data.timestamp || 0;
         // Ignore very old signals (older than 7 days)
         if (Date.now() - timestamp > 7 * 24 * 3600 * 1000) return;
+
+        // Throttle: only sync from same peer every 1 second
+        const lastSync = this.lastSyncTime.get(data.from) || 0;
+        if (Date.now() - lastSync < 1000) return;
+        this.lastSyncTime.set(data.from, Date.now());
 
         // Sync messages from this sender
         this.syncMessagesFrom(data.from);
@@ -86,11 +98,19 @@ class ChatService {
       this.gun.get('~' + peerPub).get('chat').get(this.myPub).map().once(async (encrypted: string, id: string) => {
           if (!encrypted) return;
           
-          // Check if we already have this message (EARLY CHECK)
+          // SYNCHRONOUS LOCK - prevents parallel GunDB callbacks from processing same message
+          const lockKey = `${peerPub}:${id}`;
+          if (this.processingMessages.has(lockKey)) return;
+          this.processingMessages.add(lockKey);
+          
+          // Also check cache (for messages already fully processed)
           if (!this.messageCache.has(peerPub)) {
               this.messageCache.set(peerPub, new Map());
           }
-          if (this.messageCache.get(peerPub)?.has(id)) return;
+          if (this.messageCache.get(peerPub)?.has(id)) {
+              this.processingMessages.delete(lockKey);
+              return;
+          }
 
           try {
               // Get their epub to decrypt
