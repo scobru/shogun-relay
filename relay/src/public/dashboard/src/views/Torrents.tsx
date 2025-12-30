@@ -17,7 +17,9 @@ interface Torrent {
 
 interface SearchResult {
   title: string
-  magnet: string
+  magnet?: string
+  torrentUrl?: string  // For Internet Archive items
+  identifier?: string  // Archive.org identifier
   size?: string
   seeds?: number
   peers?: number
@@ -305,32 +307,46 @@ function Torrents() {
               if (searchQuery.length >= 3) {
                    const res = await fetch(`/api/v1/torrent/registry/search?q=${encodeURIComponent(searchQuery)}`, { headers: getAuthHeaders() })
                    const data = await res.json()
-                   setSearchResults(data.results?.map((r: any) => ({
-                       title: r.name || r.title || 'Unknown',
-                       magnet: r.magnetURI || r.magnet,
-                       size: r.size ? formatBytes(r.size) : undefined,
-                       infoHash: r.infoHash,
-                       files: r.files,
-                       pinnedFiles: r.pinnedFiles || 0,
-                       fileList: r.fileList || [],
-                       addedBy: r.addedBy,
-                       source: 'registry' as const
-                   })) || [])
+                   setSearchResults(data.results?.map((r: any) => {
+                       // Parse fileListJson (GunDB stores as JSON string)
+                       let fileList = r.fileList || [];
+                       if (r.fileListJson) {
+                           try { fileList = JSON.parse(r.fileListJson); } catch { fileList = []; }
+                       }
+                       return {
+                           title: r.name || r.title || 'Unknown',
+                           magnet: r.magnetURI || r.magnet,
+                           size: r.size ? formatBytes(r.size) : undefined,
+                           infoHash: r.infoHash,
+                           files: r.files,
+                           pinnedFiles: r.pinnedFiles || 0,
+                           fileList,
+                           addedBy: r.addedBy,
+                           source: 'registry' as const
+                       };
+                   }) || [])
               } else {
                   // Browse
                   const res = await fetch('/api/v1/torrent/registry/browse?limit=50', { headers: getAuthHeaders() })
                   const data = await res.json()
-                  setSearchResults(data.results?.map((r: any) => ({
-                      title: r.name || r.title || 'Unknown',
-                      magnet: r.magnetURI || r.magnet,
-                      size: r.size ? formatBytes(r.size) : undefined,
-                      infoHash: r.infoHash,
-                      files: r.files,
-                      pinnedFiles: r.pinnedFiles || 0,
-                      fileList: r.fileList || [],
-                      addedBy: r.addedBy,
-                      source: 'registry' as const
-                  })) || [])
+                  setSearchResults(data.results?.map((r: any) => {
+                      // Parse fileListJson (GunDB stores as JSON string)
+                      let fileList = r.fileList || [];
+                      if (r.fileListJson) {
+                          try { fileList = JSON.parse(r.fileListJson); } catch { fileList = []; }
+                      }
+                      return {
+                          title: r.name || r.title || 'Unknown',
+                          magnet: r.magnetURI || r.magnet,
+                          size: r.size ? formatBytes(r.size) : undefined,
+                          infoHash: r.infoHash,
+                          files: r.files,
+                          pinnedFiles: r.pinnedFiles || 0,
+                          fileList,
+                          addedBy: r.addedBy,
+                          source: 'registry' as const
+                      };
+                  }) || [])
               }
           } else {
               const res = await fetch(`${endpoint}?q=${encodeURIComponent(searchQuery)}`, {
@@ -344,7 +360,7 @@ function Torrents() {
                   // Mock fallback if API fails/missing
                   if (discoveryMode === 'archive') {
                       setSearchResults([
-                          { title: `[Archive] ${searchQuery} - Full Backup`, magnet: 'magnet:?xt=urn:btih:mock1', size: '1.2 GB', source: 'archive' },
+                          { title: `[Archive] ${searchQuery} - Full Backup`, torrentUrl: 'https://archive.org/download/mock/mock_archive.torrent', size: '1.2 GB', source: 'archive' },
                       ])
                   }
               }
@@ -668,11 +684,16 @@ function Torrents() {
                             <div className="flex flex-col gap-2 shrink-0">
                                 <button 
                                     className="btn btn-sm btn-primary"
-                                    onClick={() => handleAddMagnet(res.magnet)}
+                                    onClick={() => handleAddMagnet(res.magnet || res.torrentUrl)}
+                                    disabled={!res.magnet && !res.torrentUrl}
                                 >
                                     ➕ Add
                                 </button>
-                                <button className="btn btn-xs btn-ghost" onClick={() => navigator.clipboard.writeText(res.magnet)}>📋 Copy</button>
+                                <button 
+                                    className="btn btn-xs btn-ghost" 
+                                    onClick={() => navigator.clipboard.writeText(res.magnet || res.torrentUrl || '')}
+                                    disabled={!res.magnet && !res.torrentUrl}
+                                >📋 Copy</button>
                             </div>
                         </div>
                     </div>

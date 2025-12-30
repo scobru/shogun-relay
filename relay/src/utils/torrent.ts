@@ -1373,6 +1373,13 @@ export class TorrentManager {
         // Count pinned files
         const pinnedFiles = options.fileList?.filter(f => f.ipfsCid).length || 0;
 
+        // Build file list as JSON string (GunDB doesn't support arrays)
+        const fileListData = options.fileList?.slice(0, 20).map(f => ({
+          name: f.name,
+          size: f.size,
+          ipfsCid: f.ipfsCid || null
+        })) || [];
+
         // Build registry entry with file info
         const entry = {
           magnetURI,
@@ -1383,12 +1390,8 @@ export class TorrentManager {
           addedAt: Date.now(),
           addedBy: relayConfig.endpoint || 'unknown',
           aacid: options.aacMetadata?.aacid || null,
-          // Store up to 20 files with IPFS info (to avoid huge entries)
-          fileList: options.fileList?.slice(0, 20).map(f => ({
-            name: f.name,
-            size: f.size,
-            ipfsCid: f.ipfsCid || null
-          })) || []
+          // Store fileList as JSON string (GunDB doesn't support arrays)
+          fileListJson: JSON.stringify(fileListData)
         };
 
         // Publish to registry
