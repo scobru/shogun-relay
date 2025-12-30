@@ -86,7 +86,7 @@ class ChatService {
       this.gun.get('~' + peerPub).get('chat').get(this.myPub).map().once(async (encrypted: string, id: string) => {
           if (!encrypted) return;
           
-          // Check if we already have this message
+          // Check if we already have this message (EARLY CHECK)
           if (!this.messageCache.has(peerPub)) {
               this.messageCache.set(peerPub, new Map());
           }
@@ -96,6 +96,9 @@ class ChatService {
               // Get their epub to decrypt
               // We need to fetch their user node to get 'epub'
               this.gun.get('~' + peerPub).once(async (peerData: any) => {
+                  // SECOND dedup check (in case parallel callbacks)
+                  if (this.messageCache.get(peerPub)?.has(id)) return;
+                  
                   if (peerData && peerData.epub && pair && pair.epriv) {
                       const secret = await Gun.SEA.secret(peerData.epub, pair as any); 
                       // secret returns Promise<string | undefined>
@@ -103,17 +106,21 @@ class ChatService {
                           const decrypted = await Gun.SEA.decrypt(encrypted, secret);
                           
                           if (decrypted) {
+                              // THIRD dedup check before processing
+                              if (this.messageCache.get(peerPub)?.has(id)) return;
+
                               // Check for ChatOps commands
                               const { chatCommands } = await import("./chat-commands");
                               const commandResponse = await chatCommands.handleCommand(decrypted, peerPub, this.sendMessage.bind(this));
 
                               if (commandResponse) {
-                                  log.info(`🤖 ChatOps executed for ${peerPub}`);
-                                  // Send response back
-                                  await this.sendMessage(peerPub, commandResponse);
-                                  
-                                  // Don't show the command itself in the UI history (optional, but cleaner)
-                                  // But for now, let's keep it so user sees their own command history if looking at logs
+                                  log.info(`🤖 ChatOps executed for ${peerPub.substring(0,6)}...`);
+                                  // Send response back - wrapped in try-catch to avoid unhandled rejection
+                                  try {
+                                      await this.sendMessage(peerPub, commandResponse);
+                                  } catch (e: any) {
+                                      log.warn({ err: e.message }, `💬 Failed to send command response to ${peerPub.substring(0,6)}...`);
+                                  }
                               }
 
                               const msg: ChatMessage = {
