@@ -331,8 +331,8 @@ router.get("/stats", async (req, res) => {
           processedHosts.add(currentRelayHost);
           stats.totalRelays++;
           stats.activeRelays++;
-          // Get connections from app locals (set by index.ts)
-          const activeWires = req.app.get("activeWires") || 0;
+          // Get connections from app locals or GunDB internals
+          const activeWires = req.app.get("activeWires") || Object.keys(gun._.opt.peers || {}).length || 0;
           stats.totalConnections += activeWires;
           relaysFound.push({ host: currentRelayHost, hasPulse: false });
 

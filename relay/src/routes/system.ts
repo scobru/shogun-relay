@@ -1,5 +1,6 @@
 import express, { Request, Response, Router } from "express";
 import fs from "fs";
+import path from "path";
 import { loggers } from "../utils/logger";
 import { packageConfig } from "../config";
 import { config } from "../config/env-config";
@@ -631,6 +632,74 @@ router.post("/peers/add", (req, res) => {
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "❌ Peers add error");
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Services Logs endpoint
+router.get("/services/:name/logs", (req, res) => {
+  try {
+    const serviceName = req.params.name;
+    const limit = parseInt(req.query.limit as string) || 100;
+    const tail = parseInt(req.query.tail as string) || 100;
+
+    // Map service names to log files
+    // This assumes standard log locations or PM2 log naming convention
+    let logFile = "";
+    
+    // Normalize service name
+    const normalizedName = serviceName.toLowerCase().replace(/%20/g, ' ').trim();
+    
+    if (normalizedName.includes("ipfs")) {
+       // Check common IPFS log locations or PM2
+       logFile = "/var/log/supervisor/ipfs.log"; // Supervisor default
+       if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "ipfs.log"); 
+    } else if (normalizedName.includes("gun") || normalizedName.includes("relay")) {
+       logFile = "/var/log/supervisor/relay.log";
+       if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "relay.log");
+    } else {
+       // Generic fallback
+       logFile = `/var/log/supervisor/${normalizedName.replace(/\s+/g, '-')}.log`;
+    }
+
+    if (!fs.existsSync(logFile)) {
+        // Try PM2 convention if Supervisor not found
+        const pm2Log = path.join(process.env.HOME || '/root', '.pm2', 'logs', `${normalizedName.replace(/\s+/g, '-')}-out.log`);
+        if (fs.existsSync(pm2Log)) {
+            logFile = pm2Log;
+        } else {
+             return res.status(404).json({
+                success: false,
+                error: `Log file not found for service: ${serviceName}`,
+                path: logFile
+            });
+        }
+    }
+
+    // Reuse log reading logic (simplified here)
+    const logContent = fs.readFileSync(logFile, "utf8");
+    const lines = logContent.split("\n").filter((line) => line.trim() !== "");
+    const lastLines = lines.slice(-tail);
+    
+    // Simple parsing - just return lines for now to fix 404
+    const formattedLogs = lastLines.map((line, i) => ({
+        id: `l_${Date.now()}_${i}`,
+        timestamp: new Date().toISOString(), // Placeholder, real parsing is complex
+        message: line,
+        level: 'info'
+    }));
+
+    res.json({
+      success: true,
+      logs: formattedLogs,
+      count: formattedLogs.length,
+      service: serviceName
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "❌ Service Logs error");
     res.status(500).json({
       success: false,
       error: error.message,
