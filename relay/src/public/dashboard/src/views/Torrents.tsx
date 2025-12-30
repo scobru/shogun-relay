@@ -26,6 +26,8 @@ interface SearchResult {
   aacid?: string
   infoHash?: string
   files?: number
+  pinnedFiles?: number
+  fileList?: { name: string; size: number; ipfsCid?: string }[]
 }
 
 interface CatalogStats {
@@ -309,6 +311,8 @@ function Torrents() {
                        size: r.size ? formatBytes(r.size) : undefined,
                        infoHash: r.infoHash,
                        files: r.files,
+                       pinnedFiles: r.pinnedFiles || 0,
+                       fileList: r.fileList || [],
                        addedBy: r.addedBy,
                        source: 'registry' as const
                    })) || [])
@@ -322,6 +326,8 @@ function Torrents() {
                       size: r.size ? formatBytes(r.size) : undefined,
                       infoHash: r.infoHash,
                       files: r.files,
+                      pinnedFiles: r.pinnedFiles || 0,
+                      fileList: r.fileList || [],
                       addedBy: r.addedBy,
                       source: 'registry' as const
                   })) || [])
@@ -655,6 +661,7 @@ function Torrents() {
                                     {res.peers !== undefined && <span className="badge badge-sm badge-ghost">👥 {res.peers} peers</span>}
                                     {res.addedBy && <span className="badge badge-sm badge-ghost">User: {res.addedBy.substring(0,6)}...</span>}
                                     {res.files && <span className="badge badge-sm badge-ghost">📄 {res.files} files</span>}
+                                    {(res.pinnedFiles ?? 0) > 0 && <span className="badge badge-sm badge-success">📌 {res.pinnedFiles} on IPFS</span>}
                                 </div>
                                 {res.infoHash && <div className="text-xs font-mono text-base-content/50 mt-1 truncate">{res.infoHash}</div>}
                             </div>

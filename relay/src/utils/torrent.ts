@@ -374,7 +374,8 @@ export class TorrentManager {
           // Publish to global registry for network discovery
           this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
             size: torrent.length,
-            files: torrent.files?.length || 0
+            files: torrent.files?.length || 0,
+            fileList: torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || []
           });
         });
         
@@ -386,7 +387,8 @@ export class TorrentManager {
           // Publish to global registry
           this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
             size: torrent.length,
-            files: torrent.files?.length || 0
+            files: torrent.files?.length || 0,
+            fileList: torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || []
           });
         }
       });
@@ -487,7 +489,8 @@ export class TorrentManager {
                 this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
                   size: torrent.length,
                   files: torrent.files?.length || 0,
-                  aacMetadata: aacRecords[0] // Include first AAC record
+                  aacMetadata: aacRecords[0], // Include first AAC record
+                  fileList: torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || []
                 });
               })
               .catch((err) => {
@@ -637,11 +640,17 @@ export class TorrentManager {
                 const entry = this.catalog.get(torrent.infoHash.toLowerCase());
                 const size = entry ? entry.files.reduce((acc, f) => acc + f.size, 0) : torrent.length;
                 const fileCount = entry ? entry.files.length : (torrent.files?.length || 0);
+                
+                // Include file list with IPFS CIDs from catalog
+                const fileList = entry 
+                    ? entry.files.map(f => ({ name: f.name, size: f.size, ipfsCid: f.ipfsCid }))
+                    : torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || [];
 
                 await this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
                     size,
                     files: fileCount,
-                    force: true
+                    force: true,
+                    fileList
                 });
             }
         }
@@ -1326,6 +1335,7 @@ export class TorrentManager {
       files?: number;
       aacMetadata?: any;
       force?: boolean;
+      fileList?: { name: string; size: number; ipfsCid?: string }[];
     } = {}
   ): Promise<{ success: boolean; alreadyExists?: boolean }> {
     if (!this.gun) {
@@ -1345,15 +1355,25 @@ export class TorrentManager {
           return;
         }
 
-        // Build registry entry
+        // Count pinned files
+        const pinnedFiles = options.fileList?.filter(f => f.ipfsCid).length || 0;
+
+        // Build registry entry with file info
         const entry = {
           magnetURI,
           name,
           size: options.size || 0,
           files: options.files || 0,
+          pinnedFiles: pinnedFiles,
           addedAt: Date.now(),
           addedBy: relayConfig.endpoint || 'unknown',
-          aacid: options.aacMetadata?.aacid || null
+          aacid: options.aacMetadata?.aacid || null,
+          // Store up to 20 files with IPFS info (to avoid huge entries)
+          fileList: options.fileList?.slice(0, 20).map(f => ({
+            name: f.name,
+            size: f.size,
+            ipfsCid: f.ipfsCid || null
+          })) || []
         };
 
         // Publish to registry
@@ -1364,8 +1384,8 @@ export class TorrentManager {
           } else {
             loggers.server.info(`📚 Published torrent to global registry: ${name} (${normalizedHash})`);
             
-            // Also add to search index (keywords from name)
-            this.addToSearchIndex(normalizedHash, name);
+            // Also add to search index (keywords from name AND file names)
+            this.addToSearchIndex(normalizedHash, name, options.fileList);
             
             resolve({ success: true, alreadyExists: false });
           }
@@ -1376,20 +1396,36 @@ export class TorrentManager {
 
   /**
    * Add torrent to search index for keyword-based discovery
+   * Now also indexes file names for deep search
    */
-  private addToSearchIndex(infoHash: string, name: string): void {
+  private addToSearchIndex(infoHash: string, name: string, fileList?: { name: string }[]): void {
     if (!this.gun) return;
 
-    // Extract keywords from name (lowercase, split by non-alphanumeric)
-    const keywords = name.toLowerCase()
+    const allKeywords = new Set<string>();
+
+    // Extract keywords from torrent name (lowercase, split by non-alphanumeric)
+    const nameKeywords = name.toLowerCase()
       .split(/[^a-z0-9]+/)
       .filter(k => k.length >= 3); // Only keywords with 3+ chars
+    
+    nameKeywords.forEach(k => allKeywords.add(k));
 
-    for (const keyword of keywords) {
+    // Also extract keywords from file names
+    if (fileList && fileList.length > 0) {
+      for (const file of fileList) {
+        const fileKeywords = file.name.toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter(k => k.length >= 3);
+        fileKeywords.forEach(k => allKeywords.add(k));
+      }
+    }
+
+    // Index all unique keywords
+    for (const keyword of allKeywords) {
       this.gun.get('shogun').get('torrents').get('search').get(keyword).get(infoHash).put(true);
     }
     
-    loggers.server.debug(`📚 Added ${keywords.length} keywords to search index for ${infoHash}`);
+    loggers.server.debug(`📚 Added ${allKeywords.size} keywords to search index for ${infoHash}`);
   }
 
   /**
