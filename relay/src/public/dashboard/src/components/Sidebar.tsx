@@ -15,6 +15,7 @@ const navItems: NavItem[] = [
   { path: '/drive', icon: '💾', label: 'Drive', group: 'storage' },
   { path: '/explore', icon: '🔍', label: 'Explore', group: 'storage' },
   { path: '/network', icon: '🌐', label: 'Network', group: 'blockchain' },
+  { path: '/chat', icon: '💬', label: 'Chat', group: 'blockchain' },
   { path: '/registry', icon: '🖥️', label: 'Registry', group: 'blockchain' },
   { path: '/deals', icon: '💼', label: 'Deals', group: 'blockchain' },
   { path: '/x402', icon: '💳', label: 'x402', group: 'blockchain' },

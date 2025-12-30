@@ -70,6 +70,7 @@ import x402Router from "./x402";
 import networkRouter from "./network";
 import dealsRouter from "./deals";
 import registryRouter from "./registry";
+import chatRouter from "./chat";
 
 import torrentRouter from "./torrent";
 import driveRouter from "./drive";
@@ -532,8 +533,9 @@ export default (app: express.Application) => {
     res.sendFile(path.resolve(publicPath, "graph.html"));
   });
 
-  // Removed /chat and /subscription - these files have been deleted
-  // Chat and subscription functionality is now handled by external apps
+  // Chat Route (Encrypted Relay-to-Relay)
+  app.use(`${baseRoute}/chat`, chatRouter);
+  loggers.server.info(`✅ Chat routes registered`);
 
   // Deals dashboard removed - now using external @shogun-deals app
 

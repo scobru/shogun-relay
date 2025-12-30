@@ -134,6 +134,28 @@ async function initializeServer() {
       return true;
     }
 
+    // Allow public registry writes (discovery & torrents)
+    // This enables the Global Registry and Peer Discovery to work even in protected mode
+    if (msg.put) {
+      const souls = Object.keys(msg.put);
+      const isPublicRegistry = souls.some(soul => 
+        soul === 'shogun' || 
+        soul === 'relays' || 
+        soul === 'annas-archive' ||
+        soul === 'torrents' ||
+        soul === 'registry' ||
+        soul === 'search' ||
+        soul.startsWith('shogun/') ||
+        soul.startsWith('relays/') ||
+        soul.startsWith('annas-archive/')
+      );
+      
+      if (isPublicRegistry) {
+        // loggers.server.debug(`🔍 PUT allowed for public registry: ${souls.join(', ')}`);
+        return true;
+      }
+    }
+
     // Se ha headers, verifica il token
     if (msg && msg.headers && msg.headers.token) {
       const hasValidAuth = msg.headers.token === authConfig.adminPassword;
@@ -143,7 +165,7 @@ async function initializeServer() {
       }
     }
 
-    loggers.server.warn(`❌ PUT denied - no valid auth: ${msg.headers}`);
+    loggers.server.warn(`❌ PUT denied - no valid auth: ${JSON.stringify(msg.headers)}`);
     return false;
   }
 
@@ -1997,6 +2019,15 @@ See docs/RELAY_KEYS.md for more information.
     await torrentManager.start(relayPub, gun);
   } catch (error) {
     loggers.server.error({ err: error }, "❌ Failed to initialize Torrent integration");
+  }
+
+  // Initialize Chat Service
+  try {
+    const { chatService } = await import("./utils/chat-service");
+    chatService.initialize(gun);
+    loggers.server.info("💬 Chat Service initialized");
+  } catch (error) {
+    loggers.server.error({ err: error }, "❌ Failed to initialize Chat Service");
   }
 
   return {
