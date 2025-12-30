@@ -152,4 +152,50 @@ router.post("/sync/:pub", requireAuth, async (req, res) => {
     }
 });
 
+// ============================================================================
+// PUBLIC LOBBY ROUTES
+// ============================================================================
+
+/**
+ * GET /chat/lobby
+ * Get recent public lobby messages
+ */
+router.get("/lobby", requireAuth, async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit as string) || 50;
+        const messages = chatService.getLobbyMessages(limit);
+        res.json({
+            success: true,
+            data: messages
+        });
+    } catch (e: any) {
+        log.error({ err: e }, "Failed to get lobby messages");
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+/**
+ * POST /chat/lobby
+ * Send a message to the public lobby
+ */
+router.post("/lobby", requireAuth, async (req, res) => {
+    try {
+        const { text } = req.body;
+        
+        if (!text) {
+            return res.status(400).json({ success: false, error: "Missing text" });
+        }
+
+        await chatService.sendLobbyMessage(text);
+        
+        res.json({
+            success: true,
+            message: "Message sent to lobby"
+        });
+    } catch (e: any) {
+        log.error({ err: e }, "Failed to send lobby message");
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 export default router;

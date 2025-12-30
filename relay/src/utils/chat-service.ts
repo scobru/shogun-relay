@@ -47,6 +47,7 @@ class ChatService {
         this.active = true;
         log.info(`💬 Chat Service initialized for ${this.myPub.substring(0, 8)}...`);
         this.startSignalListener();
+        this.startLobbyListener();
       }
     }, 1000);
   }
@@ -252,6 +253,88 @@ class ChatService {
       
       return threads;
   }
+
+  // ============================================================================
+  // PUBLIC LOBBY (Non-encrypted global chat room)
+  // ============================================================================
+
+  private lobbyCache = new Map<string, LobbyMessage>();
+
+  /**
+   * Start listening to the public lobby
+   */
+  private startLobbyListener() {
+      // Path: shogun/lobby/<msgId>
+      this.gun.get('shogun').get('lobby').map().on((data: any, msgId: string) => {
+          if (!data || !data.text || !data.from) return;
+          
+          // Ignore old messages (older than 24 hours)
+          const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+          if (data.timestamp && data.timestamp < oneDayAgo) return;
+
+          // Cache the message
+          if (!this.lobbyCache.has(msgId)) {
+              this.lobbyCache.set(msgId, {
+                  id: msgId,
+                  from: data.from,
+                  alias: data.alias || data.from.substring(0, 8) + '...',
+                  text: data.text,
+                  timestamp: data.timestamp || parseInt(msgId) || Date.now()
+              });
+          }
+      });
+
+      log.info("📢 Listening to public lobby");
+  }
+
+  /**
+   * Send a message to the public lobby
+   */
+  public async sendLobbyMessage(text: string): Promise<boolean> {
+      if (!this.active) throw new Error("Chat service not active");
+      
+      const pair = getRelayKeyPair();
+      if (!pair) throw new Error("Relay not authenticated");
+
+      const msgId = Date.now().toString();
+      const lobbyMsg = {
+          from: this.myPub,
+          alias: process.env.RELAY_NAME || this.myPub.substring(0, 8) + '...',
+          text: text,
+          timestamp: Date.now()
+      };
+
+      // Write to public lobby (no encryption!)
+      this.gun.get('shogun').get('lobby').get(msgId).put(lobbyMsg);
+
+      // Cache our own message
+      this.lobbyCache.set(msgId, {
+          id: msgId,
+          ...lobbyMsg
+      });
+
+      log.info(`📢 Sent lobby message`);
+      return true;
+  }
+
+  /**
+   * Get recent lobby messages
+   */
+  public getLobbyMessages(limit: number = 50): LobbyMessage[] {
+      const messages = Array.from(this.lobbyCache.values())
+          .sort((a, b) => a.timestamp - b.timestamp)
+          .slice(-limit);
+      
+      return messages;
+  }
+}
+
+export interface LobbyMessage {
+  id: string;
+  from: string;
+  alias: string;
+  text: string;
+  timestamp: number;
 }
 
 export const chatService = new ChatService();
