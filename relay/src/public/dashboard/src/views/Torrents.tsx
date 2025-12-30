@@ -303,12 +303,28 @@ function Torrents() {
               if (searchQuery.length >= 3) {
                    const res = await fetch(`/api/v1/torrent/registry/search?q=${encodeURIComponent(searchQuery)}`, { headers: getAuthHeaders() })
                    const data = await res.json()
-                   setSearchResults(data.results?.map((r: any) => ({ ...r, source: 'registry' })) || [])
+                   setSearchResults(data.results?.map((r: any) => ({
+                       title: r.name || r.title || 'Unknown',
+                       magnet: r.magnetURI || r.magnet,
+                       size: r.size ? formatBytes(r.size) : undefined,
+                       infoHash: r.infoHash,
+                       files: r.files,
+                       addedBy: r.addedBy,
+                       source: 'registry' as const
+                   })) || [])
               } else {
                   // Browse
                   const res = await fetch('/api/v1/torrent/registry/browse?limit=50', { headers: getAuthHeaders() })
                   const data = await res.json()
-                  setSearchResults(data.results?.map((r: any) => ({ ...r, source: 'registry' })) || [])
+                  setSearchResults(data.results?.map((r: any) => ({
+                      title: r.name || r.title || 'Unknown',
+                      magnet: r.magnetURI || r.magnet,
+                      size: r.size ? formatBytes(r.size) : undefined,
+                      infoHash: r.infoHash,
+                      files: r.files,
+                      addedBy: r.addedBy,
+                      source: 'registry' as const
+                  })) || [])
               }
           } else {
               const res = await fetch(`${endpoint}?q=${encodeURIComponent(searchQuery)}`, {

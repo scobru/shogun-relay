@@ -29,14 +29,36 @@ const requireAuth = (req: any, res: any, next: any) => {
  */
 router.get("/peers", requireAuth, async (req, res) => {
     try {
-        const network = await torrentManager.getNetworkCatalog();
-        const peers = network
-            .filter(node => node.relayKey) // Only those with valid keys
-            .map(node => ({
-                pub: node.relayKey,
-                alias: node.relayUrl || 'Unknown Relay',
-                lastSeen: node.lastUpdated
-            }));
+        const gun = req.app.get("gunInstance");
+        if (!gun) {
+            return res.json({ success: true, data: [] });
+        }
+
+        const peers: { pub: string; alias: string; lastSeen: number }[] = [];
+        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+
+        await new Promise<void>((resolve) => {
+            const timeout = setTimeout(() => resolve(), 3000);
+
+            // Read from shogun-network/relays (same path as announceRelayPresence)
+            gun.get("shogun-network").get("relays").map().once((data: any, pubKey: string) => {
+                if (!data || !data.endpoint) return;
+                
+                // Only include recently seen relays
+                if (data.lastSeen && data.lastSeen > fiveMinutesAgo) {
+                    peers.push({
+                        pub: pubKey,
+                        alias: data.endpoint || 'Unknown Relay',
+                        lastSeen: data.lastSeen
+                    });
+                }
+            });
+
+            setTimeout(() => {
+                clearTimeout(timeout);
+                resolve();
+            }, 2500);
+        });
         
         res.json({
             success: true,
