@@ -171,6 +171,55 @@ router.post("/create", upload.array('files', 20), async (req, res) => {
 });
 
 /**
+ * POST /control
+ * Unified control endpoint for pause/resume/remove actions
+ * Used by dashboard frontend
+ */
+router.post("/control", express.json(), async (req, res) => {
+  try {
+    const { infoHash, action } = req.body;
+    
+    if (!infoHash || !action) {
+      return res.status(400).json({
+        success: false,
+        error: "infoHash and action are required"
+      });
+    }
+    
+    const validActions = ['pause', 'resume', 'remove'];
+    if (!validActions.includes(action)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid action. Must be one of: ${validActions.join(', ')}`
+      });
+    }
+    
+    switch (action) {
+      case 'pause':
+        torrentManager.pauseTorrent(infoHash);
+        break;
+      case 'resume':
+        torrentManager.resumeTorrent(infoHash);
+        break;
+      case 'remove':
+        await torrentManager.removeTorrent(infoHash, false);
+        break;
+    }
+    
+    res.json({
+      success: true,
+      message: `Torrent ${action} successful`
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, `Failed to ${req.body?.action || 'control'} torrent`);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
  * POST /pause/:infoHash
  * Pause a torrent
  */
