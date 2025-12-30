@@ -146,12 +146,24 @@ class ChatService {
       const pair = getRelayKeyPair();
       if (!user || !pair) throw new Error("Relay user not authenticated");
 
-      // 1. Get recipient epub
+      // 1. Get recipient epub with timeout
       return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+              reject(new Error(`Peer lookup timed out for ${toPub.substring(0, 8)}... - peer may be offline or not registered`));
+          }, 5000);
+
           this.gun.get('~' + toPub).once(async (peerData: any) => {
-              if (!peerData || !peerData.epub) {
-                  log.warn(`💬 Could not find epub for ${toPub}`);
-                  reject(new Error("Peer not found or invalid keys"));
+              clearTimeout(timeout);
+
+              if (!peerData) {
+                  log.warn(`💬 Peer not found in GunDB: ${toPub.substring(0, 8)}...`);
+                  reject(new Error(`Peer not found: ${toPub.substring(0, 8)}... - they may not be a registered relay`));
+                  return;
+              }
+
+              if (!peerData.epub) {
+                  log.warn(`💬 Peer found but missing epub key: ${toPub.substring(0, 8)}...`);
+                  reject(new Error(`Peer ${toPub.substring(0, 8)}... has no encryption key - they may not have fully initialized`));
                   return;
               }
 
