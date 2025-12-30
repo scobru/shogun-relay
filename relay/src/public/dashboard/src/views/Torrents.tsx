@@ -294,8 +294,8 @@ function Torrents() {
       
       try {
           let endpoint = ''
-          if (discoveryMode === 'archive') endpoint = '/api/v1/torrent/search/archive'
-          else if (discoveryMode === 'dht') endpoint = '/api/v1/torrent/search/dht'
+          if (discoveryMode === 'archive') endpoint = '/api/v1/torrent/search/internet-archive'
+          else if (discoveryMode === 'dht') endpoint = '/api/v1/torrent/search/piratebay'
           else endpoint = '/api/v1/torrent/registry/search' // Fallback for specific logic below
           
           // Special handling for registry browse vs search
