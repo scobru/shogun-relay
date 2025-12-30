@@ -72,6 +72,15 @@ router.get("/conversations", requireAuth, async (req, res) => {
 router.get("/messages/:pub", requireAuth, async (req, res) => {
     try {
         const { pub } = req.params;
+        
+        // Validation: Pub key should not contain colons (implies message ID)
+        if (pub.includes(':') || pub.length > 100) {
+             return res.status(400).json({ 
+                 success: false, 
+                 error: "Invalid public key format. Did you pass a message ID instead?" 
+             });
+        }
+
         const messages = await chatService.getHistory(pub);
         res.json({
             success: true,
