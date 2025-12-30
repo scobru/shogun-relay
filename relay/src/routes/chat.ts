@@ -242,4 +242,44 @@ router.post("/lobby", requireAuth, async (req, res) => {
     }
 });
 
+// ============================================================================
+// MESSAGE DELETION ROUTES
+// ============================================================================
+
+/**
+ * DELETE /chat/conversations/:pub
+ * Clear an entire conversation
+ */
+router.delete("/conversations/:pub", requireAuth, async (req, res) => {
+    try {
+        const { pub } = req.params;
+        await chatService.clearConversation(pub);
+        res.json({
+            success: true,
+            message: "Conversation cleared"
+        });
+    } catch (e: any) {
+        log.error({ err: e }, "Failed to clear conversation");
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+/**
+ * DELETE /chat/messages/:pub/:messageId
+ * Delete a single message
+ */
+router.delete("/messages/:pub/:messageId", requireAuth, async (req, res) => {
+    try {
+        const { pub, messageId } = req.params;
+        await chatService.deleteMessage(pub, messageId);
+        res.json({
+            success: true,
+            message: "Message deleted"
+        });
+    } catch (e: any) {
+        log.error({ err: e }, "Failed to delete message");
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 export default router;

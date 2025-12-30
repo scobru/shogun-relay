@@ -454,9 +454,29 @@ function Chat() {
           </>
         ) : activePub ? (
             <>
-                <div className="p-4 border-b border-base-200 bg-base-200/30">
-                    <span className="text-xs uppercase tracking-wider opacity-60">Chat with Relay</span>
-                    <div className="font-mono text-sm truncate select-all">{activePub}</div>
+                <div className="p-4 border-b border-base-200 bg-base-200/30 flex justify-between items-start">
+                    <div>
+                        <span className="text-xs uppercase tracking-wider opacity-60">Chat with Relay</span>
+                        <div className="font-mono text-sm truncate select-all">{activePub}</div>
+                    </div>
+                    <button 
+                        className="btn btn-xs btn-ghost text-error" 
+                        onClick={async () => {
+                            if (!confirm('Clear all messages in this conversation?')) return
+                            try {
+                                await fetch(`/api/v1/chat/conversations/${activePub}`, {
+                                    method: 'DELETE',
+                                    headers: getAuthHeaders()
+                                })
+                                setMessages([])
+                                fetchThreads()
+                            } catch (e) {
+                                alert('Failed to clear conversation')
+                            }
+                        }}
+                    >
+                        🗑️ Clear
+                    </button>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">

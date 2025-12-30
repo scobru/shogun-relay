@@ -48,6 +48,7 @@ class ChatService {
         log.info(`💬 Chat Service initialized for ${this.myPub.substring(0, 8)}...`);
         this.startSignalListener();
         this.startLobbyListener();
+        this.startLobbyCleanupJob();
       }
     }, 1000);
   }
@@ -326,6 +327,89 @@ class ChatService {
           .slice(-limit);
       
       return messages;
+  }
+
+  // ============================================================================
+  // MESSAGE DELETION / CLEANUP
+  // ============================================================================
+
+  /**
+   * Clear a private conversation (local cache + GunDB)
+   */
+  public async clearConversation(peerPub: string): Promise<boolean> {
+      if (!this.active) throw new Error("Chat service not active");
+      
+      const user = getRelayUser();
+      if (!user) throw new Error("Relay not authenticated");
+
+      // Clear local cache
+      this.messageCache.delete(peerPub);
+
+      // Clear from GunDB (our outbox to them)
+      user.get('chat').get(peerPub).put(null);
+      
+      // Clear signals we sent to them
+      this.gun.get('shogun').get('chat-signals').get(peerPub).put(null);
+
+      log.info(`💬 Cleared conversation with ${peerPub.substring(0, 8)}...`);
+      return true;
+  }
+
+  /**
+   * Delete a single message from conversation
+   */
+  public async deleteMessage(peerPub: string, messageId: string): Promise<boolean> {
+      if (!this.active) throw new Error("Chat service not active");
+      
+      const user = getRelayUser();
+      if (!user) throw new Error("Relay not authenticated");
+
+      // Remove from cache
+      this.messageCache.get(peerPub)?.delete(messageId);
+
+      // Remove from GunDB (only our own outbox - we can't delete their messages)
+      user.get('chat').get(peerPub).get(messageId).put(null);
+
+      log.info(`💬 Deleted message ${messageId} from conversation`);
+      return true;
+  }
+
+  /**
+   * Cleanup old lobby messages (older than 24h)
+   * Call this periodically
+   */
+  public cleanupOldLobbyMessages(): number {
+      const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+      let cleaned = 0;
+
+      for (const [msgId, msg] of this.lobbyCache.entries()) {
+          if (msg.timestamp < oneDayAgo) {
+              this.lobbyCache.delete(msgId);
+              // Also mark as null in GunDB (can only delete our own, but we try)
+              this.gun.get('shogun').get('lobby').get(msgId).put(null);
+              cleaned++;
+          }
+      }
+
+      if (cleaned > 0) {
+          log.info(`📢 Cleaned up ${cleaned} old lobby messages`);
+      }
+      return cleaned;
+  }
+
+  /**
+   * Start periodic lobby cleanup (every hour)
+   */
+  public startLobbyCleanupJob() {
+      // Run immediately
+      this.cleanupOldLobbyMessages();
+      
+      // Then every hour
+      setInterval(() => {
+          this.cleanupOldLobbyMessages();
+      }, 60 * 60 * 1000);
+      
+      log.info("📢 Lobby cleanup job started (every 1h)");
   }
 }
 
