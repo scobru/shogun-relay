@@ -118,7 +118,80 @@ export async function syncOnchainRelaysAsPeers(
 }
 
 /**
- * Start periodic sync of on-chain relays
+ * Announce this relay's presence on GunDB
+ * @param gun - GunDB instance
+ * @param relayInfo - Relay information (endpoint, etc.)
+ * @param pubKey - Relay's public key (SEA pub)
+ */
+export function announceRelayPresence(
+  gun: IGunInstance,
+  relayInfo: { endpoint: string; [key: string]: any },
+  pubKey: string
+): void {
+  if (!pubKey || !relayInfo.endpoint) {
+    log.warn("Cannot announce relay presence: missing pubKey or endpoint");
+    return;
+  }
+
+  const presenceData = {
+    ...relayInfo,
+    lastSeen: Date.now(),
+  };
+
+  // Write to shogun-network/relays/PUBKEY
+  // Using shogun-network root to match reputation module
+  gun.get("shogun-network").get("relays").get(pubKey).put(presenceData);
+  log.info({ pubKey, endpoint: relayInfo.endpoint }, "Announced relay presence on GunDB");
+}
+
+/**
+ * Sync peers from GunDB (shogun-network/relays)
+ * @param gun - GunDB instance
+ * @param excludeEndpoint - Endpoint to exclude (our own)
+ */
+export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): void {
+  log.info("Starting GunDB peer discovery...");
+  
+  gun.get("shogun-network").get("relays").map().on((data: any, pubKey: string) => {
+    if (!data || !data.endpoint) return;
+
+    // Validate endpoint (basic check)
+    if (typeof data.endpoint !== 'string' || !data.endpoint.startsWith('http')) {
+      return;
+    }
+
+    let peerEndpoint = data.endpoint.trim();
+    if (peerEndpoint.endsWith("/")) {
+      peerEndpoint = peerEndpoint.slice(0, -1);
+    }
+
+    // Skip our own endpoint
+    if (excludeEndpoint && peerEndpoint.toLowerCase() === excludeEndpoint.toLowerCase()) {
+      return;
+    }
+
+    // Build Gun peer URL - add /gun if not already present
+    let gunPeerUrl: string;
+    if (peerEndpoint.endsWith("/gun")) {
+      gunPeerUrl = peerEndpoint;
+    } else {
+      gunPeerUrl = `${peerEndpoint}/gun`;
+    }
+
+    // Check if we already have this peer (simple check, Gun handles dedupe internally too)
+    // But we want to log only new ones if possible. Gun doesn't expose easy "hasPeer" check 
+    // without accessing internal state. We'll rely on Gun's opt for deduplication.
+    
+    // Add as peer
+    gun.opt({ peers: [gunPeerUrl] });
+    
+    // Log is spammy with on(), so maybe debug only or check if new
+    log.debug({ peer: gunPeerUrl, pubKey }, "Discovered peer via GunDB");
+  });
+}
+
+/**
+ * Start periodic sync of on-chain relays AND GunDB discovery
  *
  * @param gun - GunDB instance
  * @param chainId - Chain ID for registry
@@ -135,6 +208,10 @@ export function startPeriodicPeerSync(
   let intervalId: NodeJS.Timeout | null = null;
   let isRunning = false;
 
+  // 1. Start GunDB discovery immediately (reactive)
+  syncGunDBPeers(gun, excludeEndpoint);
+
+  // 2. Periodic On-chain Sync
   const doSync = async () => {
     if (isRunning) {
       log.debug("Peer sync already in progress, skipping");
@@ -151,10 +228,10 @@ export function startPeriodicPeerSync(
     }
   };
 
-  // Initial sync
+  // Initial on-chain sync
   doSync();
 
-  // Start periodic sync
+  // Start periodic on-chain sync
   intervalId = setInterval(doSync, intervalMs);
 
   // Return stop function

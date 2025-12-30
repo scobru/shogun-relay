@@ -46,7 +46,7 @@ import {
   getChainName,
   createProductionErrorHandler,
 } from "./utils/security";
-import { startPeriodicPeerSync } from "./utils/peer-discovery";
+import { startPeriodicPeerSync, announceRelayPresence } from "./utils/peer-discovery";
 import { torrentManager } from "./utils/torrent";
 
 dotenv.config();
@@ -1944,7 +1944,27 @@ See docs/RELAY_KEYS.md for more information.
       ? `https://${process.env.RELAY_HOST}`
       : `http://localhost:${port}`;
 
-    startPeriodicPeerSync(gun, chainId, ownEndpoint, 5 * 60 * 1000); // Every 5 minutes
+    // Start peer sync (On-chain + GunDB)
+    const stopPeerSync = startPeriodicPeerSync(gun, chainId, ownEndpoint, 60000);
+
+    // Announce presence on GunDB (GunDB-first discovery)
+    if (relayKeyPair && relayKeyPair.pub) {
+      const relayInfo = {
+        endpoint: ownEndpoint,
+        version: packageConfig.version,
+      };
+      
+      // Announce immediately
+      announceRelayPresence(gun, relayInfo, relayKeyPair.pub);
+      
+      // And periodically to update 'lastSeen'
+      setInterval(() => {
+        announceRelayPresence(gun, relayInfo, relayKeyPair.pub);
+      }, 60 * 1000); // Every minute
+      
+      loggers.server.info({ pubKey: relayKeyPair.pub }, "📢 Relay presence announced on GunDB");
+    }
+
     loggers.server.info(
       { chainId, excludeEndpoint: ownEndpoint },
       "🔗 Started on-chain relay peer discovery"
