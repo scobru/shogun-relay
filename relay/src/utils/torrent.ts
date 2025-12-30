@@ -482,16 +482,31 @@ export class TorrentManager {
             // For seeded torrents - add to catalog (use .then() since this is not async)
             loggers.server.info(`📚 Adding torrent ${torrent.name} to catalog...`);
             this.onTorrentComplete(torrent)
-              .then(() => {
+              .then(async () => {
                 loggers.server.info(`📚 Catalog updated, now has ${this.catalog.size} entries`);
                 
+                // Get catalog entry (now has files with potential IPFS CIDs)
+                const catalogEntry = this.catalog.get(torrent.infoHash.toLowerCase());
+                const fileList = catalogEntry?.files.map(f => ({
+                  name: f.name,
+                  size: f.size,
+                  ipfsCid: f.ipfsCid
+                })) || torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || [];
+                
                 // Publish to global registry for network discovery
-                this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
+                loggers.server.info(`📚 Publishing to global registry: ${torrent.name} with ${fileList.length} files`);
+                const result = await this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
                   size: torrent.length,
                   files: torrent.files?.length || 0,
                   aacMetadata: aacRecords[0], // Include first AAC record
-                  fileList: torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || []
+                  fileList
                 });
+                
+                if (result.success) {
+                  loggers.server.info(`📚 Successfully published to global registry: ${torrent.name}`);
+                } else {
+                  loggers.server.error(`📚 Failed to publish to global registry: ${torrent.name}`);
+                }
               })
               .catch((err) => {
                 loggers.server.error({ err }, `📚 Failed to add to catalog`);
