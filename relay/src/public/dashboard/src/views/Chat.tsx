@@ -24,6 +24,7 @@ function Chat() {
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [activePub, setActivePub] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [peers, setPeers] = useState<{pub: string, alias: string, lastSeen: number}[]>([])
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -33,7 +34,11 @@ function Chat() {
   // Polling for threads
   useEffect(() => {
     fetchThreads()
-    const interval = setInterval(fetchThreads, 5000)
+    fetchPeers()
+    const interval = setInterval(() => {
+        fetchThreads()
+        fetchPeers()
+    }, 5000)
     return () => clearInterval(interval)
   }, [])
 
@@ -63,6 +68,14 @@ function Chat() {
     } catch (e) {
       console.error(e)
     }
+  }
+
+  const fetchPeers = async () => {
+      try {
+          const res = await fetch('/api/v1/chat/peers', { headers: getAuthHeaders() })
+          const data = await res.json()
+          if (data.success) setPeers(data.data)
+      } catch (e) { console.error(e) }
   }
 
   const fetchMessages = async (pub: string) => {
@@ -103,10 +116,22 @@ function Chat() {
   }
 
   const handleNewChat = () => {
-      const pub = prompt("Enter Relay Public Key:");
+      // Open modal
+      const modal = document.getElementById('new_chat_modal') as HTMLDialogElement
+      if (modal) modal.showModal()
+  }
+
+  const startChat = (pub: string) => {
+      setActivePub(pub)
+      fetchMessages(pub)
+      const modal = document.getElementById('new_chat_modal') as HTMLDialogElement
+      if (modal) modal.close()
+  }
+
+  const handleManualEntry = () => {
+      const pub = prompt("Enter Relay Public Key:")
       if (pub && pub.length > 10) {
-          setActivePub(pub);
-          fetchMessages(pub);
+          startChat(pub)
       }
   }
 
@@ -114,6 +139,33 @@ function Chat() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-4">
+      {/* New Chat Modal */}
+      <dialog id="new_chat_modal" className="modal">
+        <div className="modal-box">
+            <h3 className="font-bold text-lg mb-4">Start New Chat</h3>
+            <div className="max-h-60 overflow-y-auto space-y-2 mb-4">
+                {peers.length === 0 && <p className="opacity-50 text-center text-sm">No peers discovered yet.</p>}
+                {peers.map((peer: {pub: string, alias: string}) => (
+                    <div key={peer.pub} onClick={() => startChat(peer.pub)} 
+                         className="p-3 bg-base-200 rounded-lg cursor-pointer hover:bg-base-300 flex justify-between items-center group">
+                        <div className="overflow-hidden">
+                            <div className="font-bold text-sm truncate">{peer.alias}</div>
+                            <div className="text-xs font-mono opacity-60 truncate">{peer.pub}</div>
+                        </div>
+                        <button className="btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity">Chat</button>
+                    </div>
+                ))}
+            </div>
+            <div className="divider">OR</div>
+            <button className="btn btn-outline btn-block btn-sm" onClick={handleManualEntry}>
+                Enter Public Key Manually
+            </button>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+            <button>close</button>
+        </form>
+      </dialog>
+
       {/* Sidebar - Threads */}
       <div className="w-1/3 min-w-[250px] card bg-base-100 shadow-sm flex flex-col">
         <div className="p-4 border-b border-base-200 flex justify-between items-center">

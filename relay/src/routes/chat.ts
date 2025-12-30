@@ -3,6 +3,7 @@ import { Router } from "express";
 import { loggers } from "../utils/logger";
 import { chatService } from "../utils/chat-service";
 import { authConfig } from "../config/env-config";
+import { torrentManager } from "../utils/torrent";
 
 const router = Router();
 const log = loggers.server;
@@ -21,6 +22,31 @@ const requireAuth = (req: any, res: any, next: any) => {
     }
     next();
 };
+
+/**
+ * GET /chat/peers
+ * List potential chat peers from network discovery
+ */
+router.get("/peers", requireAuth, async (req, res) => {
+    try {
+        const network = await torrentManager.getNetworkCatalog();
+        const peers = network
+            .filter(node => node.relayKey) // Only those with valid keys
+            .map(node => ({
+                pub: node.relayKey,
+                alias: node.relayUrl || 'Unknown Relay',
+                lastSeen: node.lastUpdated
+            }));
+        
+        res.json({
+            success: true,
+            data: peers
+        });
+    } catch (e: any) {
+        log.error({ err: e }, "Failed to get peers");
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
 
 /**
  * GET /chat/conversations

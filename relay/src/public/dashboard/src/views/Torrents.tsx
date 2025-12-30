@@ -123,7 +123,8 @@ function Torrents() {
       try {
           const res = await fetch('/api/v1/torrent/refresh-catalog', { 
               method: 'POST',
-              headers: getAuthHeaders() 
+              headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+              body: JSON.stringify({ force: true })
           })
           if (res.ok) {
               await fetchCatalogStats()

@@ -405,7 +405,8 @@ router.get("/catalog", async (req, res) => {
       success: true,
       relay: {
         url: relayUrl,
-        ipfsGateway: ipfsGateway
+        ipfsGateway: ipfsGateway,
+        key: torrentManager.getRelayKey() // Include public key for chat/dm
       },
       catalog: catalog,
       count: catalog.length,
@@ -478,7 +479,8 @@ router.post("/refetch", express.json(), async (req, res) => {
  */
 router.post("/refresh-catalog", async (req, res) => {
   try {
-    const result = torrentManager.refreshCatalog();
+    const { force } = req.body;
+    const result = await torrentManager.refreshCatalog(force === true);
     
     res.json({
       success: true,

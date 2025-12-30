@@ -574,10 +574,18 @@ export class TorrentManager {
   }
 
   /**
+   * Get the relay's public key
+   */
+  public getRelayKey(): string {
+    return this.relayKey;
+  }
+
+  /**
    * Public method to manually refresh/publish the catalog
    * Syncs the catalog with active torrents in the client and publishes to GunDB
+   * @param force Force republishing to global registry even if already exists
    */
-  public refreshCatalog(): { catalogSize: number; published: boolean; removed: number } {
+  public async refreshCatalog(force: boolean = false): Promise<{ catalogSize: number; published: boolean; removed: number }> {
     try {
       let removedCount = 0;
 
@@ -605,6 +613,23 @@ export class TorrentManager {
         if (removedCount > 0) {
           loggers.server.info(`📚 Removed ${removedCount} inactive torrents from catalog`);
           this.saveCatalog();
+        }
+
+        // If force is true, iterate all active torrents and force publish to registry
+        if (force) {
+            loggers.server.info(`📚 Forcing republish of ${this.client.torrents.length} torrents to global registry...`);
+            for (const torrent of this.client.torrents) {
+                // Determine sizes/files from catalog if available, or torrent object
+                const entry = this.catalog.get(torrent.infoHash.toLowerCase());
+                const size = entry ? entry.files.reduce((acc, f) => acc + f.size, 0) : torrent.length;
+                const fileCount = entry ? entry.files.length : (torrent.files?.length || 0);
+
+                await this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
+                    size,
+                    files: fileCount,
+                    force: true
+                });
+            }
         }
       }
 
@@ -737,6 +762,7 @@ export class TorrentManager {
             results.push({
               relayUrl: data.relay?.url || relayUrl,
               ipfsGateway: data.relay?.ipfsGateway,
+              relayKey: data.relay?.key || null, // Capture relay key for chat
               lastUpdated: Date.now(),
               torrentCount: data.count || 0,
               torrents: torrents
@@ -1285,6 +1311,7 @@ export class TorrentManager {
       size?: number;
       files?: number;
       aacMetadata?: any;
+      force?: boolean;
     } = {}
   ): Promise<{ success: boolean; alreadyExists?: boolean }> {
     if (!this.gun) {
@@ -1297,7 +1324,8 @@ export class TorrentManager {
     return new Promise((resolve) => {
       // Check if torrent already exists in registry
       this.gun.get('shogun').get('torrents').get('registry').get(normalizedHash).once((existing: any) => {
-        if (existing && existing.magnetURI) {
+        // If force is true, we proceed regardless of existing
+        if (existing && existing.magnetURI && !options.force) {
           loggers.server.info(`📚 Torrent ${normalizedHash} already in global registry`);
           resolve({ success: true, alreadyExists: true });
           return;
