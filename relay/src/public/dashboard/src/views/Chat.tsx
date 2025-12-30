@@ -20,6 +20,13 @@ interface LobbyMessage {
   timestamp: number
 }
 
+interface ConsoleEntry {
+  id: string
+  type: 'command' | 'response'
+  text: string
+  timestamp: number
+}
+
 interface ChatThread {
   pub: string
   alias?: string
@@ -37,13 +44,20 @@ function Chat() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'console' | 'lobby' | 'private'>('console')
+  
   // Lobby state
-  const [activeTab, setActiveTab] = useState<'private' | 'lobby'>('lobby')
   const [lobbyMessages, setLobbyMessages] = useState<LobbyMessage[]>([])
   const [lobbyInput, setLobbyInput] = useState('')
   
+  // Console state
+  const [consoleHistory, setConsoleHistory] = useState<ConsoleEntry[]>([])
+  const [consoleInput, setConsoleInput] = useState('')
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const lobbyEndRef = useRef<HTMLDivElement>(null)
+  const consoleEndRef = useRef<HTMLDivElement>(null)
 
   // Polling for threads and lobby
   useEffect(() => {
@@ -75,6 +89,10 @@ function Chat() {
   useEffect(() => {
     lobbyEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [lobbyMessages])
+
+  useEffect(() => {
+    consoleEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [consoleHistory])
 
   const fetchThreads = async () => {
     try {
@@ -170,6 +188,55 @@ function Chat() {
     }
   }
 
+  const handleConsoleCommand = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!consoleInput.trim() || sending) return
+
+    const command = consoleInput.startsWith('/') ? consoleInput : `/${consoleInput}`
+    
+    // Add command to history
+    const cmdEntry: ConsoleEntry = {
+      id: Date.now().toString(),
+      type: 'command',
+      text: command,
+      timestamp: Date.now()
+    }
+    setConsoleHistory(prev => [...prev, cmdEntry])
+    setConsoleInput('')
+
+    setSending(true)
+    try {
+      const res = await fetch('/api/v1/chat/console', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders()
+        },
+        body: JSON.stringify({ command })
+      })
+      const data = await res.json()
+      
+      // Add response to history
+      const respEntry: ConsoleEntry = {
+        id: (Date.now() + 1).toString(),
+        type: 'response',
+        text: data.success ? data.response : `❌ Error: ${data.error}`,
+        timestamp: Date.now()
+      }
+      setConsoleHistory(prev => [...prev, respEntry])
+    } catch (e) {
+      const errEntry: ConsoleEntry = {
+        id: (Date.now() + 1).toString(),
+        type: 'response',
+        text: '❌ Network error',
+        timestamp: Date.now()
+      }
+      setConsoleHistory(prev => [...prev, errEntry])
+    } finally {
+      setSending(false)
+    }
+  }
+
   const handleNewChat = () => {
       // Open modal
       const modal = document.getElementById('new_chat_modal') as HTMLDialogElement
@@ -226,9 +293,28 @@ function Chat() {
       <div className="w-1/3 min-w-[250px] card bg-base-100 shadow-sm flex flex-col">
         {/* Tabs */}
         <div className="tabs tabs-boxed bg-transparent p-2">
+            <a className={`tab ${activeTab === 'console' ? 'tab-active' : ''}`} onClick={() => setActiveTab('console')}>🤖 Console</a>
             <a className={`tab ${activeTab === 'lobby' ? 'tab-active' : ''}`} onClick={() => setActiveTab('lobby')}>📢 Lobby</a>
             <a className={`tab ${activeTab === 'private' ? 'tab-active' : ''}`} onClick={() => setActiveTab('private')}>🔒 Private</a>
         </div>
+
+        {activeTab === 'console' && (
+          <div className="flex-1 flex flex-col p-4">
+            <h2 className="font-bold text-lg mb-2">🤖 Bot Console</h2>
+            <p className="text-xs opacity-60 mb-4">Execute relay commands directly.</p>
+            <div className="bg-base-200 rounded-lg p-3 space-y-2">
+              <div className="text-xs font-mono">
+                <div className="opacity-70">Available commands:</div>
+                <div className="mt-1 space-y-1">
+                  <div><span className="text-primary">/help</span> - List commands</div>
+                  <div><span className="text-primary">/status</span> - Relay status</div>
+                  <div><span className="text-primary">/search</span> &lt;query&gt;</div>
+                  <div><span className="text-primary">/add</span> &lt;magnet&gt;</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {activeTab === 'private' && (
           <>
@@ -279,7 +365,52 @@ function Chat() {
 
       {/* Main Chat Area */}
       <div className="flex-1 card bg-base-100 shadow-sm flex flex-col">
-        {activeTab === 'lobby' ? (
+        {activeTab === 'console' ? (
+          <>
+            <div className="p-4 border-b border-base-200 bg-gradient-to-r from-success/10 to-info/10">
+                <span className="text-lg font-bold">🤖 Relay Console</span>
+                <div className="text-xs opacity-60">Execute commands • Type /help to get started</div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-base-200/30 font-mono text-sm">
+                {consoleHistory.length === 0 && (
+                    <div className="text-center opacity-50 py-8">
+                        <div className="text-4xl mb-2">🤖</div>
+                        <p className="font-sans">Type a command to get started</p>
+                        <p className="text-xs mt-2 font-sans">Try: /help, /status, /search linux</p>
+                    </div>
+                )}
+                {consoleHistory.map((entry: ConsoleEntry) => (
+                    <div key={entry.id} className={entry.type === 'command' ? 'text-primary' : 'text-base-content'}>
+                        {entry.type === 'command' ? (
+                            <div className="flex items-start gap-2">
+                                <span className="text-success">$</span>
+                                <span>{entry.text}</span>
+                            </div>
+                        ) : (
+                            <div className="pl-4 whitespace-pre-wrap opacity-90">{entry.text}</div>
+                        )}
+                    </div>
+                ))}
+                <div ref={consoleEndRef} />
+            </div>
+
+            <form onSubmit={handleConsoleCommand} className="p-4 border-t border-base-200 flex gap-2">
+                <span className="flex items-center text-success font-mono">$</span>
+                <input 
+                    type="text" 
+                    className="input input-bordered w-full font-mono" 
+                    placeholder="/help" 
+                    value={consoleInput}
+                    onChange={e => setConsoleInput(e.target.value)}
+                    disabled={sending}
+                />
+                <button type="submit" className="btn btn-primary" disabled={sending}>
+                    {sending ? '...' : 'Run'}
+                </button>
+            </form>
+          </>
+        ) : activeTab === 'lobby' ? (
           <>
             <div className="p-4 border-b border-base-200 bg-gradient-to-r from-primary/10 to-secondary/10">
                 <span className="text-lg font-bold">📢 Shogun Lobby</span>

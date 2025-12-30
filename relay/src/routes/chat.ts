@@ -153,6 +153,50 @@ router.post("/sync/:pub", requireAuth, async (req, res) => {
 });
 
 // ============================================================================
+// BOT CONSOLE ROUTE (Direct command execution)
+// ============================================================================
+
+import { chatCommands } from "../utils/chat-commands";
+import { getRelayKeyPair } from "../utils/relay-user";
+
+/**
+ * POST /chat/console
+ * Execute a command directly and return the response
+ * This is for the "Console" tab - no P2P messaging involved
+ */
+router.post("/console", requireAuth, async (req, res) => {
+    try {
+        const { command } = req.body;
+        
+        if (!command) {
+            return res.status(400).json({ success: false, error: "Missing command" });
+        }
+
+        const relayKeyPair = getRelayKeyPair();
+        if (!relayKeyPair) {
+            return res.status(500).json({ success: false, error: "Relay not initialized" });
+        }
+
+        // Execute command as self (fromPub = own pubkey)
+        // Provide a dummy sendMessage that just logs (used for /browse)
+        const dummySend = async (to: string, text: string) => {
+            log.info({ to, text }, "Console: Would send P2P message");
+            return false; // Not actually sent
+        };
+
+        const response = await chatCommands.handleCommand(command, relayKeyPair.pub, dummySend);
+        
+        res.json({
+            success: true,
+            response: response || "Command executed (no output)"
+        });
+    } catch (e: any) {
+        log.error({ err: e }, "Failed to execute console command");
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// ============================================================================
 // PUBLIC LOBBY ROUTES
 // ============================================================================
 
