@@ -43,6 +43,7 @@ export interface TorrentStatus {
     uploadSpeed: number;
     peers: number;
     paused: boolean;
+    state?: 'downloading' | 'seeding' | 'paused' | 'queued' | 'checking' | 'error';
     files: number;
   }[];
 }
@@ -811,6 +812,46 @@ export class TorrentManager {
   }
 
   /**
+   * Manually pin all files in a torrent to IPFS
+   */
+  public async pinTorrent(infoHash: string): Promise<{ success: boolean; pinned: number; total: number; errors: string[] }> {
+    // Normalize infoHash to lowercase for consistent lookup
+    const normalizedHash = infoHash.toLowerCase();
+    
+    const entry = this.catalog.get(normalizedHash);
+    if (!entry) {
+      return { success: false, pinned: 0, total: 0, errors: [`Torrent not found in catalog`] };
+    }
+    
+    let pinned = 0;
+    const errors: string[] = [];
+    
+    loggers.server.info(`📚 Pinning all ${entry.files.length} files for torrent ${normalizedHash}`);
+    
+    for (const file of entry.files) {
+      // Skip if already pinned
+      if (file.ipfsCid) {
+        pinned++;
+        continue;
+      }
+      
+      const result = await this.pinFile(infoHash, file.path);
+      if (result.success) {
+        pinned++;
+      } else {
+        errors.push(`${file.name}: ${result.error}`);
+      }
+    }
+    
+    return { 
+      success: errors.length === 0, 
+      pinned, 
+      total: entry.files.length, 
+      errors 
+    };
+  }
+
+  /**
    * Manually pin a file from a torrent to IPFS
    * Returns the CID if successful
    */
@@ -1222,6 +1263,7 @@ export class TorrentManager {
           peers: t.numPeers,
           paused: t.paused,
           files: t.files.length,
+          state: t.paused ? 'paused' : (t.progress === 1 ? 'seeding' : 'downloading'),
           magnetURI: t.magnetURI
       }))
     };

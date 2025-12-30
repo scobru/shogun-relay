@@ -328,6 +328,39 @@ router.post("/pin", async (req, res) => {
 });
 
 /**
+ * POST /pin-all
+ * Pin all files of a torrent to IPFS
+ */
+router.post("/pin-all", async (req, res) => {
+  try {
+    const { infoHash } = req.body;
+    
+    if (!infoHash) {
+      return res.status(400).json({
+        success: false,
+        error: "infoHash is required"
+      });
+    }
+    
+    const result = await torrentManager.pinTorrent(infoHash);
+    
+    res.json({
+      success: result.success,
+      pinned: result.pinned,
+      total: result.total,
+      errors: result.errors,
+      message: `Pinned ${result.pinned}/${result.total} files`
+    });
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "Failed to pin torrent to IPFS");
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
+    });
+  }
+});
+
+/**
  * GET /files/:infoHash?
 
  * Get files for a specific torrent or all torrents
@@ -609,7 +642,7 @@ router.get("/search", async (req, res) => {
 
 /**
  * GET /search/internet-archive
- * Search Internet Archive for items with BitTorrent format
+ * Search Internet Archive for items (all formats)
  */
 router.get("/search/internet-archive", async (req, res) => {
   try {

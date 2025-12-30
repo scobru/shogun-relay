@@ -1,0 +1,370 @@
+/**
+ * Runtime Configuration Manager
+ * 
+ * Provides hot-reload capability for certain configuration values.
+ * Some configs can be changed without restart, others require .env modification.
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { loggers } from './logger';
+
+// ============================================================================
+// HOT-RELOADABLE CONFIGURATION KEYS
+// ============================================================================
+
+/**
+ * Keys that can be modified at runtime without server restart
+ */
+export const HOT_RELOADABLE_KEYS = [
+  // Pricing - Deals
+  'DEAL_PRICE_STANDARD',
+  'DEAL_PRICE_PREMIUM',
+  'DEAL_PRICE_ENTERPRISE',
+  'DEAL_MIN_SIZE_MB',
+  'DEAL_MAX_SIZE_MB',
+  'DEAL_MIN_DURATION_DAYS',
+  'DEAL_MAX_DURATION_DAYS',
+  'DEAL_PREMIUM_REPLICATION',
+  'DEAL_ENTERPRISE_REPLICATION',
+  
+  // Pricing - Subscriptions
+  'SUB_BASIC_STORAGE_MB',
+  'SUB_BASIC_PRICE',
+  'SUB_STANDARD_STORAGE_MB',
+  'SUB_STANDARD_PRICE',
+  'SUB_PREMIUM_STORAGE_MB',
+  'SUB_PREMIUM_PRICE',
+  'SUB_DURATION_DAYS',
+  
+  // Logging
+  'LOG_LEVEL',
+  'DEBUG',
+  
+  // Sync Intervals
+  'DEAL_SYNC_INTERVAL_MS',
+  'DEAL_SYNC_FAST_INTERVAL_MS',
+  'DEAL_SYNC_INITIAL_DELAY_MS',
+  'WORMHOLE_CLEANUP_INTERVAL_MS',
+  'WORMHOLE_MAX_AGE_SECS',
+  
+  // Limits
+  'RELAY_MAX_STORAGE_GB',
+  'RELAY_STORAGE_WARNING_THRESHOLD',
+  'HOLSTER_MAX_CONNECTIONS',
+  'IPFS_PIN_TIMEOUT_MS',
+  
+  // Replication
+  'AUTO_REPLICATION',
+  
+  // Torrent
+  'TORRENT_MAX_TB',
+] as const;
+
+export type HotReloadableKey = typeof HOT_RELOADABLE_KEYS[number];
+
+/**
+ * Keys that require server restart
+ */
+export const RESTART_REQUIRED_KEYS = [
+  // Server
+  'RELAY_HOST',
+  'RELAY_PORT',
+  'RELAY_NAME',
+  'RELAY_ENDPOINT',
+  'RELAY_PROTECTED',
+  'RELAY_PEERS',
+  
+  // Authentication
+  'ADMIN_PASSWORD',
+  
+  // Keys
+  'RELAY_SEA_KEYPAIR',
+  'RELAY_SEA_KEYPAIR_PATH',
+  'X402_PRIVATE_KEY',
+  'RELAY_PRIVATE_KEY',
+  'PRIVATE_KEY',
+  
+  // Module Enable Flags
+  'IPFS_ENABLED',
+  'X402_ENABLED',
+  'DEALS_ENABLED',
+  'REGISTRY_ENABLED',
+  'HOLSTER_ENABLED',
+  'WORMHOLE_ENABLED',
+  'TORRENT_ENABLED',
+  'DEAL_SYNC_ENABLED',
+  
+  // URLs / Endpoints
+  'IPFS_API_URL',
+  'IPFS_GATEWAY_URL',
+  'IPFS_API_TOKEN',
+  'X402_PAY_TO_ADDRESS',
+  'X402_FACILITATOR_URL',
+  
+  // Networks
+  'X402_NETWORKS',
+  'X402_DEFAULT_NETWORK',
+  'DEALS_NETWORKS',
+  'DEALS_DEFAULT_NETWORK',
+  'REGISTRY_NETWORKS',
+  'REGISTRY_DEFAULT_NETWORK',
+  
+  // Storage
+  'DATA_DIR',
+  'STORAGE_TYPE',
+  'DISABLE_RADISK',
+  
+  // Holster
+  'HOLSTER_RELAY_HOST',
+  'HOLSTER_RELAY_PORT',
+  'HOLSTER_RELAY_STORAGE',
+  'HOLSTER_RELAY_STORAGE_PATH',
+  
+  // Torrent
+  'TORRENT_DATA_DIR',
+  'TORRENT_ANNAS_ARCHIVE_URL',
+  
+  // Drive
+  'DRIVE_DATA_DIR',
+] as const;
+
+export type RestartRequiredKey = typeof RESTART_REQUIRED_KEYS[number];
+export type ConfigKey = HotReloadableKey | RestartRequiredKey;
+
+// ============================================================================
+// RUNTIME STORE
+// ============================================================================
+
+/**
+ * In-memory store for runtime configuration overrides
+ */
+const runtimeOverrides: Map<string, string> = new Map();
+
+/**
+ * Get the current value for a config key
+ * Priority: Runtime override > Environment variable > undefined
+ */
+export function getConfigValue(key: string): string | undefined {
+  // Check runtime override first
+  if (runtimeOverrides.has(key)) {
+    return runtimeOverrides.get(key);
+  }
+  // Fall back to environment variable
+  return process.env[key];
+}
+
+/**
+ * Set a runtime override for a hot-reloadable config key
+ * @returns true if successful, false if key is not hot-reloadable
+ */
+export function setRuntimeValue(key: HotReloadableKey, value: string): boolean {
+  if (!HOT_RELOADABLE_KEYS.includes(key)) {
+    loggers.server.warn({ key }, 'Attempted to hot-reload non-hot-reloadable key');
+    return false;
+  }
+  
+  runtimeOverrides.set(key, value);
+  loggers.server.info({ key, value }, '🔄 Runtime config updated (hot-reload)');
+  return true;
+}
+
+/**
+ * Clear a runtime override, reverting to env value
+ */
+export function clearRuntimeValue(key: string): void {
+  runtimeOverrides.delete(key);
+}
+
+/**
+ * Get all current runtime overrides
+ */
+export function getRuntimeOverrides(): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of runtimeOverrides) {
+    result[key] = value;
+  }
+  return result;
+}
+
+/**
+ * Check if a key is hot-reloadable
+ */
+export function isHotReloadable(key: string): boolean {
+  return HOT_RELOADABLE_KEYS.includes(key as HotReloadableKey);
+}
+
+/**
+ * Check if a key requires restart
+ */
+export function requiresRestart(key: string): boolean {
+  return RESTART_REQUIRED_KEYS.includes(key as RestartRequiredKey);
+}
+
+// ============================================================================
+// .ENV FILE OPERATIONS
+// ============================================================================
+
+/**
+ * Read the .env file contents
+ */
+export function readEnvFile(): string | null {
+  try {
+    const envPath = path.join(process.cwd(), '.env');
+    if (!fs.existsSync(envPath)) {
+      return null;
+    }
+    return fs.readFileSync(envPath, 'utf-8');
+  } catch (error) {
+    loggers.server.error({ err: error }, 'Failed to read .env file');
+    return null;
+  }
+}
+
+/**
+ * Parse .env file into key-value pairs
+ */
+export function parseEnvFile(content: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const lines = content.split('\n');
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Skip comments and empty lines
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex > 0) {
+      const key = trimmed.substring(0, eqIndex).trim();
+      let value = trimmed.substring(eqIndex + 1).trim();
+      
+      // Remove surrounding quotes if present
+      if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      
+      result[key] = value;
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Update a value in the .env file
+ * @returns true if successful
+ */
+export function updateEnvFile(updates: Record<string, string>): boolean {
+  try {
+    const envPath = path.join(process.cwd(), '.env');
+    let content = '';
+    
+    if (fs.existsSync(envPath)) {
+      content = fs.readFileSync(envPath, 'utf-8');
+    }
+    
+    const lines = content.split('\n');
+    const updatedKeys = new Set<string>();
+    
+    // Update existing keys
+    const newLines = lines.map(line => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return line;
+      
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex > 0) {
+        const key = trimmed.substring(0, eqIndex).trim();
+        if (updates.hasOwnProperty(key)) {
+          updatedKeys.add(key);
+          const value = updates[key];
+          // Quote values with spaces or special chars
+          const needsQuotes = /[\s#]/.test(value);
+          return `${key}=${needsQuotes ? `"${value}"` : value}`;
+        }
+      }
+      return line;
+    });
+    
+    // Add new keys that weren't in the file
+    for (const [key, value] of Object.entries(updates)) {
+      if (!updatedKeys.has(key)) {
+        const needsQuotes = /[\s#]/.test(value);
+        newLines.push(`${key}=${needsQuotes ? `"${value}"` : value}`);
+      }
+    }
+    
+    fs.writeFileSync(envPath, newLines.join('\n'));
+    loggers.server.info({ keys: Object.keys(updates) }, '📝 .env file updated');
+    
+    return true;
+  } catch (error) {
+    loggers.server.error({ err: error }, 'Failed to update .env file');
+    return false;
+  }
+}
+
+// ============================================================================
+// GET ALL CONFIG
+// ============================================================================
+
+interface ConfigInfo {
+  key: string;
+  value: string | undefined;
+  source: 'runtime' | 'env' | 'default';
+  hotReloadable: boolean;
+  category: string;
+}
+
+/**
+ * Get all configuration with metadata
+ */
+export function getAllConfig(): ConfigInfo[] {
+  const allKeys = [...HOT_RELOADABLE_KEYS, ...RESTART_REQUIRED_KEYS];
+  
+  const categorize = (key: string): string => {
+    if (key.startsWith('DEAL_PRICE') || key.startsWith('SUB_')) return 'Pricing';
+    if (key.startsWith('DEAL_SYNC') || key.includes('INTERVAL') || key.includes('TIMEOUT')) return 'Intervals';
+    if (key.startsWith('LOG') || key === 'DEBUG') return 'Logging';
+    if (key.startsWith('RELAY_')) return 'Relay';
+    if (key.startsWith('IPFS_')) return 'IPFS';
+    if (key.startsWith('X402_')) return 'X402';
+    if (key.startsWith('DEALS_')) return 'Deals';
+    if (key.startsWith('REGISTRY_')) return 'Registry';
+    if (key.startsWith('HOLSTER_')) return 'Holster';
+    if (key.startsWith('WORMHOLE_')) return 'Wormhole';
+    if (key.startsWith('TORRENT_')) return 'Torrent';
+    if (key.startsWith('DRIVE_')) return 'Drive';
+    if (key.includes('STORAGE') || key === 'DATA_DIR') return 'Storage';
+    if (key.includes('PASSWORD') || key.includes('KEY') || key.includes('TOKEN')) return 'Security';
+    return 'Other';
+  };
+  
+  return allKeys.map(key => {
+    const hasRuntimeOverride = runtimeOverrides.has(key);
+    const envValue = process.env[key];
+    
+    return {
+      key,
+      value: hasRuntimeOverride ? runtimeOverrides.get(key) : envValue,
+      source: hasRuntimeOverride ? 'runtime' : (envValue !== undefined ? 'env' : 'default'),
+      hotReloadable: isHotReloadable(key),
+      category: categorize(key),
+    };
+  });
+}
+
+export default {
+  HOT_RELOADABLE_KEYS,
+  RESTART_REQUIRED_KEYS,
+  getConfigValue,
+  setRuntimeValue,
+  clearRuntimeValue,
+  getRuntimeOverrides,
+  isHotReloadable,
+  requiresRestart,
+  readEnvFile,
+  parseEnvFile,
+  updateEnvFile,
+  getAllConfig,
+};

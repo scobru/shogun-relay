@@ -9,7 +9,7 @@ interface Torrent {
   downloadSpeed: number
   uploadSpeed: number
   numPeers: number
-  state: 'downloading' | 'seeding' | 'paused' | 'queued' | 'checking' | 'error'
+  state?: 'downloading' | 'seeding' | 'paused' | 'queued' | 'checking' | 'error'
   size: number
   magnetURI?: string
   files?: { name: string, path: string, length: number }[]
@@ -161,6 +161,27 @@ function Torrents() {
       } finally {
           setFetchingBulk(false)
       }
+  }
+
+  const handlePinAll = async (infoHash: string, name: string) => {
+    if(!confirm(`Pin all files for "${name}" to IPFS? This may take a while.`)) return
+    setStatusMsg(`Pinning files for ${name}...`)
+    try {
+        const res = await fetch('/api/v1/torrent/pin-all', {
+             method: 'POST',
+             headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+             body: JSON.stringify({ infoHash })
+        })
+        const data = await res.json()
+        if (data.success) {
+            setStatusMsg(`✅ ${data.message}`)
+        } else {
+            setStatusMsg(`⚠️ Finished with errors: ${data.errors?.join(', ') || 'Unknown error'}`)
+        }
+    } catch(e) {
+        setStatusMsg('❌ Failed to start pin')
+    }
+    setTimeout(() => setStatusMsg(''), 5000)
   }
 
   const fetchTorrents = async () => {
@@ -481,6 +502,8 @@ function Torrents() {
                             <span className="text-xs font-bold w-12 text-right">{(t.progress * 100).toFixed(1)}%</span>
                         </div>
                         
+
+
                         {/* Actions */}
                         <div className="flex gap-2 justify-end mt-2">
                             <button className="btn btn-xs btn-outline" onClick={() => {navigator.clipboard.writeText(t.magnetURI || ''); setStatusMsg('Magnet copied!')}}>🧲 Magnet</button>
@@ -489,6 +512,7 @@ function Torrents() {
                             ) : (
                             <button className="btn btn-xs btn-warning" onClick={() => handleAction(t.infoHash, 'pause')}>⏸ Pause</button>
                             )}
+                            <button className="btn btn-xs btn-info" onClick={() => handlePinAll(t.infoHash, t.name)}>📌 Pin to IPFS</button>
                             <button className="btn btn-xs btn-error" onClick={() => handleRemoveClick(t)}>🗑️ Remove</button>
                         </div>
                         

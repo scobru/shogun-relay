@@ -75,9 +75,8 @@ export async function searchInternetArchive(
   const { mediaType, rows = 50, page = 1, sort = 'downloads desc' } = options;
 
   try {
-    // Build query - always filter for items with "Archive BitTorrent" format
+    // Build query - search all formats (torrent is available for most items anyway)
     let q = `(${encodeURIComponent(query)})`;
-    q += ' AND format:"Archive BitTorrent"';
     
     if (mediaType) {
       q += ` AND mediatype:${encodeURIComponent(mediaType)}`;

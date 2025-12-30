@@ -1052,6 +1052,186 @@ export default (app: express.Application) => {
     }
   });
 
+  /**
+   * GET /api/v1/admin/config
+   * Get all configuration values with metadata
+   * Admin only
+   */
+  app.get(`${baseRoute}/admin/config`, tokenAuthMiddleware, async (req: Request, res: Response) => {
+    try {
+      const { getAllConfig, HOT_RELOADABLE_KEYS, RESTART_REQUIRED_KEYS } = await import("../utils/runtime-config");
+      
+      const config = getAllConfig();
+      
+      // Group by category
+      const grouped: Record<string, typeof config> = {};
+      for (const item of config) {
+        if (!grouped[item.category]) {
+          grouped[item.category] = [];
+        }
+        grouped[item.category].push(item);
+      }
+      
+      res.json({
+        success: true,
+        config: grouped,
+        hotReloadableKeys: HOT_RELOADABLE_KEYS,
+        restartRequiredKeys: RESTART_REQUIRED_KEYS,
+      });
+    } catch (error: any) {
+      loggers.server.error({ err: error }, "Failed to get config");
+      res.status(500).json({
+        success: false,
+        error: error.message || "Internal server error",
+      });
+    }
+  });
+
+  /**
+   * PUT /api/v1/admin/config
+   * Update hot-reloadable configuration values (no restart required)
+   * Admin only
+   */
+  app.put(`${baseRoute}/admin/config`, tokenAuthMiddleware, async (req: Request, res: Response) => {
+    try {
+      const { setRuntimeValue, isHotReloadable, HOT_RELOADABLE_KEYS } = await import("../utils/runtime-config");
+      const updates = req.body as Record<string, string>;
+      
+      if (!updates || typeof updates !== 'object') {
+        return res.status(400).json({
+          success: false,
+          error: "Request body must be an object with key-value pairs",
+        });
+      }
+      
+      const results: Record<string, { success: boolean; error?: string }> = {};
+      const successful: string[] = [];
+      const failed: string[] = [];
+      
+      for (const [key, value] of Object.entries(updates)) {
+        if (!isHotReloadable(key)) {
+          results[key] = { 
+            success: false, 
+            error: `Key '${key}' is not hot-reloadable. Modify .env and restart server.` 
+          };
+          failed.push(key);
+          continue;
+        }
+        
+        const success = setRuntimeValue(key as any, String(value));
+        results[key] = { success };
+        if (success) {
+          successful.push(key);
+        } else {
+          failed.push(key);
+        }
+      }
+      
+      res.json({
+        success: failed.length === 0,
+        message: `Updated ${successful.length} config(s)${failed.length > 0 ? `, ${failed.length} failed` : ''}`,
+        results,
+        hotReloadableKeys: HOT_RELOADABLE_KEYS,
+      });
+    } catch (error: any) {
+      loggers.server.error({ err: error }, "Failed to update config");
+      res.status(500).json({
+        success: false,
+        error: error.message || "Internal server error",
+      });
+    }
+  });
+
+  /**
+   * PUT /api/v1/admin/config/env
+   * Update .env file directly (requires server restart)
+   * Admin only
+   */
+  app.put(`${baseRoute}/admin/config/env`, tokenAuthMiddleware, async (req: Request, res: Response) => {
+    try {
+      const { updateEnvFile, isHotReloadable, requiresRestart } = await import("../utils/runtime-config");
+      const updates = req.body as Record<string, string>;
+      
+      if (!updates || typeof updates !== 'object') {
+        return res.status(400).json({
+          success: false,
+          error: "Request body must be an object with key-value pairs",
+        });
+      }
+      
+      // Identify which keys require restart
+      const restartRequired: string[] = [];
+      const hotReloadable: string[] = [];
+      
+      for (const key of Object.keys(updates)) {
+        if (requiresRestart(key)) {
+          restartRequired.push(key);
+        } else if (isHotReloadable(key)) {
+          hotReloadable.push(key);
+        }
+      }
+      
+      const success = updateEnvFile(updates);
+      
+      if (!success) {
+        return res.status(500).json({
+          success: false,
+          error: "Failed to write to .env file",
+        });
+      }
+      
+      res.json({
+        success: true,
+        message: ".env file updated",
+        restartRequired: restartRequired.length > 0,
+        restartRequiredKeys: restartRequired,
+        hotReloadableKeys: hotReloadable,
+        warning: restartRequired.length > 0 
+          ? `⚠️ Server restart required for: ${restartRequired.join(', ')}`
+          : undefined,
+      });
+    } catch (error: any) {
+      loggers.server.error({ err: error }, "Failed to update .env file");
+      res.status(500).json({
+        success: false,
+        error: error.message || "Internal server error",
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/admin/config/env
+   * Read the current .env file contents
+   * Admin only
+   */
+  app.get(`${baseRoute}/admin/config/env`, tokenAuthMiddleware, async (req: Request, res: Response) => {
+    try {
+      const { readEnvFile, parseEnvFile } = await import("../utils/runtime-config");
+      
+      const content = readEnvFile();
+      if (content === null) {
+        return res.status(404).json({
+          success: false,
+          error: ".env file not found",
+        });
+      }
+      
+      const parsed = parseEnvFile(content);
+      
+      res.json({
+        success: true,
+        raw: content,
+        parsed,
+      });
+    } catch (error: any) {
+      loggers.server.error({ err: error }, "Failed to read .env file");
+      res.status(500).json({
+        success: false,
+        error: error.message || "Internal server error",
+      });
+    }
+  });
+
   loggers.server.info(`✅ Admin routes registered`);
 
   // Route di default per API non trovate
