@@ -157,7 +157,7 @@ function GraphExplorer() {
   return (
     <div className="flex flex-col gap-6 max-w-6xl">
       {/* Header & Path */}
-      <div className="card bg-base-100 shadow">
+      <div className="card bg-base-100 shadow-sm">
         <div className="card-body">
             <div className="flex justify-between items-center mb-4">
                 <div>
@@ -196,7 +196,7 @@ function GraphExplorer() {
       </div>
       
       {/* Controls Row */}
-      <div className="card bg-base-100 shadow">
+      <div className="card bg-base-100 shadow-sm">
           <div className="card-body flex-row justify-between items-center flex-wrap gap-4">
               <div className="flex gap-2 flex-wrap items-center">
                   <input 
@@ -216,7 +216,7 @@ function GraphExplorer() {
       </div>
 
       {/* Content Explorer */}
-      <div className="card bg-base-100 shadow">
+      <div className="card bg-base-100 shadow-sm">
         <div className="card-body">
             {loading ? (
                 <div className="flex justify-center p-8">
@@ -271,7 +271,7 @@ function GraphExplorer() {
       </div>
 
       {/* Write Panel */}
-      <div className="card bg-base-100 shadow">
+      <div className="card bg-base-100 shadow-sm">
         <div className="card-body">
             <h3 className="card-title text-lg">✏ Write Operations</h3>
             <form onSubmit={handleWrite} className="flex flex-wrap gap-4 items-end mt-2">

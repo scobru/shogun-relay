@@ -1,5 +1,12 @@
 import { useNavigate } from 'react-router-dom'
 
+const colorBgMap: Record<string, string> = {
+  primary: 'bg-primary/10',
+  secondary: 'bg-secondary/10',
+  success: 'bg-success/10',
+  warning: 'bg-warning/10',
+}
+
 function Explore() {
   const navigate = useNavigate()
 
@@ -12,7 +19,7 @@ function Explore() {
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl">
-      <div className="card bg-base-100 shadow">
+      <div className="card bg-base-100 shadow-sm">
         <div className="card-body">
           <h2 className="card-title text-2xl">🧭 Data Hub</h2>
           <p className="text-base-content/70">Central navigation for all Shogun Relay subsystems and data inspectors.</p>
@@ -23,11 +30,11 @@ function Explore() {
         {sections.map(section => (
           <div 
             key={section.path} 
-            className="card bg-base-100 shadow hover:shadow-lg transition-all cursor-pointer hover:-translate-y-1"
+            className="card bg-base-100 shadow-sm hover:shadow-md transition-all cursor-pointer hover:-translate-y-1"
             onClick={() => navigate(section.path)}
           >
             <div className="card-body flex-row items-center gap-4">
-              <div className={`text-4xl p-3 rounded-xl bg-${section.color}/10`}>
+              <div className={`text-4xl p-3 rounded-xl ${colorBgMap[section.color] || 'bg-base-200'}`}>
                 {section.icon}
               </div>
               <div className="flex-1">
@@ -44,3 +51,4 @@ function Explore() {
 }
 
 export default Explore
+

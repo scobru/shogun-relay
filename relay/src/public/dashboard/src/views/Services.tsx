@@ -118,7 +118,7 @@ function Services() {
   return (
     <div className="flex flex-col gap-6 max-w-6xl">
       {/* Header */}
-      <div className="card bg-base-100 shadow">
+      <div className="card bg-base-100 shadow-sm">
         <div className="card-body flex-row items-center justify-between">
           <div>
             <h2 className="card-title">🛠️ System Services</h2>
@@ -146,7 +146,7 @@ function Services() {
           </div>
         ) : (
           services.map((svc) => (
-            <div key={svc.name} className="card bg-base-100 shadow">
+            <div key={svc.name} className="card bg-base-100 shadow-sm">
               <div className="card-body">
                 <div className="flex items-center justify-between">
                   <h3 className="card-title text-base">{svc.name}</h3>

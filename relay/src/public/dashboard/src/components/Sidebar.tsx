@@ -36,36 +36,54 @@ const groupLabels: Record<string, string> = {
   system: 'System'
 }
 
+const groupIcons: Record<string, string> = {
+  main: '🏠',
+  storage: '💿',
+  blockchain: '⛓️',
+  tools: '🛠️',
+  system: '⚙️'
+}
+
 function Sidebar() {
   const groups = ['main', 'storage', 'blockchain', 'tools', 'system']
 
   return (
     <div className="drawer-side z-40">
       <label htmlFor="main-drawer" aria-label="close sidebar" className="drawer-overlay"></label>
-      <aside className="bg-base-300 min-h-screen w-64 flex flex-col">
+      <aside className="bg-base-200 min-h-screen w-64 flex flex-col border-r border-base-300">
         {/* Logo */}
-        <div className="p-4 flex items-center gap-2 border-b border-base-content/10">
-          <span className="text-2xl">⚡</span>
-          <span className="font-bold text-xl">SHOGUN</span>
+        <div className="p-4 flex items-center gap-3 bg-base-300">
+          <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-content text-xl font-bold">
+            ⚡
+          </div>
+          <div>
+            <span className="font-bold text-lg">SHOGUN</span>
+            <p className="text-xs text-base-content/60">Relay Dashboard</p>
+          </div>
         </div>
 
         {/* Navigation */}
-        <ul className="menu menu-md flex-1 p-2 overflow-y-auto">
+        <ul className="menu menu-sm flex-1 p-2 gap-1 overflow-y-auto">
           {groups.map((group) => (
-            <li key={group}>
-              <h2 className="menu-title">{groupLabels[group]}</h2>
-              <ul>
+            <li key={group} className="mt-2 first:mt-0">
+              <h2 className="menu-title flex items-center gap-2 text-xs uppercase tracking-wider opacity-60">
+                <span>{groupIcons[group]}</span>
+                {groupLabels[group]}
+              </h2>
+              <ul className="ml-1">
                 {navItems
                   .filter((item) => item.group === group)
                   .map((item) => (
                     <li key={item.path}>
                       <NavLink
                         to={item.path}
-                        className={({ isActive }) => isActive ? 'active' : ''}
+                        className={({ isActive }: { isActive: boolean }) => 
+                          `flex items-center gap-2 rounded-lg transition-all ${isActive ? 'bg-primary text-primary-content font-medium' : 'hover:bg-base-300'}`
+                        }
                         end={item.path === '/'}
                       >
-                        <span>{item.icon}</span>
-                        {item.label}
+                        <span className="text-base">{item.icon}</span>
+                        <span className="text-sm">{item.label}</span>
                       </NavLink>
                     </li>
                   ))}
@@ -75,15 +93,15 @@ function Sidebar() {
         </ul>
 
         {/* Footer */}
-        <div className="p-4 border-t border-base-content/10">
+        <div className="p-3 border-t border-base-300 bg-base-300/50">
           <a
             href="https://github.com/scobru/shogun"
             target="_blank"
             rel="noopener noreferrer"
-            className="btn btn-ghost btn-sm w-full justify-start gap-2"
+            className="btn btn-ghost btn-sm w-full justify-start gap-2 text-base-content/70"
           >
             <span>📦</span>
-            GitHub
+            <span className="text-xs">View on GitHub</span>
           </a>
         </div>
       </aside>

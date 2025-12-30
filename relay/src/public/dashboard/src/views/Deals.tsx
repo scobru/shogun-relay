@@ -61,7 +61,7 @@ function Deals() {
   return (
     <div className="flex flex-col gap-6 max-w-6xl">
       {/* Header */}
-      <div className="card bg-base-100 shadow">
+      <div className="card bg-base-100 shadow-sm">
         <div className="card-body flex-row items-center justify-between">
           <div>
             <h2 className="card-title">💼 Storage Deals</h2>
@@ -109,7 +109,7 @@ function Deals() {
       </div>
 
       {/* Content */}
-      <div className="card bg-base-100 shadow">
+      <div className="card bg-base-100 shadow-sm">
         <div className="card-body">
           {activeTab === 'stats' && stats && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
