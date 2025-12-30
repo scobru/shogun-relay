@@ -97,6 +97,14 @@ async function initRelayUserWithKeyPair(
       relayKeyPair = keyPair;
       isInitialized = true;
 
+      // IMPORTANT: Explicitly publish epub to user graph for encrypted chat
+      // This ensures other relays can find our encryption key
+      if (keyPair.epub) {
+        user.get('epub').put(keyPair.epub);
+        user.get('pub').put(keyPair.pub);
+        log.debug({ pub: relayPub }, "Published epub key for encrypted chat");
+      }
+
       log.debug({ pub: relayPub, pubLength: relayPub?.length }, "Relay user authenticated with keypair");
       resolve({ user: relayUser, pub: relayPub!, keyPair: relayKeyPair });
     });
