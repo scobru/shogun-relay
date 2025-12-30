@@ -59,25 +59,38 @@ class ChatService {
 
   // Track last sync time per peer to avoid spam
   private lastSyncTime = new Map<string, number>();
+  // Track processed signal IDs to avoid reprocessing
+  private processedSignals = new Set<string>();
   
   private startSignalListener() {
     if (!this.active || !this.myPub) return;
 
-    // Listen for signals aimed at me
+    // Listen for signals aimed at me - use .once() to avoid repeated firing
     // Path: shogun/chat-signals/<MyPub>
-    this.gun.get('shogun').get('chat-signals').get(this.myPub).map().on((data: any, key: string) => {
+    this.gun.get('shogun').get('chat-signals').get(this.myPub).map().once((data: any, key: string) => {
         if (!data || !data.from) return;
         
+        // Skip if we already processed this signal key
+        if (this.processedSignals.has(key)) return;
+        this.processedSignals.add(key);
+        
+        // Limit processedSignals size to prevent memory leak
+        if (this.processedSignals.size > 1000) {
+            const toDelete = Array.from(this.processedSignals).slice(0, 500);
+            toDelete.forEach(k => this.processedSignals.delete(k));
+        }
+        
         const timestamp = data.timestamp || 0;
-        // Ignore very old signals (older than 7 days)
-        if (Date.now() - timestamp > 7 * 24 * 3600 * 1000) return;
+        // Ignore very old signals (older than 1 day now, more aggressive)
+        if (Date.now() - timestamp > 24 * 3600 * 1000) return;
 
-        // Throttle: only sync from same peer every 1 second
+        // Throttle: only sync from same peer every 30 seconds (very aggressive)
         const lastSync = this.lastSyncTime.get(data.from) || 0;
-        if (Date.now() - lastSync < 1000) return;
+        if (Date.now() - lastSync < 30000) return;
         this.lastSyncTime.set(data.from, Date.now());
 
         // Sync messages from this sender
+        log.info(`💬 Signal from ${data.from.substring(0,6)}... - syncing messages`);
         this.syncMessagesFrom(data.from);
     });
 
@@ -154,7 +167,7 @@ class ChatService {
                               };
                               
                               this.messageCache.get(peerPub)?.set(id, msg);
-                              log.info(`💬 Received message from ${peerPub.substring(0,6)}...`);
+                              log.debug(`💬 Received message from ${peerPub.substring(0,6)}...`);
                           }
                       }
                   }
