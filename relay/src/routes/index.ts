@@ -897,6 +897,163 @@ export default (app: express.Application) => {
     });
   });
 
+  // ============================================================================
+  // ADMIN ENDPOINTS
+  // ============================================================================
+
+  /**
+   * GET /api/v1/admin/relay-keys
+   * Get the relay's SEA keypair (pub, priv, epub, epriv)
+   * Admin only - requires authentication
+   */
+  app.get(`${baseRoute}/admin/relay-keys`, tokenAuthMiddleware, async (req: Request, res: Response) => {
+    try {
+      const { getRelayKeyPair, getRelayPub } = await import("../utils/relay-user");
+      const keyPair = getRelayKeyPair();
+      const pub = getRelayPub();
+
+      if (!keyPair || !pub) {
+        return res.status(503).json({
+          success: false,
+          error: "Relay user not initialized",
+        });
+      }
+
+      res.json({
+        success: true,
+        keys: {
+          pub: keyPair.pub,
+          priv: keyPair.priv,
+          epub: keyPair.epub,
+          epriv: keyPair.epriv,
+        },
+      });
+    } catch (error: any) {
+      loggers.server.error({ err: error }, "Failed to get relay keys");
+      res.status(500).json({
+        success: false,
+        error: error.message || "Internal server error",
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/admin/storage-stats
+   * Get storage usage statistics for all data directories
+   * Admin only - requires authentication
+   */
+  app.get(`${baseRoute}/admin/storage-stats`, tokenAuthMiddleware, async (req: Request, res: Response) => {
+    try {
+      const dataDir = path.resolve(process.cwd(), "data");
+      const radataDir = path.resolve(process.cwd(), "radata");
+
+      // Helper function to get directory size
+      const getDirSize = (dirPath: string): { bytes: number; files: number } => {
+        let totalSize = 0;
+        let fileCount = 0;
+
+        if (!fs.existsSync(dirPath)) {
+          return { bytes: 0, files: 0 };
+        }
+
+        const walkDir = (dir: string) => {
+          try {
+            const items = fs.readdirSync(dir, { withFileTypes: true });
+            for (const item of items) {
+              const fullPath = path.join(dir, item.name);
+              if (item.isDirectory()) {
+                walkDir(fullPath);
+              } else if (item.isFile()) {
+                try {
+                  const stats = fs.statSync(fullPath);
+                  totalSize += stats.size;
+                  fileCount++;
+                } catch (e) {
+                  // Ignore unreadable files
+                }
+              }
+            }
+          } catch (e) {
+            // Ignore unreadable directories
+          }
+        };
+
+        walkDir(dirPath);
+        return { bytes: totalSize, files: fileCount };
+      };
+
+      const formatSize = (bytes: number) => {
+        const mb = bytes / (1024 * 1024);
+        const gb = bytes / (1024 * 1024 * 1024);
+        return {
+          bytes,
+          mb: Math.round(mb * 100) / 100,
+          gb: Math.round(gb * 100) / 100,
+          formatted: gb >= 1 ? `${gb.toFixed(2)} GB` : `${mb.toFixed(2)} MB`,
+        };
+      };
+
+      // Calculate sizes for each directory
+      const dataStats = getDirSize(dataDir);
+      const radataStats = getDirSize(radataDir);
+      const torrentsStats = getDirSize(path.join(dataDir, "torrents"));
+      const ipfsStats = getDirSize(path.join(dataDir, "ipfs"));
+      const gundbStats = getDirSize(path.join(dataDir, "gun"));
+      const dealsStats = getDirSize(path.join(dataDir, "deals"));
+
+      const totalBytes = dataStats.bytes + radataStats.bytes;
+
+      res.json({
+        success: true,
+        storage: {
+          total: formatSize(totalBytes),
+          data: {
+            ...formatSize(dataStats.bytes),
+            path: dataDir,
+            files: dataStats.files,
+          },
+          radata: {
+            ...formatSize(radataStats.bytes),
+            path: radataDir,
+            files: radataStats.files,
+            description: "GunDB radix storage",
+          },
+          breakdown: {
+            torrents: {
+              ...formatSize(torrentsStats.bytes),
+              path: path.join(dataDir, "torrents"),
+              files: torrentsStats.files,
+            },
+            ipfs: {
+              ...formatSize(ipfsStats.bytes),
+              path: path.join(dataDir, "ipfs"),
+              files: ipfsStats.files,
+            },
+            gundb: {
+              ...formatSize(gundbStats.bytes),
+              path: path.join(dataDir, "gun"),
+              files: gundbStats.files,
+            },
+            deals: {
+              ...formatSize(dealsStats.bytes),
+              path: path.join(dataDir, "deals"),
+              files: dealsStats.files,
+            },
+          },
+        },
+        timestamp: Date.now(),
+      });
+    } catch (error: any) {
+      loggers.server.error({ err: error }, "Failed to get storage stats");
+      res.status(500).json({
+        success: false,
+        error: error.message || "Internal server error",
+      });
+    }
+  });
+
+  loggers.server.info(`✅ Admin routes registered`);
+
   // Route di default per API non trovate
   app.use(`${baseRoute}/*`, (req: Request, res: Response) => {
     res.status(404).json({

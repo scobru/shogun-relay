@@ -46,7 +46,7 @@ function Deals() {
     try {
       const res = await fetch('/api/v1/deals/relay/active', { headers: getAuthHeaders() })
       const data = await res.json()
-      if (data.success) setDeals(data.deals || [])
+      if (data.success) setDeals(data.activeDeals || [])
     } catch (error) { console.error('Failed to fetch deals:', error) }
     finally { setLoading(false) }
   }
