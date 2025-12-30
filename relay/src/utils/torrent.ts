@@ -941,7 +941,9 @@ export class TorrentManager {
       throw new Error("Anna's Archive integration is not enabled");
     }
 
-    const torrent = this.client.torrents.find(t => t.infoHash === infoHash);
+    // Normalize to lowercase for consistent matching
+    const normalizedHash = infoHash.toLowerCase();
+    const torrent = this.client.torrents.find(t => t.infoHash.toLowerCase() === normalizedHash);
     if (!torrent) {
       throw new Error(`Torrent not found: ${infoHash}`);
     }
@@ -958,7 +960,9 @@ export class TorrentManager {
       throw new Error("Anna's Archive integration is not enabled");
     }
 
-    const torrent = this.client.torrents.find(t => t.infoHash === infoHash);
+    // Normalize to lowercase for consistent matching
+    const normalizedHash = infoHash.toLowerCase();
+    const torrent = this.client.torrents.find(t => t.infoHash.toLowerCase() === normalizedHash);
     if (!torrent) {
       throw new Error(`Torrent not found: ${infoHash}`);
     }
@@ -977,15 +981,16 @@ export class TorrentManager {
       throw new Error("Anna's Archive integration is not enabled");
     }
 
-    const torrent = this.client.torrents.find(t => t.infoHash === infoHash);
+    // Normalize to lowercase for consistent matching
+    const normalizedHash = infoHash.toLowerCase();
+    const torrent = this.client.torrents.find(t => t.infoHash.toLowerCase() === normalizedHash);
     if (!torrent) {
       throw new Error(`Torrent not found: ${infoHash}`);
     }
 
     const torrentName = torrent.name;
     
-    // Normalize infoHash to lowercase (catalog uses lowercase keys)
-    const normalizedHash = infoHash.toLowerCase();
+    // normalizedHash already declared above
     
     // Unpin files from IPFS if any
     const catalogEntry = this.catalog.get(normalizedHash);

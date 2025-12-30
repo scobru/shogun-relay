@@ -77,6 +77,14 @@ function Torrents() {
   const [catalogStats, setCatalogStats] = useState<CatalogStats | null>(null)
   const [refreshingCatalog, setRefreshingCatalog] = useState(false)
 
+  // Remove Torrent Modal State
+  const [removeModal, setRemoveModal] = useState<{ open: boolean; infoHash: string; name: string; deleteFiles: boolean }>({
+    open: false,
+    infoHash: '',
+    name: '',
+    deleteFiles: false
+  })
+
   useEffect(() => {
     if (isAuthenticated) {
         fetchTorrents()
@@ -170,18 +178,36 @@ function Torrents() {
     }
   }
 
-  const handleAction = async (infoHash: string, action: string) => {
+  const handleAction = async (infoHash: string, action: string, deleteFiles: boolean = false) => {
       // action: pause, resume, remove
       try {
           await fetch('/api/v1/torrent/control', {
               method: 'POST',
               headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-              body: JSON.stringify({ infoHash, action })
+              body: JSON.stringify({ infoHash, action, deleteFiles })
           })
           fetchTorrents()
+          if (action === 'remove') {
+              setStatusMsg(deleteFiles ? '✅ Torrent removed with files' : '✅ Torrent removed')
+              setTimeout(() => setStatusMsg(''), 3000)
+          }
       } catch (e) {
           console.error(e)
       }
+  }
+
+  const handleRemoveClick = (torrent: Torrent) => {
+      setRemoveModal({
+          open: true,
+          infoHash: torrent.infoHash,
+          name: torrent.name || torrent.infoHash.substring(0, 12) + '...',
+          deleteFiles: false
+      })
+  }
+
+  const confirmRemove = () => {
+      handleAction(removeModal.infoHash, 'remove', removeModal.deleteFiles)
+      setRemoveModal({ open: false, infoHash: '', name: '', deleteFiles: false })
   }
 
   const handleAddMagnet = async (magnet?: string) => {
@@ -463,7 +489,7 @@ function Torrents() {
                             ) : (
                             <button className="btn btn-xs btn-warning" onClick={() => handleAction(t.infoHash, 'pause')}>⏸ Pause</button>
                             )}
-                            <button className="btn btn-xs btn-error" onClick={() => handleAction(t.infoHash, 'remove')}>🗑️ Remove</button>
+                            <button className="btn btn-xs btn-error" onClick={() => handleRemoveClick(t)}>🗑️ Remove</button>
                         </div>
                         
                         {/* Files (collapsible) */}
@@ -699,6 +725,52 @@ function Torrents() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Remove Torrent Confirmation Modal */}
+      {removeModal.open && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">🗑️ Remove Torrent</h3>
+            <p className="py-4">
+              Are you sure you want to remove <strong>{removeModal.name}</strong>?
+            </p>
+            
+            <div className="form-control">
+              <label className="label cursor-pointer justify-start gap-3">
+                <input 
+                  type="checkbox" 
+                  className="checkbox checkbox-error" 
+                  checked={removeModal.deleteFiles}
+                  onChange={(e) => setRemoveModal((prev: typeof removeModal) => ({ ...prev, deleteFiles: e.target.checked }))}
+                />
+                <span className="label-text">
+                  <strong className="text-error">Also delete files from disk</strong>
+                  <br />
+                  <span className="text-xs text-base-content/60">This action cannot be undone</span>
+                </span>
+              </label>
+            </div>
+
+            <div className="modal-action">
+              <button 
+                className="btn btn-ghost" 
+                onClick={() => setRemoveModal({ open: false, infoHash: '', name: '', deleteFiles: false })}
+              >
+                Cancel
+              </button>
+              <button 
+                className={`btn ${removeModal.deleteFiles ? 'btn-error' : 'btn-warning'}`}
+                onClick={confirmRemove}
+              >
+                {removeModal.deleteFiles ? '🗑️ Remove & Delete Files' : 'Remove Torrent'}
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={() => setRemoveModal({ open: false, infoHash: '', name: '', deleteFiles: false })}>close</button>
+          </form>
+        </dialog>
       )}
     </div>
   )

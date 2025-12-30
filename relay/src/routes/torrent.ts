@@ -177,7 +177,7 @@ router.post("/create", upload.array('files', 20), async (req, res) => {
  */
 router.post("/control", express.json(), async (req, res) => {
   try {
-    const { infoHash, action } = req.body;
+    const { infoHash, action, deleteFiles } = req.body;
     
     if (!infoHash || !action) {
       return res.status(400).json({
@@ -202,7 +202,7 @@ router.post("/control", express.json(), async (req, res) => {
         torrentManager.resumeTorrent(infoHash);
         break;
       case 'remove':
-        await torrentManager.removeTorrent(infoHash, false);
+        await torrentManager.removeTorrent(infoHash, deleteFiles === true);
         break;
     }
     
