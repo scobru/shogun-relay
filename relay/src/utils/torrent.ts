@@ -1475,19 +1475,25 @@ export class TorrentManager {
 
   /**
    * Search the global registry by keyword
+   * Falls back to direct registry search if keyword index has no results
    */
   public async searchGlobalRegistry(query: string, limit: number = 50): Promise<any[]> {
     if (!this.gun) return [];
 
-    const keywords = query.toLowerCase()
+    const queryLower = query.toLowerCase();
+    const keywords = queryLower
       .split(/[^a-z0-9]+/)
       .filter(k => k.length >= 3);
 
-    if (keywords.length === 0) return [];
+    if (keywords.length === 0) {
+      // If query is too short for keywords, do direct search
+      return this.searchRegistryDirect(queryLower, limit);
+    }
 
     const results = new Map<string, any>();
     
-    return new Promise((resolve) => {
+    // First try keyword index
+    const indexResults = await new Promise<any[]>((resolve) => {
       let pending = keywords.length;
       
       for (const keyword of keywords) {
@@ -1511,16 +1517,54 @@ export class TorrentManager {
           if (pending <= 0) {
             // Wait a bit more for fetches to complete, then resolve
             setTimeout(() => {
-              const arr = Array.from(results.values()).slice(0, limit);
-              loggers.server.info(`📚 Search "${query}" returned ${arr.length} results`);
-              resolve(arr);
+              resolve(Array.from(results.values()).slice(0, limit));
             }, 500);
           }
         }, 1000);
       }
       
       // Fallback timeout
-      setTimeout(() => resolve(Array.from(results.values()).slice(0, limit)), 6000);
+      setTimeout(() => resolve(Array.from(results.values()).slice(0, limit)), 3000);
+    });
+
+    // If keyword index found results, return them
+    if (indexResults.length > 0) {
+      loggers.server.info(`📚 Search "${query}" returned ${indexResults.length} results from index`);
+      return indexResults;
+    }
+
+    // Fallback: search directly in registry by name
+    loggers.server.info(`📚 No index results for "${query}", falling back to direct search`);
+    return this.searchRegistryDirect(queryLower, limit);
+  }
+
+  /**
+   * Direct search in registry - slower but finds everything
+   */
+  private async searchRegistryDirect(query: string, limit: number): Promise<any[]> {
+    if (!this.gun) return [];
+
+    const results: any[] = [];
+    
+    return new Promise((resolve) => {
+      this.gun.get(GUN_PATHS.TORRENTS).map().once((entry: any, hash: string) => {
+        if (entry && entry.magnetURI && results.length < limit) {
+          // Check if name contains the query
+          const name = (entry.name || '').toLowerCase();
+          if (name.includes(query)) {
+            results.push({
+              infoHash: hash,
+              ...entry
+            });
+          }
+        }
+      });
+      
+      // Wait for results then resolve
+      setTimeout(() => {
+        loggers.server.info(`📚 Direct search "${query}" returned ${results.length} results`);
+        resolve(results);
+      }, 3000);
     });
   }
 

@@ -107,7 +107,30 @@ export class ChatCommandHandler {
                 return `❌ Failed to add torrent: ${err.message}`;
             }
         }
-    })
+    });
+
+    // /list [limit]
+    this.register({
+      name: "list",
+      description: "List all torrents in the global registry",
+      usage: "/list [limit]",
+      execute: async (args) => {
+        const limit = parseInt(args[0]) || 10;
+        const results = await torrentManager.browseGlobalRegistry(limit);
+        
+        if (results.length === 0) {
+          return "📂 No torrents found in the global registry";
+        }
+        
+        let response = `📂 **Global Torrent Registry** (${results.length} results)\n`;
+        results.forEach((r, i) => {
+          const size = ((r.size || 0) / 1024 / 1024).toFixed(2);
+          response += `\n${i + 1}. **${r.name}** (${size} MB)`;
+        });
+        
+        return response;
+      }
+    });
   }
 
   private register(command: ChatCommand) {
