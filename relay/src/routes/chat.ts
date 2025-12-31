@@ -35,24 +35,36 @@ router.get("/peers", requireAuth, async (req, res) => {
             return res.json({ success: true, data: [] });
         }
 
-        const peers: { pub: string; alias: string; lastSeen: number }[] = [];
+        const peersMap = new Map<string, { pub: string; alias: string; lastSeen: number }>();
         const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
 
         await new Promise<void>((resolve) => {
             const timeout = setTimeout(() => resolve(), 3000);
 
+            // Helper to process peer data
+            const processPeerData = (data: any, pubKey: string, type: 'relay' | 'peer') => {
+                if (!data || !data.alias && !data.endpoint) return;
+                
+                // Only include recently seen peers
+                if (data.lastSeen && data.lastSeen > fiveMinutesAgo) {
+                    if (!peersMap.has(pubKey)) {
+                        peersMap.set(pubKey, {
+                            pub: pubKey,
+                            alias: data.alias || data.endpoint || 'Unknown',
+                            lastSeen: data.lastSeen
+                        });
+                    }
+                }
+            };
+
             // Read from unified relays path
             gun.get(GUN_PATHS.RELAYS).map().once((data: any, pubKey: string) => {
-                if (!data || !data.endpoint) return;
-                
-                // Only include recently seen relays
-                if (data.lastSeen && data.lastSeen > fiveMinutesAgo) {
-                    peers.push({
-                        pub: pubKey,
-                        alias: data.endpoint || 'Unknown Relay',
-                        lastSeen: data.lastSeen
-                    });
-                }
+                processPeerData(data, pubKey, 'relay');
+            });
+
+            // Read from unified peers path
+            gun.get(GUN_PATHS.PEERS).map().once((data: any, pubKey: string) => {
+                processPeerData(data, pubKey, 'peer');
             });
 
             setTimeout(() => {
@@ -60,6 +72,8 @@ router.get("/peers", requireAuth, async (req, res) => {
                 resolve();
             }, 2500);
         });
+        
+        const peers = Array.from(peersMap.values());
         
         res.json({
             success: true,
