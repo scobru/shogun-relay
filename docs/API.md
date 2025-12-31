@@ -501,6 +501,27 @@ Get subscription status for a user.
 }
 ```
 
+#### GET `/api/v1/x402/subscriptions`
+
+List all active subscriptions (admin only).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "count": 1,
+  "subscriptions": [
+    {
+      "userAddress": "0x...",
+      "tier": "premium",
+      "isActive": true,
+      "status": "active"
+    }
+  ]
+}
+```
+
 #### POST `/api/v1/x402/subscribe`
 
 Purchase or renew a subscription.
@@ -730,6 +751,110 @@ Direct search to Internet Archive.
 - `rows`: Number of results
 
 ---
+
+### Chat
+
+#### GET `/api/v1/chat/peers`
+
+List potential chat peers from network discovery.
+
+**Headers:**
+- `Authorization: Bearer <ADMIN_TOKEN>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "pub": "...",
+      "alias": "...",
+      "lastSeen": 1234567890
+    }
+  ]
+}
+```
+
+#### GET `/api/v1/chat/conversations`
+
+List active chat conversations.
+
+**Headers:**
+- `Authorization: Bearer <ADMIN_TOKEN>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {}
+}
+```
+
+#### GET `/api/v1/chat/messages/:pub`
+
+Get message history for a peer.
+
+**Headers:**
+- `Authorization: Bearer <ADMIN_TOKEN>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": []
+}
+```
+
+#### POST `/api/v1/chat/messages/:pub`
+
+Send a private encrypted message.
+
+**Headers:**
+- `Authorization: Bearer <ADMIN_TOKEN>`
+- `Content-Type: application/json`
+
+**Body:**
+
+```json
+{
+  "text": "Hello world"
+}
+```
+
+#### POST `/api/v1/chat/console`
+
+Execute a bot command.
+
+**Headers:**
+- `Authorization: Bearer <ADMIN_TOKEN>`
+- `Content-Type: application/json`
+
+**Body:**
+
+```json
+{
+  "command": "/help"
+}
+```
+
+#### GET `/api/v1/chat/lobby`
+
+Get public lobby messages.
+
+#### POST `/api/v1/chat/lobby`
+
+Send public lobby message.
+
+**Body:**
+
+```json
+{
+  "text": "Hello lobby"
+}
+```
 
 ## Error Responses
 
@@ -1294,6 +1419,16 @@ curl -X GET "http://localhost:8765/api/v1/drive/public/abc123..." \
 ```
 
 Or simply open the URL in a browser. The file will be served directly with appropriate content-type headers.
+
+### Visual Graph
+
+#### GET `/api/v1/visualGraph`
+
+Get the visual graph HTML interface.
+
+**Response:**
+
+- HTML content of the visual graph interface.
 
 ## Changelog
 

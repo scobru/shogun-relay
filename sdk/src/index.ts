@@ -10,14 +10,18 @@ import { UploadsModule } from "./modules/uploads";
 import { AnnasArchiveModule } from "./modules/annas-archive";
 import { DriveModule } from "./modules/drive";
 import { ApiKeysModule } from "./modules/api-keys";
-import { AuthModule } from "./modules/auth"; // Import AuthModule
+import { AuthModule } from "./modules/auth";
+import { ChatModule } from "./modules/chat";
+import { VisualGraphModule } from "./modules/visualGraph";
 
 // Export types
 export * from "./types";
 export * from "./modules/annas-archive";
 export * from "./modules/drive";
 export * from "./modules/api-keys";
-export * from "./modules/auth"; // Export AuthModule
+export * from "./modules/auth";
+export * from "./modules/chat";
+export * from "./modules/visualGraph";
 
 // Export wallet utilities
 export * from "./utils/wallet";
@@ -36,7 +40,9 @@ export class ShogunRelaySDK {
   public annasArchive: AnnasArchiveModule;
   public drive: DriveModule;
   public apiKeys: ApiKeysModule;
-  public auth: AuthModule; // Add auth property
+  public auth: AuthModule;
+  public chat: ChatModule;
+  public visualGraph: VisualGraphModule;
 
   constructor(config: ApiClientConfig) {
     this.client = new ApiClient(config);
@@ -52,7 +58,9 @@ export class ShogunRelaySDK {
     this.annasArchive = new AnnasArchiveModule(this.client);
     this.drive = new DriveModule(this.client);
     this.apiKeys = new ApiKeysModule(this.client);
-    this.auth = new AuthModule(this.client); // Initialize auth module
+    this.auth = new AuthModule(this.client);
+    this.chat = new ChatModule(this.client);
+    this.visualGraph = new VisualGraphModule(this.client);
   }
 
   public setToken(token: string) {

@@ -60,4 +60,12 @@ export class X402Module {
   public async getRelayStorage(): Promise<any> {
     return this.client.get("/api/v1/x402/relay-storage");
   }
+
+  public async getDetailedRelayStorage(): Promise<any> {
+    return this.client.get("/api/v1/x402/relay-storage/detailed");
+  }
+
+  public async getSubscriptions(): Promise<any> {
+    return this.client.get("/api/v1/x402/subscriptions");
+  }
 }
