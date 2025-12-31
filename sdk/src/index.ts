@@ -10,12 +10,14 @@ import { UploadsModule } from "./modules/uploads";
 import { AnnasArchiveModule } from "./modules/annas-archive";
 import { DriveModule } from "./modules/drive";
 import { ApiKeysModule } from "./modules/api-keys";
+import { AuthModule } from "./modules/auth"; // Import AuthModule
 
 // Export types
 export * from "./types";
 export * from "./modules/annas-archive";
 export * from "./modules/drive";
 export * from "./modules/api-keys";
+export * from "./modules/auth"; // Export AuthModule
 
 // Export wallet utilities
 export * from "./utils/wallet";
@@ -34,6 +36,7 @@ export class ShogunRelaySDK {
   public annasArchive: AnnasArchiveModule;
   public drive: DriveModule;
   public apiKeys: ApiKeysModule;
+  public auth: AuthModule; // Add auth property
 
   constructor(config: ApiClientConfig) {
     this.client = new ApiClient(config);
@@ -49,6 +52,7 @@ export class ShogunRelaySDK {
     this.annasArchive = new AnnasArchiveModule(this.client);
     this.drive = new DriveModule(this.client);
     this.apiKeys = new ApiKeysModule(this.client);
+    this.auth = new AuthModule(this.client); // Initialize auth module
   }
 
   public setToken(token: string) {
