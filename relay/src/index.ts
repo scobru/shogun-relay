@@ -1,3 +1,4 @@
+
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -49,6 +50,26 @@ import {
 import { startPeriodicPeerSync, announceRelayPresence } from "./utils/peer-discovery";
 import { torrentManager } from "./utils/torrent";
 import { GUN_PATHS } from "./utils/gun-paths";
+
+// Route Imports
+import authRoutes from "./routes/auth";
+import apiKeysRoutes from "./routes/api-keys";
+import networkRoutes from "./routes/network";
+import uploadsRoutes from "./routes/uploads";
+import dealsRoutes from "./routes/deals/index";
+import storageRoutes from "./routes/deals/storage-routes";
+import x402Routes from "./routes/x402";
+import systemRoutes from "./routes/system";
+import servicesRoutes from "./routes/services";
+import debugRoutes from "./routes/debug";
+import chatRoutes from "./routes/chat";
+import registryRoutes from "./routes/registry";
+import torrentRoutes from "./routes/torrent";
+import visualGraphRoutes from "./routes/visualGraph";
+import driveRoutes from "./routes/drive";
+
+// Middleware
+import { apiKeysAuthMiddleware } from "./middleware/api-keys-auth";
 
 dotenv.config();
 
@@ -1099,6 +1120,23 @@ See docs/RELAY_KEYS.md for more information.
   let activeWires = 0;
   app.set("totalConnections", 0);
   app.set("activeWires", 0);
+
+  // --- Modular Routes ---
+  app.use("/api/v1/auth", authRoutes);
+  app.use("/api/v1/api-keys", apiKeysRoutes);
+  app.use("/api/v1/network", networkRoutes);
+  app.use("/api/v1/uploads", uploadsRoutes);
+  app.use("/api/v1/deals", dealsRoutes);
+  app.use("/api/v1/storage", storageRoutes);
+  app.use("/api/v1/x402", x402Routes);
+  app.use("/api/v1/system", systemRoutes);
+  app.use("/api/v1/services", servicesRoutes);
+  app.use("/api/v1/debug", debugRoutes);
+  app.use("/api/v1/chat", chatRoutes);
+  app.use("/api/v1/registry", registryRoutes);
+  app.use("/api/v1/torrents", torrentRoutes);
+  app.use("/api/v1/graph", visualGraphRoutes);
+  app.use("/api/v1/drive", driveRoutes);
 
   // Route legacy per compatibilità (definite prima delle route modulari)
 
