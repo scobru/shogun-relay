@@ -1965,6 +1965,7 @@ See docs/RELAY_KEYS.md for more information.
       const relayInfo = {
         endpoint: ownEndpoint,
         version: packageConfig.version,
+        alias: relayConfig.name,
       };
       
       // Announce immediately

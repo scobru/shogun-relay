@@ -171,6 +171,68 @@ router.get("/relay/:host", async (req, res) => {
 });
 
 /**
+ * GET /api/v1/network/peers
+ *
+ * Discover all generic peers (Mules) in the network.
+ */
+router.get("/peers", async (req, res) => {
+  try {
+    const gun = req.app.get("gunInstance");
+    if (!gun) {
+      return res.status(500).json({ success: false, error: "Gun instance not available" });
+    }
+
+    const peers: {
+      pubKey: string;
+      alias: string | null;
+      lastSeen: number;
+      type: string;
+      torrentsCount?: number;
+    }[] = [];
+    
+    const minLastSeen = Date.now() - (parseInt(String(req.query.maxAge)) || 3600000); // Default 1 hour
+
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, 2000); // Short timeout for quick response
+
+      gun
+        .get(GUN_PATHS.PEERS)
+        .map()
+        .once((data: any, pubKey: string) => {
+          if (!data || typeof data !== "object") return;
+          
+          if (data.lastSeen && data.lastSeen > minLastSeen) {
+             peers.push({
+               pubKey,
+               alias: data.alias || null,
+               lastSeen: data.lastSeen,
+               type: data.type || 'unknown',
+               torrentsCount: data.torrentsCount
+             });
+          }
+        });
+        
+        // Give GunDB time to collect
+        setTimeout(() => {
+          clearTimeout(timer);
+          resolve(undefined);
+        }, 1500);
+    });
+
+    peers.sort((a, b) => b.lastSeen - a.lastSeen);
+
+    res.json({
+      success: true,
+      count: peers.length,
+      peers
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ success: false, error: errorMessage });
+  }
+});
+
+/**
  * GET /api/v1/network/stats
  *
  * Network-wide statistics aggregated from all known relays.
