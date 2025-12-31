@@ -1102,6 +1102,9 @@ export class TorrentManager {
     
     // normalizedHash already declared above
     
+    // Remove from global GunDB registry first
+    await this.removeFromGlobalRegistry(normalizedHash, torrentName);
+    
     // Unpin files from IPFS if any
     const catalogEntry = this.catalog.get(normalizedHash);
     if (catalogEntry) {
@@ -1415,6 +1418,77 @@ export class TorrentManager {
         });
       });
     });
+  }
+
+  /**
+   * Remove a torrent from the global registry on GunDB
+   * This makes the torrent no longer discoverable by other relays
+   */
+  public async removeFromGlobalRegistry(
+    infoHash: string,
+    name?: string
+  ): Promise<{ success: boolean }> {
+    if (!this.gun) {
+      loggers.server.warn('📚 GunDB not available, cannot remove from global registry');
+      return { success: false };
+    }
+
+    const normalizedHash = infoHash.toLowerCase();
+    
+    return new Promise((resolve) => {
+      // Check if entry exists and was added by this relay
+      this.gun.get(GUN_PATHS.TORRENTS).get(normalizedHash).once((existing: any) => {
+        if (!existing || !existing.magnetURI) {
+          loggers.server.info(`📚 Torrent ${normalizedHash} not found in global registry`);
+          resolve({ success: true }); // Already not there
+          return;
+        }
+
+        // Only remove if added by this relay
+        const addedBy = existing.addedBy || '';
+        const thisRelay = relayConfig.endpoint || '';
+        
+        if (addedBy && thisRelay && !addedBy.includes(thisRelay.replace(/https?:\/\//, '').split('/')[0])) {
+          loggers.server.info(`📚 Torrent ${normalizedHash} was added by another relay (${addedBy}), not removing`);
+          resolve({ success: true });
+          return;
+        }
+
+        // Remove from registry (set to null)
+        this.gun.get(GUN_PATHS.TORRENTS).get(normalizedHash).put(null, (ack: any) => {
+          if (ack.err) {
+            loggers.server.error({ err: ack.err }, '📚 Failed to remove from global registry');
+            resolve({ success: false });
+          } else {
+            loggers.server.info(`📚 Removed torrent from global registry: ${name || normalizedHash}`);
+            
+            // Also remove from search index
+            this.removeFromSearchIndex(normalizedHash, name || '');
+            
+            resolve({ success: true });
+          }
+        });
+      });
+    });
+  }
+
+  /**
+   * Remove torrent from search index
+   */
+  private removeFromSearchIndex(infoHash: string, name: string): void {
+    if (!this.gun) return;
+
+    // Extract keywords from name
+    const keywords = name.toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(k => k.length >= 3);
+    
+    // Remove from each keyword index
+    for (const keyword of keywords) {
+      this.gun.get(GUN_PATHS.SEARCH).get(keyword).get(infoHash).put(null);
+    }
+    
+    loggers.server.debug(`📚 Removed ${keywords.length} keywords from search index for ${infoHash}`);
   }
 
   /**
