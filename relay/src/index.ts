@@ -57,7 +57,7 @@ import apiKeysRoutes from "./routes/api-keys";
 import networkRoutes from "./routes/network";
 import uploadsRoutes from "./routes/uploads";
 import dealsRoutes from "./routes/deals/index";
-import storageRoutes from "./routes/deals/storage-routes";
+
 import x402Routes from "./routes/x402";
 import systemRoutes from "./routes/system";
 import servicesRoutes from "./routes/services";
@@ -69,7 +69,7 @@ import visualGraphRoutes from "./routes/visualGraph";
 import driveRoutes from "./routes/drive";
 
 // Middleware
-import { apiKeysAuthMiddleware } from "./middleware/api-keys-auth";
+
 
 dotenv.config();
 
@@ -1127,7 +1127,7 @@ See docs/RELAY_KEYS.md for more information.
   app.use("/api/v1/network", networkRoutes);
   app.use("/api/v1/uploads", uploadsRoutes);
   app.use("/api/v1/deals", dealsRoutes);
-  app.use("/api/v1/storage", storageRoutes);
+
   app.use("/api/v1/x402", x402Routes);
   app.use("/api/v1/system", systemRoutes);
   app.use("/api/v1/services", servicesRoutes);

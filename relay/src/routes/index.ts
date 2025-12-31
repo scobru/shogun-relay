@@ -395,51 +395,6 @@ export default (app: express.Application) => {
     })
   );
 
-  // Route mancanti dall'index-old.js
-  app.get("/blog/:id", (req: any, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    const indexPath = path.resolve(publicPath, "index.html");
-    const htmlData = fs.readFileSync(indexPath, "utf8");
-    let numberOfTries = 0;
-    const gun = req.app.get("gunInstance");
-    const chain = gun
-      .get(`hal9000/post`)
-      .get(req.params.id)
-      .on((post: any) => {
-        numberOfTries++;
-        if (!post) {
-          if (numberOfTries > 1) {
-            chain.off();
-            return res.sendStatus(404);
-          }
-          return;
-        }
-        if (res.writableEnded) {
-          chain.off();
-          return;
-        }
-        const finalHtml = `
-            <!DOCTYPE html>
-            <html>
-               <head>
-                  <title>${post.title || "Blog Post"}</title>
-                  <meta name="description" content="${post.description || ""}" />
-               </head>
-               <body>
-                  ${post.content}
-               </body>
-            </html>
-         `;
-        return res.send(finalHtml);
-      });
-    setTimeout(() => {
-      if (!res.writableEnded) {
-        res.sendStatus(408);
-      }
-      chain.off();
-    }, 5000);
-  });
-
   app.get("/api/v1/ipfs/webui", (req, res) => {
     const token =
       req.query?.auth_token ||
