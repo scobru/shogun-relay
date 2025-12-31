@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-yellow)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-blue)](https://www.typescriptlang.org/)
 [![Tests](https://img.shields.io/badge/tests-127%20passing-brightgreen)]()
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/scobru/shogun-relay)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/scobru/shogun-relay) a
 
 **Shogun Relay** is a production-ready connection hub that unifies **GunDB** and **IPFS** into a single solution.
 
