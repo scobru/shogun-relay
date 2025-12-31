@@ -615,6 +615,63 @@ export async function deleteUpload(userAddress: string, hash: string): Promise<v
 }
 
 /**
+ * Get all subscriptions
+ * @returns Promise with array of subscriptions
+ */
+export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
+  if (!relayUser) {
+    throw new Error("Relay user not initialized");
+  }
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      resolve([]);
+    }, 5000);
+
+    const subscriptionsNode = relayUser!.get(GUN_PATHS.X402).get(GUN_PATHS.SUBSCRIPTIONS);
+
+    subscriptionsNode.once((parentData: Record<string, any>) => {
+      clearTimeout(timeout);
+
+      if (!parentData || typeof parentData !== "object") {
+        resolve([]);
+        return;
+      }
+
+      const userKeys = Object.keys(parentData).filter((key) => !["_", "#", ">", "<"].includes(key));
+
+      if (userKeys.length === 0) {
+        resolve([]);
+        return;
+      }
+
+      const subscriptions: Array<SubscriptionData> = [];
+      let completedReads = 0;
+      const totalReads = userKeys.length;
+
+      userKeys.forEach((userAddress) => {
+        subscriptionsNode.get(userAddress).once((subData: SubscriptionData) => {
+          completedReads++;
+
+          if (subData && subData.tier) {
+            const cleanData: SubscriptionData = {};
+            Object.keys(subData).forEach((key) => {
+                // @ts-ignore
+                if (!["_", "#", ">", "<"].includes(key)) cleanData[key] = subData[key];
+            });
+            subscriptions.push(cleanData);
+          }
+
+          if (completedReads === totalReads) {
+            resolve(subscriptions);
+          }
+        });
+      });
+    });
+  });
+}
+
+/**
  * Middleware to require admin authentication
  */
 export const adminAuthMiddleware = (req: any, res: any, next: any) => {
@@ -647,4 +704,5 @@ export default {
   saveUpload,
   getUserUploads,
   deleteUpload,
+  getAllSubscriptions,
 };

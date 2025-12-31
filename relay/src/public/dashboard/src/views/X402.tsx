@@ -22,6 +22,8 @@ function X402() {
   const [tiers, setTiers] = useState<Tier[]>([])
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState<'checking' | 'active' | 'disabled' | 'error'>('checking')
+  const [subscriptions, setSubscriptions] = useState<any[]>([])
+  const [loadingSubs, setLoadingSubs] = useState(false)
 
   useEffect(() => { fetchX402Status() }, [])
 
@@ -54,6 +56,32 @@ function X402() {
     const chains: Record<number, string> = { 1: 'Ethereum', 84532: 'Base Sepolia', 8453: 'Base', 11155111: 'Sepolia' }
     return chains[chainId] || `Chain ${chainId}`
   }
+
+  useEffect(() => {
+    if (isAuthenticated && status === 'active') {
+        fetchSubscriptions()
+    }
+  }, [isAuthenticated, status])
+
+  const fetchSubscriptions = async () => {
+    setLoadingSubs(true)
+    try {
+        const token = localStorage.getItem('admin_token') || '' 
+        const res = await fetch('/api/v1/x402/subscriptions', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        const data = await res.json()
+        if (data.success) {
+            setSubscriptions(data.subscriptions)
+        }
+    } catch (e) {
+        console.error("Failed to fetch subs", e)
+    } finally {
+        setLoadingSubs(false)
+    }
+  }
+
+  const formatDate = (d: any) => new Date(d).toLocaleDateString() + ' ' + new Date(d).toLocaleTimeString()
 
   return (
     <div className="flex flex-col gap-6 max-w-6xl">
@@ -137,6 +165,47 @@ function X402() {
         </div>
       )}
 
+      {/* Info */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+            <h3 className="card-title">👥 Active Subscriptions</h3>
+            <div className="overflow-x-auto">
+                <table className="table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Tier</th>
+                            <th>Status</th>
+                            <th>Storage</th>
+                            <th>Expires</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loadingSubs ? (
+                             <tr><td colSpan={5} className="text-center"><span className="loading loading-spinner"></span></td></tr>
+                        ) : subscriptions.length === 0 ? (
+                            <tr><td colSpan={5} className="text-center text-base-content/50">No active subscriptions found</td></tr>
+                        ) : (
+                            subscriptions.map((sub, i) => (
+                                <tr key={i}>
+                                    <td className="font-mono text-xs">{sub.userAddress?.substring(0,6)}...{sub.userAddress?.substring(38)}</td>
+                                    <td><div className="badge badge-primary badge-outline">{sub.tier}</div></td>
+                                    <td>
+                                        {sub.isActive ? <span className="text-success">Active</span> : <span className="text-error">Expired</span>}
+                                    </td>
+                                    <td>{sub.storageUsedMB?.toFixed(2) || 0} / {sub.storageMB} MB</td>
+                                    <td className="text-xs">{formatDate(sub.expiresAt)}</td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+            <div className="divider"></div>
+            <button className="btn btn-sm btn-ghost" onClick={fetchSubscriptions}>🔄 Refresh List</button>
+        </div>
+      </div>
+      
       {/* Info */}
       <div className="card bg-base-100 shadow">
         <div className="card-body">

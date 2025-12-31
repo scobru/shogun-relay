@@ -1186,4 +1186,64 @@ function asyncHandler(fn: any) {
   };
 }
 
+/**
+ * GET /subscriptions
+ * List all active subscriptions
+ * Protected: requires admin authentication
+ */
+router.get("/subscriptions", async (req, res) => {
+  try {
+    // Check admin auth
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
+
+    if (token !== authConfig.adminPassword) {
+      return res.status(401).json({
+        success: false,
+        error: "Admin authentication required",
+      });
+    }
+
+    // Import lazily or assumes module is ready
+    const RelayUser = await import("../utils/relay-user");
+    
+    // Check initialization
+    if (!RelayUser.isRelayUserInitialized()) {
+        return res.status(503).json({
+            success: false,
+            error: "Relay user not initialized"
+        });
+    }
+
+    const subscriptions = await RelayUser.getAllSubscriptions();
+    
+    // Enrich with status checks (expired?)
+    const enriched = subscriptions.map(sub => {
+        const now = Date.now();
+        const expires = new Date(sub.expiresAt as string | number | Date).getTime();
+        const active = expires > now;
+        return {
+            ...sub,
+            isActive: active,
+            status: active ? 'active' : 'expired'
+        };
+    });
+
+    res.json({
+      success: true,
+      count: enriched.length,
+      subscriptions: enriched
+    });
+
+  } catch (error: any) {
+    console.error("List subscriptions error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 export default router;
