@@ -381,14 +381,14 @@ function Chat() {
                     </div>
                 )}
                 {consoleHistory.map((entry: ConsoleEntry) => (
-                    <div key={entry.id} className={entry.type === 'command' ? 'text-primary' : 'text-base-content'}>
+                    <div key={entry.id} className={`overflow-hidden max-w-full ${entry.type === 'command' ? 'text-primary' : 'text-base-content'}`}>
                         {entry.type === 'command' ? (
-                            <div className="flex items-start gap-2">
-                                <span className="text-success">$</span>
-                                <span>{entry.text}</span>
+                            <div className="flex items-start gap-2 overflow-hidden">
+                                <span className="text-success flex-shrink-0">$</span>
+                                <span className="break-all">{entry.text}</span>
                             </div>
                         ) : (
-                            <div className="pl-4 whitespace-pre-wrap opacity-90">{entry.text}</div>
+                            <div className="pl-4 whitespace-pre-wrap break-all opacity-90">{entry.text}</div>
                         )}
                     </div>
                 ))}
@@ -425,12 +425,12 @@ function Chat() {
                     </div>
                 )}
                 {lobbyMessages.map((msg: LobbyMessage) => (
-                    <div key={msg.id} className="chat chat-start">
+                    <div key={msg.id} className="chat chat-start max-w-full overflow-hidden">
                         <div className="chat-header opacity-70 text-xs mb-1">
                             <span className="font-bold">{msg.alias}</span>
                             <span className="ml-2">{new Date(msg.timestamp).toLocaleTimeString()}</span>
                         </div>
-                        <div className="chat-bubble chat-bubble-accent">
+                        <div className="chat-bubble chat-bubble-accent break-all overflow-hidden max-w-full">
                             {msg.text}
                         </div>
                     </div>
@@ -481,11 +481,11 @@ function Chat() {
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     {messages.map((msg: ChatMessage) => (
-                        <div key={msg.id} className={`chat ${msg.incoming ? 'chat-start' : 'chat-end'}`}>
+                        <div key={msg.id} className={`chat max-w-full overflow-hidden ${msg.incoming ? 'chat-start' : 'chat-end'}`}>
                             <div className="chat-header opacity-50 text-xs mb-1">
                                 {new Date(msg.timestamp).toLocaleTimeString()}
                             </div>
-                            <div className={`chat-bubble ${msg.incoming ? 'chat-bubble-secondary' : 'chat-bubble-primary'}`}>
+                            <div className={`chat-bubble break-all overflow-hidden max-w-full ${msg.incoming ? 'chat-bubble-secondary' : 'chat-bubble-primary'}`}>
                                 {msg.text}
                             </div>
                         </div>
