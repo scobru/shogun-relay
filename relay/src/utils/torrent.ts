@@ -348,6 +348,44 @@ export class TorrentManager {
   }
 
   /**
+   * Verify registry consistency and remove orphaned torrents
+   * Checks for torrents added by this relay that are no longer in local storage
+   */
+  public async verifyAndCleanupRegistry(): Promise<void> {
+    if (!this.gun || !this.enabled || !this.client) return;
+
+    const thisRelay = relayConfig.endpoint || '';
+    if (!thisRelay) return;
+
+    loggers.server.info("📚 Starting registry verification and cleanup...");
+    
+    // Get all local info hashes
+    const localInfoHashes = new Set(
+      this.client.torrents.map(t => t.infoHash.toLowerCase())
+    );
+
+    // We need to scan the registry
+    // Note: This might be heavy if registry is huge, but we only process valid entries
+    this.gun.get(GUN_PATHS.TORRENTS).map().once(async (entry: any, infoHash: string) => {
+      if (!entry || !entry.magnetURI) return;
+
+      const normalizedHash = infoHash.toLowerCase();
+      const addedBy = entry.addedBy || '';
+      
+      // Check if this torrent was added by THIS relay
+      if (addedBy && addedBy.includes(thisRelay.replace(/https?:\/\//, '').split('/')[0])) {
+        // If it was added by us, check if we still have it
+        if (!localInfoHashes.has(normalizedHash)) {
+          loggers.server.warn(`📚 Found orphaned torrent in registry: ${entry.name} (${normalizedHash})`);
+          loggers.server.info(`📚 Removing orphaned torrent from registry...`);
+          
+          await this.removeFromGlobalRegistry(normalizedHash, entry.name);
+        }
+      }
+    });
+  }
+
+  /**
    * Add a magnet link or torrent file manually
    */
   public addTorrent(magnetOrPath: string): any {
