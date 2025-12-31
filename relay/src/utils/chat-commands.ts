@@ -48,7 +48,7 @@ export class ChatCommandHandler {
                `Version: v${packageJson.version}\n` +
                `Uptime: ${uptimeString}\n` +
                `Active Torrents: ${status.activeTorrents}\n` +
-               `Storage Used: ${storage.totalGB.toFixed(2)} GB (${storage.totalPins} pins)\n` +
+               `Storage Used: ${storage.totalGB.toFixed(2)} GB (${storage.fileCount} files)\n` +
                `Download Speed: ${(status.downloadSpeed / 1024 / 1024).toFixed(2)} MB/s\n` +
                `Upload Speed: ${(status.uploadSpeed / 1024 / 1024).toFixed(2)} MB/s`;
       },

@@ -12,6 +12,7 @@
 import Gun from "gun";
 import "gun/sea.js";
 import { loggers } from "./logger";
+import { GUN_PATHS } from "./gun-paths";
 
 const SEA = Gun.SEA;
 const log = loggers.frozenData;
@@ -238,7 +239,7 @@ export async function createFrozenEntry(
     const currentIndex = await new Promise<IndexEntry | null>((resolve) => {
       const timeout = setTimeout(() => resolve(null), 2000);
       gun
-        .get("shogun-index")
+        .get(GUN_PATHS.SHOGUN_INDEX)
         .get(namespace)
         .get(indexKey)
         .once((data: IndexEntry | undefined) => {
@@ -251,7 +252,7 @@ export async function createFrozenEntry(
     const shouldUpdate = !currentIndex || !currentIndex.updatedAt || currentIndex.updatedAt <= now;
 
     if (shouldUpdate) {
-      gun.get("shogun-index").get(namespace).get(indexKey).put({
+      gun.get(GUN_PATHS.SHOGUN_INDEX).get(namespace).get(indexKey).put({
         latestHash: hash,
         pub: keyPair.pub,
         updatedAt: now,
@@ -386,7 +387,7 @@ export async function readFrozenEntry(
               }, 2000);
 
               gun
-                .get("shogun-index")
+                .get(GUN_PATHS.SHOGUN_INDEX)
                 .get(indexNamespace)
                 .map()
                 .once((index: IndexEntry | undefined, _key?: string) => {
@@ -529,7 +530,7 @@ export async function getLatestFrozenEntry(
     const timeout = setTimeout(() => resolve(undefined), 10000);
 
     gun
-      .get("shogun-index")
+      .get(GUN_PATHS.SHOGUN_INDEX)
       .get(namespace)
       .get(indexKey)
       .once(async (index: IndexEntry | undefined) => {
@@ -563,7 +564,7 @@ export async function listFrozenEntries(
     }, 5000);
 
     gun
-      .get("shogun-index")
+      .get(GUN_PATHS.SHOGUN_INDEX)
       .get(namespace)
       .map()
       .once(async (index: IndexEntry | undefined, key?: string) => {
@@ -624,9 +625,10 @@ export async function createFrozenObservation(
   );
 
   // Also update aggregated index for the observed host
+  // Also update aggregated index for the observed host
   gun
-    .get("shogun-index")
-    .get("observations-by-host")
+    .get(GUN_PATHS.SHOGUN_INDEX)
+    .get(GUN_PATHS.OBSERVATIONS_BY_HOST)
     .get(observedHost)
     .get(observerKeyPair.pub)
     .put({
@@ -652,8 +654,8 @@ export async function getObservationsForHost(
     const timeout = setTimeout(() => resolve(observations), 5000);
 
     gun
-      .get("shogun-index")
-      .get("observations-by-host")
+      .get(GUN_PATHS.SHOGUN_INDEX)
+      .get(GUN_PATHS.OBSERVATIONS_BY_HOST)
       .get(observedHost)
       .map()
       .once(

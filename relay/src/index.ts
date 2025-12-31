@@ -48,6 +48,7 @@ import {
 } from "./utils/security";
 import { startPeriodicPeerSync, announceRelayPresence } from "./utils/peer-discovery";
 import { torrentManager } from "./utils/torrent";
+import { GUN_PATHS } from "./utils/gun-paths";
 
 dotenv.config();
 
@@ -139,6 +140,9 @@ async function initializeServer() {
     if (msg.put) {
       const souls = Object.keys(msg.put);
       const isPublicRegistry = souls.some(soul => 
+        // Unified paths
+        Object.values(GUN_PATHS).some(path => soul === path || soul.startsWith(path + '/')) ||
+        // Legacy paths (keep for backward compatibility)
         soul === 'shogun' || 
         soul === 'relays' || 
         soul === 'annas-archive' ||

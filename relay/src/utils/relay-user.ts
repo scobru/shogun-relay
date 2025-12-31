@@ -12,6 +12,7 @@
 import { loggers } from "./logger";
 const log = loggers.relayUser;
 import { authConfig } from "../config/env-config";
+import { GUN_PATHS } from "./gun-paths";
 
 // Module state
 let relayUser: GunUser | undefined = undefined;
@@ -190,7 +191,7 @@ export function getSubscriptionsNode(): GunNode | undefined {
     log.warn("Relay user not initialized, cannot access subscriptions node");
     return undefined;
   }
-  return relayUser.get("x402").get("subscriptions");
+  return relayUser.get(GUN_PATHS.X402).get(GUN_PATHS.SUBSCRIPTIONS);
 }
 
 /**
@@ -229,8 +230,8 @@ export async function getSubscription(
 
       // Use .on() instead of .once() to get updates as data syncs
       subscription = relayUser!
-        .get("x402")
-        .get("subscriptions")
+        .get(GUN_PATHS.X402)
+        .get(GUN_PATHS.SUBSCRIPTIONS)
         .get(userAddress)
         .on((data: Record<string, any>) => {
           if (resolved) return;
@@ -261,8 +262,8 @@ export async function getSubscription(
 
       // Also check with .once() for immediate local data
       relayUser!
-        .get("x402")
-        .get("subscriptions")
+        .get(GUN_PATHS.X402)
+        .get(GUN_PATHS.SUBSCRIPTIONS)
         .get(userAddress)
         .once((data: Record<string, any>) => {
           if (resolved) return;
@@ -366,8 +367,8 @@ export async function saveSubscription(
       }, 15000);
 
       relayUser
-        ?.get("x402")
-        .get("subscriptions")
+        ?.get(GUN_PATHS.X402)
+        .get(GUN_PATHS.SUBSCRIPTIONS)
         .get(userAddress)
         .put(dataToSave as Record<string, any>, (ack: GunAck) => {
           clearTimeout(timeout);
@@ -453,8 +454,8 @@ export async function updateSubscriptionField(
 
   return new Promise((resolve, reject) => {
     relayUser!
-      .get("x402")
-      .get("subscriptions")
+      .get(GUN_PATHS.X402)
+      .get(GUN_PATHS.SUBSCRIPTIONS)
       .get(userAddress)
       .get(field)
       .put(value as Record<string, any>, (ack: GunAck) => {
@@ -479,7 +480,7 @@ export function getUserUploadsNode(userAddress: string): GunNode | undefined {
     log.warn("Relay user not initialized, cannot access uploads node");
     return undefined;
   }
-  return relayUser.get("x402").get("uploads").get(userAddress);
+  return relayUser.get(GUN_PATHS.X402).get(GUN_PATHS.UPLOADS).get(userAddress);
 }
 
 /**
@@ -508,8 +509,8 @@ export async function saveUpload(
     };
 
     relayUser!
-      .get("x402")
-      .get("uploads")
+      .get(GUN_PATHS.X402)
+      .get(GUN_PATHS.UPLOADS)
       .get(userAddress)
       .get(hash)
       .put(dataToSave as Record<string, any>, (ack: GunAck) => {
@@ -540,7 +541,7 @@ export async function getUserUploads(userAddress: string): Promise<Array<UploadI
       resolve([]);
     }, 15000);
 
-    const uploadsNode = relayUser!.get("x402").get("uploads").get(userAddress);
+    const uploadsNode = relayUser!.get(GUN_PATHS.X402).get(GUN_PATHS.UPLOADS).get(userAddress);
 
     uploadsNode.once((parentData: Record<string, any>) => {
       clearTimeout(timeout);
@@ -597,8 +598,8 @@ export async function deleteUpload(userAddress: string, hash: string): Promise<v
 
   return new Promise((resolve, reject) => {
     relayUser!
-      .get("x402")
-      .get("uploads")
+      .get(GUN_PATHS.X402)
+      .get(GUN_PATHS.UPLOADS)
       .get(userAddress)
       .get(hash)
       .put(null, (ack: GunAck) => {

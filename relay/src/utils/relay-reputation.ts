@@ -29,6 +29,7 @@
 import * as FrozenData from "./frozen-data";
 import { getRelayPub } from "./relay-user";
 import { loggers } from "./logger";
+import { GUN_PATHS } from "./gun-paths";
 
 const log = loggers.reputation;
 
@@ -505,7 +506,7 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
  * @param relayHost - Host identifier
  */
 export function initReputationTracking(gun: GunInstance, relayHost: string): GunNode {
-  const reputationNode = gun.get("shogun-network").get("reputation").get(relayHost);
+  const reputationNode = gun.get(GUN_PATHS.REPUTATION).get(relayHost);
 
   // Check if already initialized
   reputationNode.once((data: ReputationMetrics | undefined) => {
@@ -586,7 +587,7 @@ export async function recordProofSuccess(
     if (!observerKeyPair) {
       log.warn("recordProofSuccess called without keyPair - falling back to unsigned (deprecated)");
       // Legacy fallback (mutable counter)
-      const node = gun.get("shogun-network").get("reputation").get(relayHost);
+      const node = gun.get(GUN_PATHS.REPUTATION).get(relayHost);
       return new Promise((resolve) => {
         node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
@@ -629,7 +630,7 @@ export async function recordProofSuccess(
     );
 
     // Update local optimistic cache/index for backward compatibility
-    const node = gun.get("shogun-network").get("reputation").get(relayHost);
+    const node = gun.get(GUN_PATHS.REPUTATION).get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
@@ -695,7 +696,7 @@ export async function recordProofFailure(
         { relayHost },
         "recordProofFailure called without keyPair - falling back to unsigned"
       );
-      const node = gun.get("shogun-network").get("reputation").get(relayHost);
+      const node = gun.get(GUN_PATHS.REPUTATION).get(relayHost);
       return new Promise((resolve) => {
         node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};
@@ -728,7 +729,7 @@ export async function recordProofFailure(
     );
 
     // Optimistic update
-    const node = gun.get("shogun-network").get("reputation").get(relayHost);
+    const node = gun.get(GUN_PATHS.REPUTATION).get(relayHost);
     await new Promise<void>((resolve) => {
       node.once((data: ReputationMetrics | undefined) => {
         const current = data || {};
@@ -779,7 +780,7 @@ export async function recordPinFulfillment(
         { relayHost },
         "recordPinFulfillment called without keyPair - falling back to unsigned"
       );
-      const node = gun.get("shogun-network").get("reputation").get(relayHost);
+      const node = gun.get(GUN_PATHS.REPUTATION).get(relayHost);
       return new Promise((resolve) => {
         node.once((data: ReputationMetrics | undefined) => {
           const current = data || {};

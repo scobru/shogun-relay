@@ -12,6 +12,8 @@
 
 import { createRegistryClient } from "./registry-client";
 import { loggers } from "./logger";
+import { GUN_PATHS } from "./gun-paths";
+import { chatService } from "./chat-service";
 import type { IGunInstance } from "gun";
 
 const log = loggers.registry || console;
@@ -138,9 +140,12 @@ export function announceRelayPresence(
     lastSeen: Date.now(),
   };
 
-  // Write to shogun-network/relays/PUBKEY
-  // Using shogun-network root to match reputation module
-  gun.get("shogun-network").get("relays").get(pubKey).put(presenceData);
+  // Write to unified relays path
+  gun.get(GUN_PATHS.RELAYS).get(pubKey).put(presenceData);
+  
+  // Also announce to PEERS path so Mules can find us as a generic peer
+  gun.get(GUN_PATHS.PEERS).get(pubKey).put(presenceData);
+  
   log.info({ pubKey, endpoint: relayInfo.endpoint }, "Announced relay presence on GunDB");
 }
 
@@ -152,7 +157,7 @@ export function announceRelayPresence(
 export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): void {
   log.info("Starting GunDB peer discovery...");
   
-  gun.get("shogun-network").get("relays").map().on((data: any, pubKey: string) => {
+  gun.get(GUN_PATHS.RELAYS).map().on((data: any, pubKey: string) => {
     if (!data || !data.endpoint) return;
 
     // Validate endpoint (basic check)
@@ -182,7 +187,28 @@ export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): voi
     // Add as peer
     gun.opt({ peers: [gunPeerUrl] });
     
+    // Auto-subscribe to chat with this relay
+    chatService.syncMessagesFrom(pubKey);
+
     log.info({ peer: gunPeerUrl, pubKey }, "Discovered peer via GunDB");
+  });
+}
+
+/**
+ * Sync generic peers (Mules) from GunDB (shogun-network/peers)
+ * @param gun - GunDB instance
+ */
+export function syncMulePeers(gun: IGunInstance): void {
+  log.info("Starting GunDB Mule peer discovery...");
+  
+  gun.get(GUN_PATHS.PEERS).map().on((data: any, pubKey: string) => {
+    if (!data) return;
+    
+    // Auto-subscribe to chat with this peer (Mule)
+    chatService.syncMessagesFrom(pubKey);
+    
+    // We don't add Mules as gun.opt({peers}) because they are likely not running Gun servers (or are behind NAT)
+    // But we do want to discover them for chat.
   });
 }
 
@@ -204,10 +230,7 @@ export function startPeriodicPeerSync(
   let intervalId: NodeJS.Timeout | null = null;
   let isRunning = false;
 
-  // 1. Start GunDB discovery immediately (reactive)
-  syncGunDBPeers(gun, excludeEndpoint);
-
-  // 2. Periodic On-chain Sync
+  // Sync on-chain initially
   const doSync = async () => {
     if (isRunning) {
       log.debug("Peer sync already in progress, skipping");

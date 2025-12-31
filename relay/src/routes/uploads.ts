@@ -3,6 +3,7 @@ import http from "http";
 import { loggers } from "../utils/logger";
 import { authConfig } from "../config";
 import { secureCompare, hashToken } from "../utils/security";
+import { GUN_PATHS } from "../utils/gun-paths";
 
 // Extended Request interface with custom properties
 interface CustomRequest extends Request {
@@ -79,7 +80,7 @@ async function getAllSystemHashes(req: any): Promise<Array<string>> {
       resolve([]);
     }, 10000);
 
-    const uploadsNode = gun.get("shogun").get("uploads");
+    const uploadsNode = gun.get(GUN_PATHS.UPLOADS);
 
     uploadsNode.once((uploadsData: any) => {
       clearTimeout(timeoutId);
@@ -138,8 +139,7 @@ async function deleteUploadAndUpdateMB(
   return new Promise(async (resolve, reject) => {
     try {
       gun
-        .get("shogun")
-        .get("uploads")
+        .get(GUN_PATHS.UPLOADS)
         .get(userAddress)
         .get(fileHash)
         .put(null, (ack: any) => {
@@ -212,7 +212,7 @@ router.get("/system-hashes-map", async (req, res) => {
         resolve({});
       }, 10000);
 
-      const systemHashesNode = gun.get("shogun").get("systemhash");
+      const systemHashesNode = gun.get(GUN_PATHS.SYSTEM_HASH);
 
       systemHashesNode.once(async (systemHashesData: any) => {
         clearTimeout(timeoutId);
@@ -350,7 +350,7 @@ router.post(
 
       // Salva l'hash nel nodo systemhash
       await new Promise((resolve, reject) => {
-        const systemHashesNode = gun.get("shogun").get("systemhash");
+        const systemHashesNode = gun.get(GUN_PATHS.SYSTEM_HASH);
 
         const now = Date.now();
         const hashRecord: any = {
@@ -506,7 +506,7 @@ router.delete(
 
       // Rimuovi l'hash dal nodo systemhash
       await new Promise((resolve, reject) => {
-        const systemHashesNode = gun.get("shogun").get("systemhash");
+        const systemHashesNode = gun.get(GUN_PATHS.SYSTEM_HASH);
 
         systemHashesNode.get(hash).put(null, (ack: any) => {
           if (ack && ack.err) {
@@ -550,7 +550,7 @@ router.get("/:identifier", async (req, res) => {
     loggers.uploads.info(`Loading upload for identifier: ${identifier}`);
 
     const gun = getGunInstance(req);
-    const uploadsNode = gun.get("shogun").get("uploads").get(identifier);
+    const uploadsNode = gun.get(GUN_PATHS.UPLOADS).get(identifier);
 
     const getUploads = () => {
       return new Promise((resolve) => {
@@ -641,7 +641,7 @@ router.delete(
       loggers.uploads.info(`Delete request for user: ${identifier}, file: ${hash}`);
 
       const gun = getGunInstance(req);
-      const uploadNode = gun.get("shogun").get("uploads").get(identifier).get(hash);
+      const uploadNode = gun.get(GUN_PATHS.UPLOADS).get(identifier).get(hash);
 
       const fileData = await new Promise<any>((resolve, reject) => {
         const timeoutId = setTimeout(() => {

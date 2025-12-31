@@ -4,6 +4,7 @@ import path from "path";
 import { loggers } from "../utils/logger";
 import { packageConfig } from "../config";
 import { config } from "../config/env-config";
+import { GUN_PATHS } from "../utils/gun-paths";
 
 const router: Router = express.Router();
 
@@ -50,7 +51,7 @@ router.get("/alldata", (req, res) => {
     const gun = getGunInstance(req);
 
     // Get all data from Gun database
-    gun.get("shogun").once((data: any) => {
+    gun.get(GUN_PATHS.SHOGUN).once((data: any) => {
       res.json({
         success: true,
         data: data,
@@ -554,7 +555,7 @@ router.get("/logs", (req, res) => {
 router.delete("/logs", (req, res) => {
   try {
     const gun = getGunInstance(req);
-    const logsNode = gun.get("shogun").get("logs");
+    const logsNode = gun.get(GUN_PATHS.LOGS);
 
     try {
       // Clear GunDB logs only (file logs are managed by the system)

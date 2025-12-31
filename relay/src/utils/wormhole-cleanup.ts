@@ -9,6 +9,7 @@
 import type { IGunInstance } from "gun";
 import { loggers } from "./logger";
 import { wormholeConfig, ipfsConfig, authConfig } from "../config/env-config";
+import { GUN_PATHS } from "./gun-paths";
 
 const log = loggers.server || console;
 
@@ -134,8 +135,8 @@ async function runWormholeCleanup(gun: IGunInstance): Promise<void> {
 
         // Remove from Gun index
         gun
-          .get("shogun-wormhole")
-          .get("wormhole-transfers")
+          .get(GUN_PATHS.SHOGUN_WORMHOLE)
+          .get(GUN_PATHS.WORMHOLE_TRANSFERS)
           .get(code)
           .put(null as any);
 
@@ -189,7 +190,7 @@ async function getWormholeTransfers(
       });
     };
 
-    gun.get("shogun-wormhole").get("wormhole-transfers").map().once(handler);
+    gun.get(GUN_PATHS.SHOGUN_WORMHOLE).get(GUN_PATHS.WORMHOLE_TRANSFERS).map().once(handler);
 
     // Wait a bit for all data to come in
     timeout = setTimeout(() => {

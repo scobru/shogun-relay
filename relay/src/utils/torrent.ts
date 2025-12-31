@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { createRequire } from 'module';
 import { loggers } from './logger';
+import { GUN_PATHS } from "./gun-paths";
 import { torrentConfig, relayConfig, ipfsConfig } from '../config/env-config';
 import { generateAACID, createAACRecord, generateDataFolderName, AACMetadataRecord } from './aac-utils';
 
@@ -596,8 +597,12 @@ export class TorrentManager {
       };
 
       // Publish to both paths for discovery
-      this.gun.get('relays').get(this.relayKey).get('annasArchive').put(relayInfo);
-      this.gun.get('annas-archive').get('catalog').get(this.relayKey).put(relayInfo);
+      // Publish to unified path for discovery
+      this.gun.get(GUN_PATHS.RELAYS).get(this.relayKey).put(relayInfo);
+      
+      // Legacy paths for backward compatibility (optional, can be removed if all nodes update)
+      // this.gun.get('relays').get(this.relayKey).get('annasArchive').put(relayInfo);
+      // this.gun.get('annas-archive').get('catalog').get(this.relayKey).put(relayInfo);
 
       loggers.server.info(`📚 Published relay info to GunDB for discovery: ${relayUrl}`);
     } catch (error) {
@@ -978,7 +983,7 @@ export class TorrentManager {
 
   /**
    * Handle torrent completion - catalog files
-
+   * 
    */
   private async onTorrentComplete(torrent: any): Promise<void> {
     try {
@@ -1362,7 +1367,7 @@ export class TorrentManager {
     
     return new Promise((resolve) => {
       // Check if torrent already exists in registry
-      this.gun.get('shogun').get('torrents').get('registry').get(normalizedHash).once((existing: any) => {
+      this.gun.get(GUN_PATHS.TORRENTS).get(normalizedHash).once((existing: any) => {
         // If force is true, we proceed regardless of existing
         if (existing && existing.magnetURI && !options.force) {
           loggers.server.info(`📚 Torrent ${normalizedHash} already in global registry`);
@@ -1395,7 +1400,7 @@ export class TorrentManager {
         };
 
         // Publish to registry
-        this.gun.get('shogun').get('torrents').get('registry').get(normalizedHash).put(entry, (ack: any) => {
+        this.gun.get(GUN_PATHS.TORRENTS).get(normalizedHash).put(entry, (ack: any) => {
           if (ack.err) {
             loggers.server.error({ err: ack.err }, '📚 Failed to publish to global registry');
             resolve({ success: false });
@@ -1440,7 +1445,7 @@ export class TorrentManager {
 
     // Index all unique keywords
     for (const keyword of allKeywords) {
-      this.gun.get('shogun').get('torrents').get('search').get(keyword).get(infoHash).put(true);
+      this.gun.get(GUN_PATHS.SEARCH).get(keyword).get(infoHash).put(true);
     }
     
     loggers.server.debug(`📚 Added ${allKeywords.size} keywords to search index for ${infoHash}`);
@@ -1455,7 +1460,7 @@ export class TorrentManager {
     const normalizedHash = infoHash.toLowerCase();
     
     return new Promise((resolve) => {
-      this.gun.get('shogun').get('torrents').get('registry').get(normalizedHash).once((data: any) => {
+      this.gun.get(GUN_PATHS.TORRENTS).get(normalizedHash).once((data: any) => {
         if (data && data.magnetURI) {
           resolve(data);
         } else {
@@ -1486,10 +1491,10 @@ export class TorrentManager {
       let pending = keywords.length;
       
       for (const keyword of keywords) {
-        this.gun.get('shogun').get('torrents').get('search').get(keyword).map().once((val: any, hash: string) => {
+        this.gun.get(GUN_PATHS.SEARCH).get(keyword).map().once((val: any, hash: string) => {
           if (val === true && !results.has(hash)) {
             // Fetch full entry from registry
-            this.gun.get('shogun').get('torrents').get('registry').get(hash).once((entry: any) => {
+            this.gun.get(GUN_PATHS.TORRENTS).get(hash).once((entry: any) => {
               if (entry && entry.magnetURI) {
                 results.set(hash, {
                   infoHash: hash,
@@ -1528,7 +1533,7 @@ export class TorrentManager {
     const results: any[] = [];
     
     return new Promise((resolve) => {
-      this.gun.get('shogun').get('torrents').get('registry').map().once((entry: any, hash: string) => {
+      this.gun.get(GUN_PATHS.TORRENTS).map().once((entry: any, hash: string) => {
         if (entry && entry.magnetURI && results.length < limit) {
           results.push({
             infoHash: hash,

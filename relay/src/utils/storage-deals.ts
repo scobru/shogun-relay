@@ -14,6 +14,7 @@
 import { IGunInstanceRoot } from "gun";
 import FrozenData, { FrozenEntry } from "./frozen-data";
 import { loggers } from "./logger";
+import { GUN_PATHS } from "./gun-paths";
 // @ts-ignore
 import { v4 as uuidv4 } from "uuid";
 
@@ -300,8 +301,8 @@ export async function getDealsByCid(gun: IGunInstanceRoot<any, any>, cid: string
     const timeout = setTimeout(() => resolve(deals), 5000);
 
     gun
-      .get("shogun-index")
-      .get("deals-by-cid")
+      .get(GUN_PATHS.SHOGUN_INDEX)
+      .get(GUN_PATHS.DEALS_BY_CID)
       .get(cid)
       .map()
       .once(async (index: any, dealId: string) => {
@@ -329,8 +330,8 @@ export async function getDealsByClient(
     const timeout = setTimeout(() => resolve(deals), 5000);
 
     gun
-      .get("shogun-index")
-      .get("deals-by-client")
+      .get(GUN_PATHS.SHOGUN_INDEX)
+      .get(GUN_PATHS.DEALS_BY_CLIENT)
       .get(clientAddress)
       .map()
       .once(async (index: any, dealId: string) => {

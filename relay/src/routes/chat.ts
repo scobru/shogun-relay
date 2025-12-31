@@ -4,6 +4,7 @@ import { loggers } from "../utils/logger";
 import { chatService } from "../utils/chat-service";
 import { authConfig } from "../config/env-config";
 import { torrentManager } from "../utils/torrent";
+import { GUN_PATHS } from "../utils/gun-paths";
 
 const router = Router();
 const log = loggers.server;
@@ -40,8 +41,8 @@ router.get("/peers", requireAuth, async (req, res) => {
         await new Promise<void>((resolve) => {
             const timeout = setTimeout(() => resolve(), 3000);
 
-            // Read from shogun-network/relays (same path as announceRelayPresence)
-            gun.get("shogun-network").get("relays").map().once((data: any, pubKey: string) => {
+            // Read from unified relays path
+            gun.get(GUN_PATHS.RELAYS).map().once((data: any, pubKey: string) => {
                 if (!data || !data.endpoint) return;
                 
                 // Only include recently seen relays

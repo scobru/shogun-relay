@@ -6,6 +6,7 @@ import { authConfig, ipfsConfig, x402Config } from "../../config";
 import { X402Merchant } from "../../utils/x402-merchant";
 import { ipfsUpload } from "../../utils/ipfs-client";
 import type { CustomRequest } from "./types";
+import { GUN_PATHS } from "../../utils/gun-paths";
 
 const router: Router = Router();
 
@@ -243,7 +244,7 @@ router.post(
         );
 
         const saveUploadPromise = new Promise<void>((resolve, reject) => {
-          const uploadsNode = gun.get("shogun").get("uploads").get(userAddress);
+          const uploadsNode = gun.get(GUN_PATHS.UPLOADS).get(userAddress);
           uploadsNode.get(directoryCid).put(uploadData, (ack: any) => {
             loggers.server.debug({ ack }, `💾 Directory upload save ack`);
             if (ack && ack.err) {

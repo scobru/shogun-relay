@@ -19,6 +19,7 @@ import { getRelayUser, getRelayKeyPair } from "../utils/relay-user";
 import { createRegistryClient, REGISTRY_ADDRESSES } from "../utils/registry-client";
 import { authConfig, registryConfig, relayConfig } from "../config";
 import { loggers } from "../utils/logger";
+import { GUN_PATHS } from "../utils/gun-paths";
 
 // Helper to get relay keypair safely for reputation tracking
 // Returns null instead of undefined if keypair not available
@@ -72,7 +73,7 @@ router.get("/relays", async (req, res) => {
       const timer = setTimeout(resolve, timeout);
 
       gun
-        .get("relays")
+        .get(GUN_PATHS.RELAYS)
         .map()
         .once((data: { pulse: any }, host: any) => {
           if (!data || typeof data !== "object") return;
@@ -144,7 +145,7 @@ router.get("/relay/:host", async (req, res) => {
       const timer = setTimeout(() => resolve(null), 5000);
 
       gun
-        .get("relays")
+        .get(GUN_PATHS.RELAYS)
         .get(host)
         .once((data: unknown) => {
           clearTimeout(timer);
@@ -222,7 +223,7 @@ router.get("/stats", async (req, res) => {
         if (processedHosts.has(currentRelayHost)) return;
 
         gun
-          .get("relays")
+          .get(GUN_PATHS.RELAYS)
           .get(currentRelayHost)
           .once((data: { pulse: any } | undefined) => {
             if (data && data.pulse && typeof data.pulse === "object") {
@@ -258,7 +259,7 @@ router.get("/stats", async (req, res) => {
       includeCurrentRelay();
 
       gun
-        .get("relays")
+        .get(GUN_PATHS.RELAYS)
         .map()
         .once((data: { pulse: any }, host: any) => {
           if (processedHosts.has(host)) {
@@ -384,7 +385,7 @@ router.get("/stats", async (req, res) => {
           const currentRelayData = await new Promise<{ pulse?: { ipfs?: any } } | null>(
             (resolve) => {
               gun
-                .get("relays")
+                .get(GUN_PATHS.RELAYS)
                 .get(currentRelayHost)
                 .once((data: any) => resolve(data || null));
               setTimeout(() => resolve(null), 1000);
@@ -449,7 +450,7 @@ router.get("/stats", async (req, res) => {
     loggers.server.info(`📊 Syncing deals from GunDB (retroactive)...`);
     try {
       // List all frozen deal entries
-      const frozenEntries = await FrozenData.listFrozenEntries(gun, "storage-deals", {
+      const frozenEntries = await FrozenData.listFrozenEntries(gun, GUN_PATHS.STORAGE_DEALS, {
         verifyAll: true, // Get full deal data, not just index
         limit: 1000,
       });
@@ -608,8 +609,8 @@ router.get("/stats", async (req, res) => {
           const timer = setTimeout(() => resolve(), 5000);
 
           relayUser
-            .get("x402")
-            .get("subscriptions")
+            .get(GUN_PATHS.X402)
+            .get(GUN_PATHS.SUBSCRIPTIONS)
             .map()
             .once((subData: any, userAddress: any) => {
               if (subData && typeof subData === "object") {

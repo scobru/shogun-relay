@@ -8,6 +8,7 @@ import * as StorageDeals from "../../utils/storage-deals";
 import type { Deal } from "../../utils/storage-deals";
 import { getRelayUser } from "../../utils/relay-user";
 import { replicationConfig } from "../../config";
+import { GUN_PATHS } from "../../utils/gun-paths";
 
 /**
  * Apply tier-specific features (erasure coding and replication)
@@ -201,7 +202,7 @@ export async function applyTierFeatures(deal: Deal, req: Request) {
           dealId: deal.id,
         };
 
-        gun.get("shogun-network").get("pin-requests").get(requestId).put(pinRequest);
+        gun.get(GUN_PATHS.PIN_REQUESTS).get(requestId).put(pinRequest);
         loggers.server.info(
           { cid, replicationFactor, requestId },
           `✅ Replication request published: ${cid} (${replicationFactor}x)`
