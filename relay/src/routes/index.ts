@@ -71,7 +71,6 @@ import networkRouter from "./network";
 import dealsRouter from "./deals";
 import registryRouter from "./registry";
 import chatRouter from "./chat";
-
 import torrentRouter from "./torrent";
 import driveRouter from "./drive";
 import apiKeysRouter from "./api-keys";
@@ -442,12 +441,7 @@ export default (app: express.Application) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "stats.html"));
   });
-
-  app.get("/stats-v2", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "stats-v2.html"));
-  });
-
+  
   app.get("/charts", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "charts.html"));
