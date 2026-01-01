@@ -677,7 +677,33 @@ function Torrents() {
                                     {res.peers !== undefined && <span className="badge badge-sm badge-ghost">👥 {res.peers} peers</span>}
                                     {res.addedBy && <span className="badge badge-sm badge-ghost">User: {res.addedBy.substring(0,6)}...</span>}
                                     {res.files && <span className="badge badge-sm badge-ghost">📄 {res.files} files</span>}
-                                    {(res.pinnedFiles ?? 0) > 0 && <span className="badge badge-sm badge-success">📌 {res.pinnedFiles} on IPFS</span>}
+                                    {(res.pinnedFiles ?? 0) > 0 && (
+                                      <div className="dropdown dropdown-hover">
+                                        <span tabIndex={0} className="badge badge-sm badge-success cursor-pointer">📌 {res.pinnedFiles} on IPFS</span>
+                                        <div tabIndex={0} className="dropdown-content z-20 bg-base-200 rounded-box shadow-lg p-2 w-96 max-h-48 overflow-y-auto">
+                                          <p className="text-xs font-bold mb-1">IPFS Hashes:</p>
+                                          <ul className="text-xs font-mono space-y-1">
+                                            {res.fileList?.filter((f: any) => f.ipfsCid).map((f: any, idx: number) => (
+                                              <li key={idx} className="flex justify-between items-center gap-2">
+                                                <span className="truncate flex-1" title={f.name}>{f.name}</span>
+                                                <code 
+                                                  className="bg-base-300 px-1 rounded cursor-pointer hover:bg-primary/20"
+                                                  onClick={(e) => { 
+                                                    e.stopPropagation();
+                                                    navigator.clipboard.writeText(f.ipfsCid); 
+                                                    setStatusMsg(`Copied: ${f.ipfsCid.substring(0, 20)}...`);
+                                                    setTimeout(() => setStatusMsg(''), 2000);
+                                                  }}
+                                                  title={`Click to copy: ${f.ipfsCid}`}
+                                                >
+                                                  {f.ipfsCid.substring(0, 12)}...
+                                                </code>
+                                              </li>
+                                            )) || <li className="text-base-content/50">No CIDs available</li>}
+                                          </ul>
+                                        </div>
+                                      </div>
+                                    )}
                                 </div>
                                 {res.infoHash && <div className="text-xs font-mono text-base-content/50 mt-1 truncate">{res.infoHash}</div>}
                             </div>

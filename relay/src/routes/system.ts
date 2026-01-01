@@ -672,10 +672,29 @@ router.get("/services/:name/logs", (req, res) => {
         if (fs.existsSync(pm2Log)) {
             logFile = pm2Log;
         } else {
-             return res.status(404).json({
-                success: false,
-                error: `Log file not found for service: ${serviceName}`,
-                path: logFile
+            // Try Docker stdout logs - these are captured by Docker, not files
+            // Return helpful message instead of 404
+            return res.json({
+                success: true,
+                logs: [{
+                  id: 'info_0',
+                  timestamp: new Date().toISOString(),
+                  message: `Logs for ${serviceName} are managed by Docker/container orchestrator.`,
+                  level: 'info'
+                }, {
+                  id: 'info_1', 
+                  timestamp: new Date().toISOString(),
+                  message: `Use 'docker logs <container>' to view container logs.`,
+                  level: 'info'
+                }, {
+                  id: 'info_2',
+                  timestamp: new Date().toISOString(),
+                  message: `Checked paths: ${logFile}, ${pm2Log}`,
+                  level: 'debug'
+                }],
+                count: 3,
+                service: serviceName,
+                note: 'Log files not found at expected paths. Logs may be managed by Docker.'
             });
         }
     }

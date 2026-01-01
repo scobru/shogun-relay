@@ -89,11 +89,123 @@ function Drive() {
       }
   }
 
-  // ... (keep existing imports and render) ...
+  // Folder upload handler
+  const uploadFolder = async (files: FileList) => {
+    if (files.length === 0) return
+    setUploading(true)
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        // @ts-ignore - webkitRelativePath is available for folder uploads
+        const relativePath = file.webkitRelativePath || file.name
+        const fullPath = currentPath ? `${currentPath}/${relativePath}` : relativePath
+        
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('path', fullPath.split('/').slice(0, -1).join('/')) // Directory path
+        
+        await fetch('/api/v1/drive/upload', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: formData
+        })
+      }
+      loadFiles()
+      loadStats()
+      setShowUploadModal(false)
+    } catch (e) {
+      console.error('Folder upload failed:', e)
+    } finally {
+      setUploading(false)
+    }
+  }
 
+  if (!isAuthenticated) {
     return (
+      <div className="alert alert-warning">
+        <span>🔒</span>
+        <span>Authentication required to access Drive.</span>
+      </div>
+    )
+  }
+
+  return (
     <div className="flex flex-col gap-6 max-w-6xl">
-      {/* ... (existing stats and breadcrumbs) ... */}
+      {/* Header with Stats */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="card-title text-2xl">📁 Relay Drive</h2>
+              <p className="text-base-content/60">File storage on the relay server</p>
+            </div>
+            {stats && (
+              <div className="stats stats-horizontal bg-base-200 shadow-sm">
+                <div className="stat py-2 px-4">
+                  <div className="stat-title text-xs">Total Size</div>
+                  <div className="stat-value text-lg">{stats.totalSizeMB || stats.totalSizeGB || '0'}</div>
+                </div>
+                <div className="stat py-2 px-4">
+                  <div className="stat-title text-xs">Files</div>
+                  <div className="stat-value text-lg">{stats.fileCount}</div>
+                </div>
+                <div className="stat py-2 px-4">
+                  <div className="stat-title text-xs">Folders</div>
+                  <div className="stat-value text-lg">{stats.dirCount}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Breadcrumbs and Actions */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body py-3">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            {/* Breadcrumbs */}
+            <div className="breadcrumbs text-sm">
+              <ul>
+                {getBreadcrumbs().map((crumb: {name: string, path: string}, i: number) => (
+                  <li key={i}>
+                    <button 
+                      className="link link-hover"
+                      onClick={() => navigateTo(crumb.path)}
+                    >
+                      {i === 0 ? '🏠' : '📁'} {crumb.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            {/* Actions */}
+            <div className="flex gap-2 flex-wrap">
+              <button className="btn btn-primary btn-sm" onClick={() => setShowUploadModal(true)}>
+                📤 Upload Files
+              </button>
+              <label className="btn btn-secondary btn-sm">
+                📁 Upload Folder
+                <input 
+                  type="file"
+                  // @ts-ignore - webkitdirectory is a non-standard attribute
+                  webkitdirectory="" 
+                  directory="" 
+                  multiple
+                  className="hidden"
+                  onChange={(e) => e.target.files && uploadFolder(e.target.files)}
+                />
+              </label>
+              <button className="btn btn-outline btn-sm" onClick={() => setShowFolderModal(true)}>
+                ➕ New Folder
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { loadFiles(); loadStats(); }}>
+                🔄 Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
       
       {/* Modals */}
       {/* Rename Modal */}
