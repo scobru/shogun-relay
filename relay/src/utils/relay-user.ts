@@ -616,6 +616,7 @@ export async function deleteUpload(userAddress: string, hash: string): Promise<v
 
 /**
  * Get all subscriptions
+ * Uses robust reading with .on() for better sync and longer timeout
  * @returns Promise with array of subscriptions
  */
 export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
@@ -624,46 +625,142 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
   }
 
   return new Promise((resolve) => {
+    const subscriptions: Array<SubscriptionData> = [];
+    const processedAddresses = new Set<string>();
+    let parentListener: any = null;
+    let resolved = false;
+    
+    // Increased timeout to 15 seconds for better sync
     const timeout = setTimeout(() => {
-      resolve([]);
-    }, 5000);
+      if (!resolved) {
+        resolved = true;
+        parentListener?.off?.();
+        log.debug({ count: subscriptions.length }, "getAllSubscriptions timeout reached");
+        resolve(subscriptions);
+      }
+    }, 15000);
 
     const subscriptionsNode = relayUser!.get(GUN_PATHS.X402).get(GUN_PATHS.SUBSCRIPTIONS);
 
-    subscriptionsNode.once((parentData: Record<string, any>) => {
-      clearTimeout(timeout);
-
+    // Use .on() for better sync, then switch to .once() for each subscription
+    parentListener = subscriptionsNode.on((parentData: Record<string, any>) => {
+      if (resolved) return;
+      
       if (!parentData || typeof parentData !== "object") {
-        resolve([]);
+        return; // Wait for more data
+      }
+
+      const userKeys = Object.keys(parentData).filter((key) => 
+        !["_", "#", ">", "<"].includes(key) && !processedAddresses.has(key)
+      );
+
+      if (userKeys.length === 0 && processedAddresses.size === 0) {
+        // No subscriptions found, but wait a bit more in case data is syncing
         return;
       }
 
-      const userKeys = Object.keys(parentData).filter((key) => !["_", "#", ">", "<"].includes(key));
+      // Process new user keys
+      userKeys.forEach((userAddress) => {
+        processedAddresses.add(userAddress);
+        
+        subscriptionsNode.get(userAddress).once((subData: SubscriptionData) => {
+          if (resolved) return;
+          
+          if (subData && typeof subData === "object") {
+            const cleanData: SubscriptionData = {};
+            let hasValidData = false;
+            
+            Object.keys(subData).forEach((key) => {
+              if (!["_", "#", ">", "<"].includes(key)) {
+                // @ts-ignore
+                cleanData[key] = subData[key];
+                // Check for essential subscription fields
+                if (key === "tier" || key === "expiresAt" || key === "purchasedAt") {
+                  hasValidData = true;
+                }
+              }
+            });
+            
+            // Only add if we have valid subscription data
+            if (hasValidData) {
+              // Avoid duplicates
+              const exists = subscriptions.some(s => s.userAddress === cleanData.userAddress);
+              if (!exists) {
+                subscriptions.push(cleanData);
+                log.debug({ userAddress, tier: cleanData.tier }, "Found subscription");
+              }
+            }
+          }
+        });
+      });
+    });
+
+    // Also try .once() for immediate local data
+    subscriptionsNode.once((parentData: Record<string, any>) => {
+      if (resolved) return;
+      
+      if (!parentData || typeof parentData !== "object") {
+        return;
+      }
+
+      const userKeys = Object.keys(parentData).filter((key) => 
+        !["_", "#", ">", "<"].includes(key)
+      );
 
       if (userKeys.length === 0) {
-        resolve([]);
+        // If no subscriptions and nothing from .on() after 2 seconds, resolve empty
+        setTimeout(() => {
+          if (!resolved && subscriptions.length === 0) {
+            resolved = true;
+            clearTimeout(timeout);
+            parentListener?.off?.();
+            resolve([]);
+          }
+        }, 2000);
         return;
       }
 
-      const subscriptions: Array<SubscriptionData> = [];
       let completedReads = 0;
       const totalReads = userKeys.length;
 
       userKeys.forEach((userAddress) => {
         subscriptionsNode.get(userAddress).once((subData: SubscriptionData) => {
+          if (resolved) return;
           completedReads++;
 
-          if (subData && subData.tier) {
+          if (subData && typeof subData === "object") {
             const cleanData: SubscriptionData = {};
+            let hasValidData = false;
+            
             Object.keys(subData).forEach((key) => {
+              if (!["_", "#", ">", "<"].includes(key)) {
                 // @ts-ignore
-                if (!["_", "#", ">", "<"].includes(key)) cleanData[key] = subData[key];
+                cleanData[key] = subData[key];
+                if (key === "tier" || key === "expiresAt" || key === "purchasedAt") {
+                  hasValidData = true;
+                }
+              }
             });
-            subscriptions.push(cleanData);
+            
+            if (hasValidData) {
+              const exists = subscriptions.some(s => s.userAddress === cleanData.userAddress);
+              if (!exists) {
+                subscriptions.push(cleanData);
+              }
+            }
           }
 
           if (completedReads === totalReads) {
-            resolve(subscriptions);
+            // Give a small delay for .on() to potentially add more subscriptions
+            setTimeout(() => {
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timeout);
+                parentListener?.off?.();
+                log.debug({ count: subscriptions.length }, "getAllSubscriptions completed");
+                resolve(subscriptions);
+              }
+            }, 500);
           }
         });
       });
