@@ -90,7 +90,7 @@ function Drive() {
   }
 
   // Folder upload handler
-w  const uploadFolder = async (files: FileList) => {
+  const uploadFolder = async (files: FileList) => {
     if (files.length === 0) return
     setUploading(true)
     try {
