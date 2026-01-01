@@ -216,10 +216,10 @@ function VisualGraph() {
             <div className="flex flex-wrap gap-2 mt-4 items-center">
                 <span className="text-xs font-bold opacity-60 uppercase tracking-wider">Quick Load:</span>
                 <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun'); exploreData('shogun') }}>Root</button>
-                <button className="btn btn-xs btn-outline" onClick={() => { setPath('relays'); exploreData('relays') }}>Relays</button>
-                <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun/torrents/registry'); exploreData('shogun/torrents/registry') }}>Torrents</button>
-                <button className="btn btn-xs btn-outline" onClick={() => { setPath('wormhole'); exploreData('wormhole') }}>Wormhole</button>
-                <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun-index'); exploreData('shogun-index') }}>Index</button>
+                <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun/network/relays'); exploreData('shogun/network/relays') }}>Relays</button>
+                <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun/network/torrents'); exploreData('shogun/network/torrents') }}>Torrents</button>
+                <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun/wormhole'); exploreData('shogun/wormhole') }}>Wormhole</button>
+                <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun/index'); exploreData('shogun/index') }}>Index</button>
                 <button className="btn btn-xs btn-outline" onClick={() => { setPath('frozen/storage-deals'); exploreData('frozen/storage-deals') }}>Deals</button>
                 <button className="btn btn-xs btn-outline" onClick={() => { setPath('annas-archive'); exploreData('annas-archive') }}>Anna's Archive</button>
             </div>

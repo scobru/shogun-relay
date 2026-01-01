@@ -38,7 +38,11 @@ export const GUN_PATHS = {
   OBSERVATIONS_BY_HOST: 'observations-by-host', // Relative to SHOGUN_INDEX
   DEALS_BY_CID: 'deals-by-cid',                 // Relative to SHOGUN_INDEX
   DEALS_BY_CLIENT: 'deals-by-client',           // Relative to SHOGUN_INDEX
-  STORAGE_DEALS: 'storage-deals',               // Frozen data namespace
+  STORAGE_DEALS: 'storage-deals',               // Relative path for frozen namespace
+  FROZEN_STORAGE_DEALS: 'frozen/storage-deals', // Full path for frozen storage deals
+  
+  // Anna's Archive (torrent preservation network)
+  ANNAS_ARCHIVE: 'annas-archive',
   
   // Wormhole
   SHOGUN_WORMHOLE: 'shogun/wormhole',

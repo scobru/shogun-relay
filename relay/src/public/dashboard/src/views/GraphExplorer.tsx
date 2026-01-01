@@ -197,10 +197,10 @@ function GraphExplorer() {
             <div className="flex flex-wrap gap-2 mt-3 items-center">
                 <span className="text-xs font-bold opacity-60 uppercase tracking-wider">Quick Load:</span>
                 <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun')}>Root</button>
-                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('relays')}>Relays</button>
-                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun/torrents/registry')}>Torrents</button>
-                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('wormhole')}>Wormhole</button>
-                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun-index')}>Index</button>
+                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun/network/relays')}>Relays</button>
+                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun/network/torrents')}>Torrents</button>
+                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun/wormhole')}>Wormhole</button>
+                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun/index')}>Index</button>
                 <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('frozen/storage-deals')}>Deals</button>
                 <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('annas-archive')}>Anna's Archive</button>
             </div>
