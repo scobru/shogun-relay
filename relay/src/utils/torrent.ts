@@ -14,6 +14,15 @@ interface TorrentInfo {
   magnetURI?: string;
   torrentPath?: string;
 }
+
+// Extended torrent entry for persistence (supports both magnet downloads and local seeds)
+interface TorrentPersistEntry {
+  magnetURI: string;
+  infoHash?: string;
+  name?: string;
+  filePaths?: string[]; // For seeded torrents - paths to original files
+  isSeeded?: boolean;   // True if this was created locally via seed
+}
 // Catalog entry for torrents with IPFS mappings
 export interface CatalogEntry {
   torrentHash: string;
@@ -179,7 +188,7 @@ export class TorrentManager {
   private async loadTorrents(): Promise<void> {
       if (!this.client) return;
 
-      let allTorrents: string[] = [...this.torrents];
+      let allTorrents: (string | TorrentPersistEntry)[] = [...this.torrents];
 
       // 1. Load from torrents.json
       const torrentsFile = path.join(this.dataDir, 'torrents.json');
@@ -201,12 +210,6 @@ export class TorrentManager {
            } catch (error) {}
       }
 
-      // Auto-fetch removed - users can manually fetch Anna's Archive torrents via dashboard
-      // This is now just a normal torrent client
-
-      // Deduplicate
-      allTorrents = [...new Set(allTorrents)];
-
       if (allTorrents.length === 0) {
           loggers.server.info("📚 No torrents configured yet.");
           return;
@@ -214,17 +217,65 @@ export class TorrentManager {
 
       loggers.server.info(`📚 Starting ${allTorrents.length} torrents...`);
 
-      allTorrents.forEach(torrentId => {
-          this.client!.add(torrentId, { path: this.dataDir }, (torrent) => {
-              loggers.server.info(`📚 Added torrent: ${torrent.name}`);
+      for (const torrentEntry of allTorrents) {
+        try {
+          // Check if it's an extended entry with file paths (seeded torrent)
+          if (typeof torrentEntry === 'object' && torrentEntry.filePaths && torrentEntry.filePaths.length > 0) {
+            // Verify files still exist
+            const existingFiles = torrentEntry.filePaths.filter(fp => fs.existsSync(fp));
+            
+            if (existingFiles.length > 0) {
+              loggers.server.info(`📚 Resuming seed for: ${torrentEntry.name || torrentEntry.infoHash} with ${existingFiles.length} files`);
               
-              torrent.on('done', () => {
-                  loggers.server.info(`📚 Torrent download complete: ${torrent.name}`);
-                  // Add files to IPFS and update catalog
-                  this.onTorrentComplete(torrent);
+              // Use seed() to resume seeding existing files
+              this.client!.seed(existingFiles, {
+                announce: [
+                  'wss://tracker.openwebtorrent.com',
+                  'wss://tracker.btorrent.xyz',
+                  'wss://tracker.webtorrent.dev',
+                  'udp://tracker.opentrackr.org:1337/announce',
+                  'udp://tracker.openbittorrent.com:6969/announce'
+                ]
+              }, (torrent) => {
+                loggers.server.info(`📚 Resumed seeding: ${torrent.name} (100% complete)`);
+                
+                // Re-catalog the torrent
+                this.onTorrentComplete(torrent);
               });
-          });
+            } else {
+              loggers.server.warn(`📚 Files no longer exist for torrent: ${torrentEntry.name || torrentEntry.infoHash}`);
+              // Fall back to magnet if files are missing
+              if (torrentEntry.magnetURI) {
+                this.addTorrentFromMagnet(torrentEntry.magnetURI);
+              }
+            }
+          } else {
+            // Regular magnet link (string or object with only magnetURI)
+            const magnetURI = typeof torrentEntry === 'string' ? torrentEntry : torrentEntry.magnetURI;
+            if (magnetURI) {
+              this.addTorrentFromMagnet(magnetURI);
+            }
+          }
+        } catch (err) {
+          loggers.server.error({ err }, `📚 Error loading torrent entry`);
+        }
+      }
+  }
+
+  /**
+   * Helper to add torrent from magnet link
+   */
+  private addTorrentFromMagnet(magnetURI: string): void {
+    if (!this.client) return;
+    
+    this.client.add(magnetURI, { path: this.dataDir }, (torrent) => {
+      loggers.server.info(`📚 Added torrent: ${torrent.name}`);
+      
+      torrent.on('done', () => {
+        loggers.server.info(`📚 Torrent download complete: ${torrent.name}`);
+        this.onTorrentComplete(torrent);
       });
+    });
   }
 
   /**
@@ -260,25 +311,48 @@ export class TorrentManager {
   }
 
   /**
-   * Helper to persist a torrent magnet to torrents.json
+   * Helper to persist a torrent to torrents.json
+   * Supports both magnet links (string) and extended entries with file paths
    */
-  private persistTorrent(magnetOrPath: string): void {
+  private persistTorrent(magnetOrPath: string, options?: { filePaths?: string[], infoHash?: string, name?: string, isSeeded?: boolean }): void {
       try {
           const torrentsFile = path.join(this.dataDir, 'torrents.json');
-          let existingTorrents: string[] = [];
+          let existingTorrents: (string | TorrentPersistEntry)[] = [];
           
           if (fs.existsSync(torrentsFile)) {
               const fileContent = fs.readFileSync(torrentsFile, 'utf8');
               existingTorrents = JSON.parse(fileContent);
           }
           
-          if (!existingTorrents.includes(magnetOrPath)) {
-              existingTorrents.push(magnetOrPath);
+          // Check if already exists (by magnet or infoHash)
+          const alreadyExists = existingTorrents.some(entry => {
+            if (typeof entry === 'string') {
+              return entry === magnetOrPath;
+            }
+            return entry.magnetURI === magnetOrPath || (options?.infoHash && entry.infoHash === options.infoHash);
+          });
+          
+          if (!alreadyExists) {
+              if (options?.filePaths && options.filePaths.length > 0) {
+                // Save as extended entry with file paths for seeded torrents
+                const entry: TorrentPersistEntry = {
+                  magnetURI: magnetOrPath,
+                  infoHash: options.infoHash,
+                  name: options.name,
+                  filePaths: options.filePaths,
+                  isSeeded: options.isSeeded ?? true
+                };
+                existingTorrents.push(entry);
+                loggers.server.info(`📚 Persisted seeded torrent with file paths: ${options.name || magnetOrPath.substring(0, 50)}...`);
+              } else {
+                // Save as simple magnet link
+                existingTorrents.push(magnetOrPath);
+                loggers.server.info(`📚 Persisted torrent magnet: ${magnetOrPath.substring(0, 50)}...`);
+              }
               fs.writeFileSync(torrentsFile, JSON.stringify(existingTorrents, null, 2));
-              loggers.server.info(`📚 Persisted new torrent to configuration: ${magnetOrPath.substring(0, 50)}...`);
           }
       } catch (error) {
-          loggers.server.error({ err: error }, "📚 Failed to persist new torrent");
+          loggers.server.error({ err: error }, "📚 Failed to persist torrent");
       }
   }
 
@@ -507,16 +581,14 @@ export class TorrentManager {
               loggers.server.debug(`📚 No peers found via ${announceType} for ${torrent.name}`);
             });
 
-            // Save to torrents.json for persistence
-            const torrentsFile = path.join(this.dataDir, 'torrents.json');
-            let savedTorrents: string[] = [];
-            if (fs.existsSync(torrentsFile)) {
-              savedTorrents = JSON.parse(fs.readFileSync(torrentsFile, 'utf8'));
-            }
-            if (!savedTorrents.includes(torrent.magnetURI)) {
-              savedTorrents.push(torrent.magnetURI);
-              fs.writeFileSync(torrentsFile, JSON.stringify(savedTorrents, null, 2));
-            }
+            // Save to torrents.json for persistence WITH file paths for resumption
+            // This allows the torrent to be resumed at 100% after restart
+            this.persistTorrent(torrent.magnetURI, {
+              filePaths: filePaths,  // Original file paths for seed resumption
+              infoHash: torrent.infoHash,
+              name: torrent.name,
+              isSeeded: true
+            });
 
             // For seeded torrents - add to catalog (use .then() since this is not async)
             loggers.server.info(`📚 Adding torrent ${torrent.name} to catalog...`);
@@ -1184,14 +1256,24 @@ export class TorrentManager {
       const torrentsFile = path.join(this.dataDir, 'torrents.json');
       if (fs.existsSync(torrentsFile)) {
         const fileContent = fs.readFileSync(torrentsFile, 'utf8');
-        let existingTorrents: string[] = JSON.parse(fileContent);
+        let existingTorrents: (string | TorrentPersistEntry)[] = JSON.parse(fileContent);
         
-        // Filter out any magnet link that contains this infoHash
-        const filtered = existingTorrents.filter(mag => !mag.includes(infoHash));
+        // Filter out entries that match this infoHash (handles both string and object formats)
+        const filtered = existingTorrents.filter(entry => {
+          if (typeof entry === 'string') {
+            // String format: check if magnet contains the infoHash
+            return !entry.toLowerCase().includes(normalizedHash);
+          } else {
+            // Object format: check infoHash or magnetURI
+            const entryHash = entry.infoHash?.toLowerCase() || '';
+            const magnetContains = entry.magnetURI?.toLowerCase().includes(normalizedHash) || false;
+            return entryHash !== normalizedHash && !magnetContains;
+          }
+        });
         
         if (filtered.length !== existingTorrents.length) {
           fs.writeFileSync(torrentsFile, JSON.stringify(filtered, null, 2));
-          loggers.server.info("📚 Removed torrent from persistent configuration");
+          loggers.server.info(`📚 Removed torrent ${normalizedHash} from persistent configuration`);
         }
       }
     } catch (error) {
