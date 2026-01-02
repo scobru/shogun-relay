@@ -49,7 +49,7 @@ import {
 } from "./utils/security";
 import { startPeriodicPeerSync, announceRelayPresence } from "./utils/peer-discovery";
 import { torrentManager } from "./utils/torrent";
-import { GUN_PATHS } from "./utils/gun-paths";
+import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
 
 // Route Imports
 import authRoutes from "./routes/auth";
@@ -1590,7 +1590,7 @@ See docs/RELAY_KEYS.md for more information.
   app.use(express.static(publicPath));
 
   // Set up relay stats database
-  const db = gun.get("relays").get(host);
+  const db = getGunNode(gun, GUN_PATHS.RELAYS).get(host);
 
   gun.on("hi", () => {
     totalConnections += 1;
@@ -1755,10 +1755,10 @@ See docs/RELAY_KEYS.md for more information.
         }
       }
 
-      gun.get("relays").get(host).put(relayData);
+      getGunNode(gun, GUN_PATHS.RELAYS).get(host).put(relayData);
 
       // Also save to a separate pulse namespace for easier querying
-      gun.get("relays").get(host).get("pulse").put(pulse);
+      getGunNode(gun, GUN_PATHS.RELAYS).get(host).get("pulse").put(pulse);
 
       if (loggingConfig.debug) {
         loggers.server.info(
