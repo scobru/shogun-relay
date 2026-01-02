@@ -1114,6 +1114,151 @@ See docs/RELAY_KEYS.md for more information.
       { domain: tunnelConfig.domain || "localhost", maxSockets: tunnelConfig.maxTcpSockets },
       "✅ LocalTunnel server initialized"
     );
+
+    // Helper function to extract client ID from hostname
+    const getClientIdFromHostname = (hostname: string): string | null => {
+      if (!tunnelConfig.domain) return null;
+      
+      const domain = tunnelConfig.domain;
+      // hostname could be "subdomain.domain.com" or "subdomain.domain.com:port"
+      const hostWithoutPort = hostname.split(":")[0];
+      
+      // Check if hostname ends with our domain
+      if (!hostWithoutPort.endsWith(domain)) return null;
+      
+      // Extract subdomain
+      const subdomain = hostWithoutPort.slice(0, -(domain.length + 1)); // +1 for the dot
+      if (!subdomain || subdomain.includes(".")) return null;
+      
+      return subdomain;
+    };
+
+    // Helper to get scheme for URLs
+    const getScheme = (): string => {
+      return tunnelConfig.secure ? "https" : "http";
+    };
+
+    // Legacy routes for lt client compatibility
+    // GET /?new - Create tunnel with random ID (used by lt client)
+    app.get("/", (req, res, next) => {
+      // Only handle if 'new' query param is present
+      if (req.query.new === undefined) {
+        return next();
+      }
+
+      (async () => {
+        try {
+          const info = await tunnelManager.newClient();
+          const domain = tunnelConfig.domain || req.get("host") || `${serverConfig.host}:${serverConfig.port}`;
+          const url = `${getScheme()}://${info.id}.${domain}`;
+
+          res.json({
+            id: info.id,
+            port: info.port,
+            url: url,
+            max_conn_count: info.maxConnCount,
+          });
+        } catch (error: any) {
+          loggers.server.error({ err: error }, "Failed to create tunnel");
+          res.status(500).json({ error: error.message });
+        }
+      })();
+    });
+
+    // GET /:id - Create tunnel with specific ID (legacy lt client format)
+    // Note: This must be registered BEFORE static file serving to work
+    app.get("/:requestedId", (req, res, next) => {
+      const requestedId = req.params.requestedId;
+      
+      // Skip if it looks like a file request or known route
+      if (requestedId.includes(".") || 
+          requestedId === "gun" || 
+          requestedId === "health" ||
+          requestedId === "healthz" ||
+          requestedId === "ready" ||
+          requestedId === "admin" ||
+          requestedId === "dashboard" ||
+          requestedId === "api" ||
+          requestedId === "oauth-callback") {
+        return next();
+      }
+
+      // Validate subdomain format
+      if (!/^[a-z0-9][a-z0-9\-]{2,61}[a-z0-9]$/.test(requestedId) && 
+          !/^[a-z0-9]{4,63}$/.test(requestedId)) {
+        return next();
+      }
+
+      (async () => {
+        try {
+          const info = await tunnelManager.newClient(requestedId);
+          const domain = tunnelConfig.domain || req.get("host") || `${serverConfig.host}:${serverConfig.port}`;
+          const url = `${getScheme()}://${info.id}.${domain}`;
+
+          res.json({
+            id: info.id,
+            port: info.port,
+            url: url,
+            max_conn_count: info.maxConnCount,
+          });
+        } catch (error: any) {
+          loggers.server.error({ err: error }, "Failed to create tunnel with specific ID");
+          res.status(500).json({ error: error.message });
+        }
+      })();
+    });
+
+    // Hostname-based routing middleware for tunnel subdomain requests
+    app.use((req, res, next) => {
+      const hostname = req.get("host") || "";
+      const clientId = getClientIdFromHostname(hostname);
+
+      if (!clientId) {
+        return next();
+      }
+
+      const client = tunnelManager.getClient(clientId);
+      if (!client) {
+        // Tunnel not found - redirect to landing page
+        if (tunnelConfig.landingPage) {
+          return res.redirect(tunnelConfig.landingPage);
+        }
+        return res.status(404).json({
+          error: "Tunnel not found",
+          message: `No tunnel active for subdomain: ${clientId}`,
+        });
+      }
+
+      // Let the Client handle the request
+      client.handleRequest(req, res);
+    });
+
+    // WebSocket upgrade handler for tunnels
+    server.on("upgrade", (req: any, socket: any, head: any) => {
+      const hostname = req.headers.host || "";
+      const clientId = getClientIdFromHostname(hostname);
+
+      if (!clientId) {
+        // Not a tunnel request, let other upgrade handlers process it (like GunDB WebSocket)
+        return;
+      }
+
+      const client = tunnelManager.getClient(clientId);
+      if (!client) {
+        socket.destroy();
+        return;
+      }
+
+      client.handleUpgrade(req, socket);
+    });
+
+    loggers.server.info(
+      { 
+        legacyRoutes: "/?new and /:subdomain",
+        hostnameRouting: tunnelConfig.domain ? "enabled" : "requires TUNNEL_DOMAIN",
+      },
+      "✅ LocalTunnel legacy routes registered"
+    );
   } else {
     loggers.server.info("⏭️ LocalTunnel server disabled (TUNNEL_ENABLED=false)");
     app.set("tunnelManager", null);
