@@ -5,6 +5,7 @@ import { hri } from "human-readable-ids";
 
 interface ClientManagerOptions {
   maxTcpSockets?: number;
+  port?: number; // Fixed port for tunnel TCP connections (0 = random)
 }
 
 interface NewClientResult {
@@ -54,6 +55,7 @@ class ClientManager {
     const agent = new TunnelAgent({
       clientId: id,
       maxTcpSockets: maxSockets,
+      port: this.opt.port, // Use configured port
     });
 
     const client = new Client({

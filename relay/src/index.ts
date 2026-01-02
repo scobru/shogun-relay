@@ -1108,10 +1108,11 @@ See docs/RELAY_KEYS.md for more information.
     const { ClientManager } = await import("./utils/tunnel");
     const tunnelManager = new ClientManager({
       maxTcpSockets: tunnelConfig.maxTcpSockets,
+      port: tunnelConfig.port, // Use fixed port for tunnel TCP connections
     });
     app.set("tunnelManager", tunnelManager);
     loggers.server.info(
-      { domain: tunnelConfig.domain || "localhost", maxSockets: tunnelConfig.maxTcpSockets },
+      { domain: tunnelConfig.domain || "localhost", port: tunnelConfig.port, maxSockets: tunnelConfig.maxTcpSockets },
       "✅ LocalTunnel server initialized"
     );
 

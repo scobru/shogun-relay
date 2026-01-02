@@ -20,12 +20,14 @@ class TunnelAgent extends EventEmitter {
   private closed: boolean = false;
   private clientId: string;
   private eventEmitter: EventEmitter;
+  private port: number;
 
-  constructor(options: { clientId: string; maxTcpSockets?: number }) {
+  constructor(options: { clientId: string; maxTcpSockets?: number; port?: number }) {
     super();
 
     this.clientId = options.clientId;
     this.maxTcpSockets = options.maxTcpSockets || DEFAULT_MAX_SOCKETS;
+    this.port = options.port || 0; // 0 means random port
     this.server = net.createServer();
     this.eventEmitter = new EventEmitter();
   }
@@ -62,7 +64,7 @@ class TunnelAgent extends EventEmitter {
     });
 
     return new Promise((resolve) => {
-      this.server.listen(0, () => {
+      this.server.listen(this.port, () => {
         const addr = this.server.address() as AddressInfo;
         loggers.server.debug({ port: addr.port, clientId: this.clientId }, "TunnelAgent TCP server listening");
         resolve({ port: addr.port });
