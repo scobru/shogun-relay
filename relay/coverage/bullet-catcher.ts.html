@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/30</span>
+                <span class='fraction'>0/27</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/30</span>
+                <span class='fraction'>0/27</span>
             </div>
         
             
@@ -120,10 +120,7 @@
 <a name='L55'></a><a href='#L55'>55</a>
 <a name='L56'></a><a href='#L56'>56</a>
 <a name='L57'></a><a href='#L57'>57</a>
-<a name='L58'></a><a href='#L58'>58</a>
-<a name='L59'></a><a href='#L59'>59</a>
-<a name='L60'></a><a href='#L60'>60</a>
-<a name='L61'></a><a href='#L61'>61</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L58'></a><a href='#L58'>58</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -162,13 +159,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -220,26 +214,23 @@ interface GunMessageHandler {
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
   // Check all incoming traffic
-<span class="cstat-no" title="statement not covered" >  (context as any).on(</span>
-<span class="cstat-no" title="statement not covered" >    "in",</span>
-<span class="cstat-no" title="statement not covered" >    function (this: GunMessageHandler, msg: GunMessage) {</span>
-<span class="cstat-no" title="statement not covered" >      const to = this.to;</span>
-      // restrict put
-<span class="cstat-no" title="statement not covered" >      if (msg.put) {</span>
-<span class="cstat-no" title="statement not covered" >        const isValidMsg = isValid(msg);</span>
+<span class="cstat-no" title="statement not covered" >  (context as any).on("in", function (this: GunMessageHandler, msg: GunMessage) {</span>
+<span class="cstat-no" title="statement not covered" >    const to = this.to;</span>
+    // restrict put
+<span class="cstat-no" title="statement not covered" >    if (msg.put) {</span>
+<span class="cstat-no" title="statement not covered" >      const isValidMsg = isValid(msg);</span>
 &nbsp;
-<span class="cstat-no" title="statement not covered" >        if (isValidMsg instanceof Error) {</span>
-<span class="cstat-no" title="statement not covered" >          (context as any).on("in", { "@": msg["#"], err: isValidMsg.message });</span>
-<span class="cstat-no" title="statement not covered" >        } else {</span>
-<span class="cstat-no" title="statement not covered" >          if (isValidMsg) {</span>
-<span class="cstat-no" title="statement not covered" >            to.next(msg);</span>
-<span class="cstat-no" title="statement not covered" >          }</span>
-<span class="cstat-no" title="statement not covered" >        }</span>
+<span class="cstat-no" title="statement not covered" >      if (isValidMsg instanceof Error) {</span>
+<span class="cstat-no" title="statement not covered" >        (context as any).on("in", { "@": msg["#"], err: isValidMsg.message });</span>
 <span class="cstat-no" title="statement not covered" >      } else {</span>
-<span class="cstat-no" title="statement not covered" >        to.next(msg);</span>
+<span class="cstat-no" title="statement not covered" >        if (isValidMsg) {</span>
+<span class="cstat-no" title="statement not covered" >          to.next(msg);</span>
+<span class="cstat-no" title="statement not covered" >        }</span>
 <span class="cstat-no" title="statement not covered" >      }</span>
+<span class="cstat-no" title="statement not covered" >    } else {</span>
+<span class="cstat-no" title="statement not covered" >      to.next(msg);</span>
 <span class="cstat-no" title="statement not covered" >    }</span>
-<span class="cstat-no" title="statement not covered" >  );</span>
+<span class="cstat-no" title="statement not covered" >  });</span>
 <span class="cstat-no" title="statement not covered" >});</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >export default Gun;</span>
@@ -250,7 +241,7 @@ interface GunMessageHandler {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-12-15T18:04:22.609Z
+                at 2026-01-02T11:45:13.901Z
             </div>
         <script src="prettify.js"></script>
         <script>

@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/43</span>
+                <span class='fraction'>0/48</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/43</span>
+                <span class='fraction'>0/48</span>
             </div>
         
             
@@ -161,7 +161,13 @@
 <a name='L96'></a><a href='#L96'>96</a>
 <a name='L97'></a><a href='#L97'>97</a>
 <a name='L98'></a><a href='#L98'>98</a>
-<a name='L99'></a><a href='#L99'>99</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -200,6 +206,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -259,12 +271,14 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >/**<span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" ></span></span></span>
  * Storage Utilities - Centralized helpers for storage tracking
- * 
+ *
  * Provides centralized functions for updating storage statistics
  * to ensure consistency across the relay.
  */
+&nbsp;
+import { GUN_PATHS, getGunNode } from "./gun-paths";
 &nbsp;
 interface GunInstance {
   get: (path: string) =&gt; GunNode;
@@ -292,33 +306,37 @@ interface GunAck {
  * Update MB usage for a user (legacy system)
  * This is the legacy tracking system for general uploads.
  * For x402 subscriptions, use X402Merchant.updateStorageUsage() instead.
- * 
+ *
  * @param gun - GunDB instance
  * @param userAddress - User address
  * @param deltaMB - Change in MB (positive for add, negative for subtract)
  * @returns New MB usage
  */
-<span class="cstat-no" title="statement not covered" >export async function updateMBUsage(gun: GunInstance, userAddress: string, deltaMB: number): Promise&lt;number&gt; {</span>
+<span class="cstat-no" title="statement not covered" >export async function updateMBUsage(</span>
+<span class="cstat-no" title="statement not covered" >  gun: GunInstance,</span>
+<span class="cstat-no" title="statement not covered" >  userAddress: string,</span>
+<span class="cstat-no" title="statement not covered" >  deltaMB: number</span>
+<span class="cstat-no" title="statement not covered" >): Promise&lt;number&gt; {</span>
 <span class="cstat-no" title="statement not covered" >  if (!gun) {</span>
-<span class="cstat-no" title="statement not covered" >    throw new Error('Gun instance is required');</span>
+<span class="cstat-no" title="statement not covered" >    throw new Error("Gun instance is required");</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  if (!userAddress) {</span>
-<span class="cstat-no" title="statement not covered" >    throw new Error('User address is required');</span>
+<span class="cstat-no" title="statement not covered" >    throw new Error("User address is required");</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return new Promise((resolve, reject) =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >    const mbUsageNode = gun.get("shogun").get("mbUsage").get(userAddress);</span>
+<span class="cstat-no" title="statement not covered" >    const mbUsageNode = getGunNode(gun, GUN_PATHS.MB_USAGE).get(userAddress);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    mbUsageNode.once((currentData: MBUsageData) =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >      const currentMB = currentData ? (currentData.mbUsed || 0) : 0;</span>
+<span class="cstat-no" title="statement not covered" >      const currentMB = currentData ? currentData.mbUsed || 0 : 0;</span>
 <span class="cstat-no" title="statement not covered" >      const newMB = Math.max(0, currentMB + deltaMB);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >      const updateData: MBUsageData = {</span>
 <span class="cstat-no" title="statement not covered" >        mbUsed: newMB,</span>
 <span class="cstat-no" title="statement not covered" >        lastUpdated: Date.now(),</span>
 <span class="cstat-no" title="statement not covered" >        userAddress: userAddress,</span>
-<span class="cstat-no" title="statement not covered" >        updatedBy: "storage-utils"</span>
+<span class="cstat-no" title="statement not covered" >        updatedBy: "storage-utils",</span>
 <span class="cstat-no" title="statement not covered" >      };</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >      mbUsageNode.put(updateData, (ack: GunAck) =&gt; {</span>
@@ -334,25 +352,25 @@ interface GunAck {
 &nbsp;
 /**
  * Get MB usage for a user (legacy system)
- * 
+ *
  * @param gun - GunDB instance
  * @param userAddress - User address
  * @returns Current MB usage
  */
 <span class="cstat-no" title="statement not covered" >export async function getMBUsage(gun: GunInstance, userAddress: string): Promise&lt;number&gt; {</span>
 <span class="cstat-no" title="statement not covered" >  if (!gun) {</span>
-<span class="cstat-no" title="statement not covered" >    throw new Error('Gun instance is required');</span>
+<span class="cstat-no" title="statement not covered" >    throw new Error("Gun instance is required");</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  if (!userAddress) {</span>
-<span class="cstat-no" title="statement not covered" >    throw new Error('User address is required');</span>
+<span class="cstat-no" title="statement not covered" >    throw new Error("User address is required");</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return new Promise((resolve) =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >    const mbUsageNode = gun.get("shogun").get("mbUsage").get(userAddress);</span>
+<span class="cstat-no" title="statement not covered" >    const mbUsageNode = getGunNode(gun, GUN_PATHS.MB_USAGE).get(userAddress);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    mbUsageNode.once((currentData: MBUsageData) =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >      const currentMB = currentData ? (currentData.mbUsed || 0) : 0;</span>
+<span class="cstat-no" title="statement not covered" >      const currentMB = currentData ? currentData.mbUsed || 0 : 0;</span>
 <span class="cstat-no" title="statement not covered" >      resolve(currentMB);</span>
 <span class="cstat-no" title="statement not covered" >    });</span>
 <span class="cstat-no" title="statement not covered" >  });</span>
@@ -364,7 +382,7 @@ interface GunAck {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-12-15T18:04:22.609Z
+                at 2026-01-02T11:45:13.901Z
             </div>
         <script src="prettify.js"></script>
         <script>

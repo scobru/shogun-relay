@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/215</span>
+                <span class='fraction'>0/227</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/215</span>
+                <span class='fraction'>0/227</span>
             </div>
         
             
@@ -498,7 +498,19 @@
 <a name='L433'></a><a href='#L433'>433</a>
 <a name='L434'></a><a href='#L434'>434</a>
 <a name='L435'></a><a href='#L435'>435</a>
-<a name='L436'></a><a href='#L436'>436</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L436'></a><a href='#L436'>436</a>
+<a name='L437'></a><a href='#L437'>437</a>
+<a name='L438'></a><a href='#L438'>438</a>
+<a name='L439'></a><a href='#L439'>439</a>
+<a name='L440'></a><a href='#L440'>440</a>
+<a name='L441'></a><a href='#L441'>441</a>
+<a name='L442'></a><a href='#L442'>442</a>
+<a name='L443'></a><a href='#L443'>443</a>
+<a name='L444'></a><a href='#L444'>444</a>
+<a name='L445'></a><a href='#L445'>445</a>
+<a name='L446'></a><a href='#L446'>446</a>
+<a name='L447'></a><a href='#L447'>447</a>
+<a name='L448'></a><a href='#L448'>448</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -606,6 +618,9 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -649,6 +664,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -890,6 +908,9 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -898,6 +919,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -935,10 +959,10 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >/**<span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" ></span></span></span>
  * Erasure Coding Utility for Shogun Relay
- * 
+ *
  * Provides data redundancy through chunk splitting and parity generation.
  * Uses XOR-based parity for simplicity (can be upgraded to Reed-Solomon).
- * 
+ *
  * Features:
  * - Split files into data chunks
  * - Generate parity chunks for redundancy
@@ -946,8 +970,8 @@
  * - Track chunk distribution across relays
  */
 &nbsp;
-import crypto from 'crypto';
-import { loggers } from './logger';
+import crypto from "crypto";
+import { loggers } from "./logger";
 &nbsp;
 <span class="cstat-no" title="statement not covered" >const log = loggers.erasure;</span>
 &nbsp;
@@ -961,16 +985,16 @@ interface ErasureCodingConfig {
 &nbsp;
 // Default configuration
 <span class="cstat-no" title="statement not covered" >const DEFAULT_CONFIG: ErasureCodingConfig = {</span>
-<span class="cstat-no" title="statement not covered" >  chunkSize: 256 * 1024,      // 256KB per chunk</span>
-<span class="cstat-no" title="statement not covered" >  dataChunks: 10,              // Number of data chunks</span>
-<span class="cstat-no" title="statement not covered" >  parityChunks: 4,             // Number of parity chunks (40% redundancy)</span>
-<span class="cstat-no" title="statement not covered" >  minChunksForRecovery: 10,    // Need at least this many to recover</span>
+<span class="cstat-no" title="statement not covered" >  chunkSize: 256 * 1024, // 256KB per chunk</span>
+<span class="cstat-no" title="statement not covered" >  dataChunks: 10, // Number of data chunks</span>
+<span class="cstat-no" title="statement not covered" >  parityChunks: 4, // Number of parity chunks (40% redundancy)</span>
+<span class="cstat-no" title="statement not covered" >  minChunksForRecovery: 10, // Need at least this many to recover</span>
 <span class="cstat-no" title="statement not covered" >};</span>
 &nbsp;
 // Chunk info interface
 interface ChunkInfo {
   index: number;
-  type: 'data' | 'parity';
+  type: "data" | "parity";
   hash: string;
   size: number;
 }
@@ -1033,12 +1057,15 @@ interface OverheadResult {
 &nbsp;
 /**
  * Split data into fixed-size chunks
- * 
+ *
  * @param data - Data to split
  * @param chunkSize - Size of each chunk in bytes
  * @returns Array of chunks
  */
-<span class="cstat-no" title="statement not covered" >export function splitIntoChunks(data: Buffer, chunkSize: number = DEFAULT_CONFIG.chunkSize): Buffer[] {</span>
+<span class="cstat-no" title="statement not covered" >export function splitIntoChunks(</span>
+<span class="cstat-no" title="statement not covered" >  data: Buffer,</span>
+<span class="cstat-no" title="statement not covered" >  chunkSize: number = DEFAULT_CONFIG.chunkSize</span>
+<span class="cstat-no" title="statement not covered" >): Buffer[] {</span>
 <span class="cstat-no" title="statement not covered" >  const chunks: Buffer[] = [];</span>
 <span class="cstat-no" title="statement not covered" >  let offset = 0;</span>
 &nbsp;
@@ -1055,7 +1082,7 @@ interface OverheadResult {
 &nbsp;
 /**
  * XOR two buffers together
- * 
+ *
  * @param a - First buffer
  * @param b - Second buffer
  * @returns XOR result
@@ -1073,18 +1100,21 @@ interface OverheadResult {
 &nbsp;
 /**
  * Generate parity chunks using XOR
- * 
+ *
  * Simple parity scheme:
  * - P0 = XOR(D0, D1, D2, ...)
  * - P1 = XOR(D0, D2, D4, ...) (even indices)
  * - P2 = XOR(D1, D3, D5, ...) (odd indices)
  * - P3 = XOR(all with rotation)
- * 
+ *
  * @param dataChunks - Array of data chunks
  * @param parityCount - Number of parity chunks to generate
  * @returns Array of parity chunks
  */
-<span class="cstat-no" title="statement not covered" >export function generateParityChunks(dataChunks: Buffer[], parityCount: number = DEFAULT_CONFIG.parityChunks): Buffer[] {</span>
+<span class="cstat-no" title="statement not covered" >export function generateParityChunks(</span>
+<span class="cstat-no" title="statement not covered" >  dataChunks: Buffer[],</span>
+<span class="cstat-no" title="statement not covered" >  parityCount: number = DEFAULT_CONFIG.parityChunks</span>
+<span class="cstat-no" title="statement not covered" >): Buffer[] {</span>
 <span class="cstat-no" title="statement not covered" >  if (dataChunks.length === 0) {</span>
 <span class="cstat-no" title="statement not covered" >    return [];</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
@@ -1139,7 +1169,7 @@ interface OverheadResult {
 &nbsp;
 /**
  * Create erasure-coded representation of data
- * 
+ *
  * @param data - Original data
  * @param config - Configuration options
  * @returns Erasure coding result
@@ -1156,10 +1186,10 @@ interface OverheadResult {
   // Generate hashes for each chunk
 <span class="cstat-no" title="statement not covered" >  const allChunks = [...dataChunks, ...parityChunks];</span>
 <span class="cstat-no" title="statement not covered" >  const chunkInfos: ChunkInfo[] = allChunks.map((chunk, index) =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >    const hash = crypto.createHash('sha256').update(chunk).digest('hex');</span>
+<span class="cstat-no" title="statement not covered" >    const hash = crypto.createHash("sha256").update(chunk).digest("hex");</span>
 <span class="cstat-no" title="statement not covered" >    return {</span>
 <span class="cstat-no" title="statement not covered" >      index,</span>
-<span class="cstat-no" title="statement not covered" >      type: index &lt; dataChunks.length ? 'data' : 'parity',</span>
+<span class="cstat-no" title="statement not covered" >      type: index &lt; dataChunks.length ? "data" : "parity",</span>
 <span class="cstat-no" title="statement not covered" >      hash,</span>
 <span class="cstat-no" title="statement not covered" >      size: chunk.length,</span>
 <span class="cstat-no" title="statement not covered" >    };</span>
@@ -1181,7 +1211,7 @@ interface OverheadResult {
 &nbsp;
 /**
  * Reconstruct data from chunks (simple case: all data chunks available)
- * 
+ *
  * @param chunks - Available chunks (in order)
  * @param originalSize - Original data size
  * @returns Reconstructed data
@@ -1193,7 +1223,7 @@ interface OverheadResult {
 &nbsp;
 /**
  * Attempt to recover missing chunk using parity
- * 
+ *
  * @param availableChunks - Map of index -&gt; chunk
  * @param missingIndex - Index of missing chunk
  * @param totalDataChunks - Total number of data chunks
@@ -1209,7 +1239,7 @@ interface OverheadResult {
 <span class="cstat-no" title="statement not covered" >  const p0 = availableChunks.get(p0Index);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  if (!p0) {</span>
-<span class="cstat-no" title="statement not covered" >    log.warn('Cannot recover: P0 parity chunk not available');</span>
+<span class="cstat-no" title="statement not covered" >    log.warn("Cannot recover: P0 parity chunk not available");</span>
 <span class="cstat-no" title="statement not covered" >    return undefined;</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
@@ -1223,7 +1253,7 @@ interface OverheadResult {
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  if (!canRecover) {</span>
-<span class="cstat-no" title="statement not covered" >    log.warn('Cannot recover: too many missing chunks');</span>
+<span class="cstat-no" title="statement not covered" >    log.warn("Cannot recover: too many missing chunks");</span>
 <span class="cstat-no" title="statement not covered" >    return undefined;</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
@@ -1240,7 +1270,7 @@ interface OverheadResult {
 &nbsp;
 /**
  * Create chunk distribution plan for multiple relays
- * 
+ *
  * @param encoded - Result from encodeData()
  * @param relayHosts - Available relay hosts
  * @param replicationFactor - Copies per chunk
@@ -1252,7 +1282,7 @@ interface OverheadResult {
 <span class="cstat-no" title="statement not covered" >  replicationFactor: number = 2</span>
 <span class="cstat-no" title="statement not covered" >): DistributionPlan {</span>
 <span class="cstat-no" title="statement not covered" >  if (relayHosts.length === 0) {</span>
-<span class="cstat-no" title="statement not covered" >    throw new Error('No relays available for distribution');</span>
+<span class="cstat-no" title="statement not covered" >    throw new Error("No relays available for distribution");</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  const plan: DistributionPlan = {</span>
@@ -1261,7 +1291,7 @@ interface OverheadResult {
 <span class="cstat-no" title="statement not covered" >  };</span>
 &nbsp;
   // Initialize relay assignments
-<span class="cstat-no" title="statement not covered" >  relayHosts.forEach(host =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >  relayHosts.forEach((host) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    plan.relayAssignments[host] = [];</span>
 <span class="cstat-no" title="statement not covered" >  });</span>
 &nbsp;
@@ -1290,33 +1320,36 @@ interface OverheadResult {
 &nbsp;
 /**
  * Verify chunk integrity using hash
- * 
+ *
  * @param chunk - Chunk data
  * @param expectedHash - Expected SHA-256 hash
  * @returns True if valid
  */
 <span class="cstat-no" title="statement not covered" >export function verifyChunk(chunk: Buffer, expectedHash: string): boolean {</span>
-<span class="cstat-no" title="statement not covered" >  const actualHash = crypto.createHash('sha256').update(chunk).digest('hex');</span>
+<span class="cstat-no" title="statement not covered" >  const actualHash = crypto.createHash("sha256").update(chunk).digest("hex");</span>
 <span class="cstat-no" title="statement not covered" >  return actualHash === expectedHash;</span>
 <span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
 /**
  * Create metadata for storing with the deal
- * 
+ *
  * @param encoded - Result from encodeData()
  * @param distributionPlan - Result from createDistributionPlan()
  * @returns Metadata for storage
  */
-<span class="cstat-no" title="statement not covered" >export function createErasureMetadata(encoded: EncodeResult, distributionPlan?: DistributionPlan): ErasureMetadata {</span>
+<span class="cstat-no" title="statement not covered" >export function createErasureMetadata(</span>
+<span class="cstat-no" title="statement not covered" >  encoded: EncodeResult,</span>
+<span class="cstat-no" title="statement not covered" >  distributionPlan?: DistributionPlan</span>
+<span class="cstat-no" title="statement not covered" >): ErasureMetadata {</span>
 <span class="cstat-no" title="statement not covered" >  return {</span>
 <span class="cstat-no" title="statement not covered" >    version: 1,</span>
-<span class="cstat-no" title="statement not covered" >    algorithm: 'xor-parity',</span>
+<span class="cstat-no" title="statement not covered" >    algorithm: "xor-parity",</span>
 <span class="cstat-no" title="statement not covered" >    originalSize: encoded.originalSize,</span>
 <span class="cstat-no" title="statement not covered" >    chunkSize: encoded.chunkSize,</span>
 <span class="cstat-no" title="statement not covered" >    dataChunkCount: encoded.dataChunkCount,</span>
 <span class="cstat-no" title="statement not covered" >    parityChunkCount: encoded.parityChunkCount,</span>
 <span class="cstat-no" title="statement not covered" >    redundancyPercent: encoded.redundancyPercent,</span>
-<span class="cstat-no" title="statement not covered" >    chunks: encoded.chunks.map(c =&gt; ({</span>
+<span class="cstat-no" title="statement not covered" >    chunks: encoded.chunks.map((c) =&gt; ({</span>
 <span class="cstat-no" title="statement not covered" >      index: c.index,</span>
 <span class="cstat-no" title="statement not covered" >      type: c.type,</span>
 <span class="cstat-no" title="statement not covered" >      hash: c.hash,</span>
@@ -1328,12 +1361,15 @@ interface OverheadResult {
 &nbsp;
 /**
  * Calculate storage overhead for erasure coding
- * 
+ *
  * @param originalSize - Original file size in bytes
  * @param config - Erasure coding configuration
  * @returns Size calculations
  */
-<span class="cstat-no" title="statement not covered" >export function calculateOverhead(originalSize: number, config: ErasureCodingConfig = DEFAULT_CONFIG): OverheadResult {</span>
+<span class="cstat-no" title="statement not covered" >export function calculateOverhead(</span>
+<span class="cstat-no" title="statement not covered" >  originalSize: number,</span>
+<span class="cstat-no" title="statement not covered" >  config: ErasureCodingConfig = DEFAULT_CONFIG</span>
+<span class="cstat-no" title="statement not covered" >): OverheadResult {</span>
 <span class="cstat-no" title="statement not covered" >  const dataChunks = Math.ceil(originalSize / config.chunkSize);</span>
 <span class="cstat-no" title="statement not covered" >  const parityChunks = config.parityChunks;</span>
 <span class="cstat-no" title="statement not covered" >  const totalChunks = dataChunks + parityChunks;</span>
@@ -1375,7 +1411,7 @@ interface OverheadResult {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-12-15T18:04:22.609Z
+                at 2026-01-02T11:45:13.901Z
             </div>
         <script src="prettify.js"></script>
         <script>
