@@ -68,7 +68,7 @@ function VisualGraph() {
     
     try {
       // Use the generic node endpoint
-      const response = await fetch(`/api/v1/system/node/${nodePath}`, {
+      const response = await fetch(`/api/v1/system/node/${encodeURIComponent(nodePath)}`, {
         headers: getAuthHeaders()
       })
       

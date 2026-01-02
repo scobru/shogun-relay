@@ -28,7 +28,7 @@ function GraphExplorer() {
     setLoading(true)
     setError('')
     try {
-      const response = await fetch(`/api/v1/system/node/${path}`, {
+      const response = await fetch(`/api/v1/system/node/${encodeURIComponent(path)}`, {
         headers: getAuthHeaders()
       })
       
@@ -76,7 +76,7 @@ function GraphExplorer() {
         }
       }
 
-      const response = await fetch(`/api/v1/system/node/${currentPath}`, {
+      const response = await fetch(`/api/v1/system/node/${encodeURIComponent(currentPath)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
