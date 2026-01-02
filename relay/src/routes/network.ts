@@ -95,6 +95,21 @@ router.get("/relays", async (req, res) => {
                 storage: pulse.storage || null,
               });
             }
+          } else if (data.endpoint && data.lastSeen) {
+            // Handle simple announcement (from peer-discovery.ts)
+            // These entries don't have full pulse stats but are valid relays
+            if (data.lastSeen > minLastSeen) {
+              relays.push({
+                host,
+                endpoint: data.endpoint,
+                lastSeen: data.lastSeen,
+                uptime: 0, // Not available in simple announcement
+                connections: { total: 0, active: 0 },
+                memory: null,
+                ipfs: null,
+                storage: null,
+              });
+            }
           }
         });
 
@@ -381,8 +396,30 @@ router.get("/stats", async (req, res) => {
                 `   ⏰ Relay ${host} pulse too old (${age}ms ago)`
               );
             }
+          } else if (data.endpoint && data.lastSeen) {
+            // Handle simple announcement without pulse object
+            const age = Date.now() - (data.lastSeen || 0);
+            
+            if (data.lastSeen > fiveMinutesAgo) {
+              stats.totalRelays++;
+              // We count them as active if seen recently, even without full pulse
+              stats.activeRelays++;
+              relaysFound.push({ host, hasPulse: true }); // Treat as having presence
+              
+              loggers.server.debug(
+                { host, age },
+                `   📡 Active relay (announcement): ${host}, age: ${age}ms`
+              );
+            } else {
+              loggers.server.debug(
+                { host, age },
+                `   ⏰ Relay ${host} announcement too old (${age}ms ago)`
+              );
+              // Still count as found, just not active
+              relaysFound.push({ host, hasPulse: false });
+            }
           } else {
-            loggers.server.warn({ host }, `   ⚠️ No pulse data for relay ${host}`);
+            loggers.server.warn({ host }, `   ⚠️ No pulse or valid announcement for relay ${host}`);
           }
         });
 
