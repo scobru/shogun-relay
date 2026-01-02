@@ -254,6 +254,7 @@ RUN apt-get update && apt-get install -y \
     python3 \
     cmake \
     libssl-dev \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/* 
 
 # Download and install IPFS Kubo (separate step for better caching and retry)
@@ -316,9 +317,11 @@ COPY docker/ /app/docker/
 RUN dos2unix /app/docker/init-ipfs.sh \
     && dos2unix /app/docker/entrypoint.sh \
     && dos2unix /app/docker/verify-volumes.sh || true \
+    && dos2unix /app/docker/tunnel.sh \
     && chmod +x /app/docker/init-ipfs.sh \
     && chmod +x /app/docker/entrypoint.sh \
     && chmod +x /app/docker/verify-volumes.sh || true \
+    && chmod +x /app/docker/tunnel.sh \
     && cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh \
     && chmod +x /usr/local/bin/entrypoint.sh \
     && cp /app/docker/relay.env /app/relay/.env
