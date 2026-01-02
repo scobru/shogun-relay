@@ -161,9 +161,6 @@ async function initializeServer() {
     if (msg.put) {
       const souls = Object.keys(msg.put);
       const isPublicRegistry = souls.some(soul => 
-        // All paths under shogun/ are public
-        soul === 'shogun' || 
-        soul.startsWith('shogun/') ||
         // Check against all unified GUN_PATHS
         Object.values(GUN_PATHS).some(path => soul === path || soul.startsWith(path + '/'))
       );

@@ -4,7 +4,7 @@ import { loggers } from "../utils/logger";
 import { chatService } from "../utils/chat-service";
 import { authConfig } from "../config/env-config";
 import { torrentManager } from "../utils/torrent";
-import { GUN_PATHS } from "../utils/gun-paths";
+import { GUN_PATHS, getGunNode } from "../utils/gun-paths";
 
 const router = Router();
 const log = loggers.server;
@@ -58,12 +58,12 @@ router.get("/peers", requireAuth, async (req, res) => {
             };
 
             // Read from unified relays path
-            gun.get(GUN_PATHS.RELAYS).map().once((data: any, pubKey: string) => {
+            getGunNode(gun, GUN_PATHS.RELAYS).map().once((data: any, pubKey: string) => {
                 processPeerData(data, pubKey, 'relay');
             });
 
             // Read from unified peers path
-            gun.get(GUN_PATHS.PEERS).map().once((data: any, pubKey: string) => {
+            getGunNode(gun, GUN_PATHS.PEERS).map().once((data: any, pubKey: string) => {
                 processPeerData(data, pubKey, 'peer');
             });
 
