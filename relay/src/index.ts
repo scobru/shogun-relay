@@ -161,18 +161,11 @@ async function initializeServer() {
     if (msg.put) {
       const souls = Object.keys(msg.put);
       const isPublicRegistry = souls.some(soul => 
-        // Unified paths
-        Object.values(GUN_PATHS).some(path => soul === path || soul.startsWith(path + '/')) ||
-        // Legacy paths (keep for backward compatibility)
+        // All paths under shogun/ are public
         soul === 'shogun' || 
-        soul === 'relays' || 
-        soul === 'annas-archive' ||
-        soul === 'torrents' ||
-        soul === 'registry' ||
-        soul === 'search' ||
         soul.startsWith('shogun/') ||
-        soul.startsWith('relays/') ||
-        soul.startsWith('annas-archive/')
+        // Check against all unified GUN_PATHS
+        Object.values(GUN_PATHS).some(path => soul === path || soul.startsWith(path + '/'))
       );
       
       if (isPublicRegistry) {
@@ -896,8 +889,7 @@ See docs/RELAY_KEYS.md for more information.
     ); // Cleanup every 10 minutes
 
     gun
-      .get("shogun-network")
-      .get("pin-requests")
+      .get(GUN_PATHS.PIN_REQUESTS)
       .map()
       .on(async (data: any, requestId: any) => {
         if (!data || typeof data !== "object" || !data.cid) return;
@@ -1030,7 +1022,7 @@ See docs/RELAY_KEYS.md for more information.
             // Publish response
             const crypto = await import("crypto");
             const responseId = crypto.randomBytes(8).toString("hex");
-            gun.get("shogun-network").get("pin-responses").get(responseId).put({
+            gun.get(GUN_PATHS.PIN_RESPONSES).get(responseId).put({
               id: responseId,
               requestId,
               responder: relayPub,

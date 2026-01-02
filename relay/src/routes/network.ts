@@ -1050,7 +1050,7 @@ router.post("/pin-request", express.json(), async (req, res) => {
       status: "pending",
     };
 
-    gun.get("shogun-network").get("pin-requests").get(requestId).put(pinRequest);
+    gun.get(GUN_PATHS.PIN_REQUESTS).get(requestId).put(pinRequest);
 
     loggers.server.info(
       { cid, replicationFactor },
@@ -1089,8 +1089,7 @@ router.get("/pin-requests", async (req, res) => {
       const timer = setTimeout(() => resolve(), 3000);
 
       gun
-        .get("shogun-network")
-        .get("pin-requests")
+        .get(GUN_PATHS.PIN_REQUESTS)
         .map()
         .once((data: { timestamp: number }, id: any) => {
           if (!data || typeof data !== "object") return;
@@ -1147,7 +1146,7 @@ router.post("/pin-response", express.json(), async (req, res) => {
       timestamp: Date.now(),
     };
 
-    gun.get("shogun-network").get("pin-responses").get(responseId).put(response);
+    gun.get(GUN_PATHS.PIN_RESPONSES).get(responseId).put(response);
 
     loggers.server.info(
       { requestId, status },

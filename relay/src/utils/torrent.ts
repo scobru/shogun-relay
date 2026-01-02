@@ -801,7 +801,7 @@ export class TorrentManager {
     if (!this.gun) return;
 
     try {
-      this.gun.get('annas-archive')
+      this.gun.get(GUN_PATHS.ANNAS_ARCHIVE)
         .get('catalog')
         .map()
         .on((relayData: any, relayKey: string) => {
@@ -836,31 +836,23 @@ export class TorrentManager {
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => resolve(), 3000);
 
-      // Check relays path for relay URLs
-      this.gun.get('relays')
+      // Check unified path for relay URLs
+      this.gun.get(GUN_PATHS.RELAYS)
         .map()
         .once((relayData: any, host: string) => {
           if (!relayData || host === this.relayKey) return;
           
-          // Get the relay URL from annasArchive or from host info
-          this.gun.get('relays')
-            .get(host)
-            .get('annasArchive')
-            .once((annasData: any) => {
-              if (annasData?.relayUrl) {
-                relayUrls.add(annasData.relayUrl);
-              }
-            });
-          
-          // Also check for host info
           if (relayData.host) {
             const hostUrl = relayData.host.startsWith('http') ? relayData.host : `https://${relayData.host}`;
             relayUrls.add(hostUrl);
           }
+          if (relayData.relayUrl) {
+            relayUrls.add(relayData.relayUrl);
+          }
         });
 
-      // Also check legacy path
-      this.gun.get('annas-archive')
+      // Check annas-archive path for catalog relays
+      this.gun.get(GUN_PATHS.ANNAS_ARCHIVE)
         .get('catalog')
         .map()
         .once((relayData: any, relayKey: string) => {

@@ -30,22 +30,23 @@ export const GUN_PATHS = {
   UPLOADS: 'shogun/uploads',
   LOGS: 'shogun/logs',
   
-  // Reputation and Features
+  // Reputation and Features (unified under shogun/network)
   REPUTATION: 'shogun/network/reputation',
   PIN_REQUESTS: 'shogun/network/pin-requests',
+  PIN_RESPONSES: 'shogun/network/pin-responses',
   
   // System
   SYSTEM_HASH: 'shogun/systemhash',
   
-  // Indexes
-  OBSERVATIONS_BY_HOST: 'observations-by-host', // Relative to SHOGUN_INDEX
-  DEALS_BY_CID: 'deals-by-cid',                 // Relative to SHOGUN_INDEX
-  DEALS_BY_CLIENT: 'deals-by-client',           // Relative to SHOGUN_INDEX
-  STORAGE_DEALS: 'storage-deals',               // Relative path for frozen namespace
-  FROZEN_STORAGE_DEALS: 'frozen/storage-deals', // Full path for frozen storage deals
+  // Indexes (unified under shogun/index)
+  OBSERVATIONS_BY_HOST: 'shogun/index/observations-by-host',
+  DEALS_BY_CID: 'shogun/index/deals-by-cid',
+  DEALS_BY_CLIENT: 'shogun/index/deals-by-client',
+  STORAGE_DEALS: 'shogun/frozen/storage-deals',
+  FROZEN_STORAGE_DEALS: 'shogun/frozen/storage-deals',
   
-  // Anna's Archive (torrent preservation network)
-  ANNAS_ARCHIVE: 'annas-archive',
+  // Anna's Archive (torrent preservation network) - unified under shogun/
+  ANNAS_ARCHIVE: 'shogun/annas-archive',
   
   // Wormhole
   SHOGUN_WORMHOLE: 'shogun/wormhole',
