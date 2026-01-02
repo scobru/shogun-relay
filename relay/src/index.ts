@@ -37,6 +37,7 @@ import {
   replicationConfig,
   loggingConfig,
   packageConfig,
+  tunnelConfig,
 } from "./config/env-config";
 
 import { startWormholeCleanup } from "./utils/wormhole-cleanup";
@@ -67,6 +68,7 @@ import registryRoutes from "./routes/registry";
 import torrentRoutes from "./routes/torrent";
 import visualGraphRoutes from "./routes/visualGraph";
 import driveRoutes from "./routes/drive";
+import tunnelRoutes from "./routes/tunnel";
 
 // Middleware
 
@@ -1101,6 +1103,22 @@ See docs/RELAY_KEYS.md for more information.
   app.set("IPFS_API_TOKEN", IPFS_API_TOKEN);
   app.set("IPFS_GATEWAY_URL", IPFS_GATEWAY_URL);
 
+  // Initialize LocalTunnel server if enabled
+  if (tunnelConfig.enabled) {
+    const { ClientManager } = await import("./utils/tunnel");
+    const tunnelManager = new ClientManager({
+      maxTcpSockets: tunnelConfig.maxTcpSockets,
+    });
+    app.set("tunnelManager", tunnelManager);
+    loggers.server.info(
+      { domain: tunnelConfig.domain || "localhost", maxSockets: tunnelConfig.maxTcpSockets },
+      "✅ LocalTunnel server initialized"
+    );
+  } else {
+    loggers.server.info("⏭️ LocalTunnel server disabled (TUNNEL_ENABLED=false)");
+    app.set("tunnelManager", null);
+  }
+
   // Esponi l'istanza Gun globalmente per le route
   (global as any).gunInstance = gun;
 
@@ -1126,6 +1144,7 @@ See docs/RELAY_KEYS.md for more information.
   app.use("/api/v1/torrents", torrentRoutes);
   app.use("/api/v1/graph", visualGraphRoutes);
   app.use("/api/v1/drive", driveRoutes);
+  app.use("/api/v1/tunnel", tunnelRoutes);
 
   // Route legacy per compatibilità (definite prima delle route modulari)
 

@@ -363,6 +363,20 @@ export const config = {
   },
 
   // ============================================================================
+  // LOCALTUNNEL SERVER CONFIGURATION
+  // ============================================================================
+
+  tunnel: {
+    enabled: process.env.TUNNEL_ENABLED === "true" || false,
+    domain: process.env.TUNNEL_DOMAIN || undefined, // e.g., "relay.shogun.network"
+    port: parseInt(process.env.TUNNEL_PORT || "0") || 0, // 0 = auto-assign
+    secure: process.env.TUNNEL_SECURE === "true" || false,
+    maxTcpSockets: parseInt(process.env.TUNNEL_MAX_SOCKETS || "10") || 10,
+    landingPage: process.env.TUNNEL_LANDING_PAGE || "https://shogun.network",
+    requireAuth: process.env.TUNNEL_REQUIRE_AUTH === "true" || false,
+  },
+
+  // ============================================================================
   // ADMIN DRIVE CONFIGURATION
   // ============================================================================
 
@@ -398,6 +412,7 @@ export const loggingConfig = config.logging;
 export const pricingConfig = config.pricing;
 export const packageConfig = config.package;
 export const torrentConfig = config.torrent;
+export const tunnelConfig = config.tunnel;
 export const driveConfig = config.drive;
 
 // ============================================================================
