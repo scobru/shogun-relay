@@ -150,7 +150,7 @@ export function announceRelayPresence(
 }
 
 /**
- * Sync peers from GunDB (shogun-network/relays)
+ * Sync peers from GunDB (shogun/network/relays)
  * @param gun - GunDB instance
  * @param excludeEndpoint - Endpoint to exclude (our own)
  */
@@ -195,7 +195,7 @@ export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): voi
 }
 
 /**
- * Sync generic peers (Mules) from GunDB (shogun-network/peers)
+ * Sync generic peers (Mules) from GunDB (shogun/network/peers)
  * @param gun - GunDB instance
  */
 export function syncMulePeers(gun: IGunInstance): void {

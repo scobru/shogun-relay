@@ -5,6 +5,8 @@
  * to ensure consistency across the relay.
  */
 
+import { GUN_PATHS } from "./gun-paths";
+
 interface GunInstance {
   get: (path: string) => GunNode;
 }
@@ -51,7 +53,7 @@ export async function updateMBUsage(
   }
 
   return new Promise((resolve, reject) => {
-    const mbUsageNode = gun.get("shogun").get("mbUsage").get(userAddress);
+    const mbUsageNode = gun.get(GUN_PATHS.MB_USAGE).get(userAddress);
 
     mbUsageNode.once((currentData: MBUsageData) => {
       const currentMB = currentData ? currentData.mbUsed || 0 : 0;
@@ -92,7 +94,7 @@ export async function getMBUsage(gun: GunInstance, userAddress: string): Promise
   }
 
   return new Promise((resolve) => {
-    const mbUsageNode = gun.get("shogun").get("mbUsage").get(userAddress);
+    const mbUsageNode = gun.get(GUN_PATHS.MB_USAGE).get(userAddress);
 
     mbUsageNode.once((currentData: MBUsageData) => {
       const currentMB = currentData ? currentData.mbUsed || 0 : 0;

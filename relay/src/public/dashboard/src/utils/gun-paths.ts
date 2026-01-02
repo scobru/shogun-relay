@@ -29,6 +29,8 @@ export const GUN_PATHS = {
   USERS: 'shogun/users',
   UPLOADS: 'shogun/uploads',
   LOGS: 'shogun/logs',
+  MB_USAGE: 'shogun/mbUsage',
+  TEST: 'shogun/test',
   
   // Reputation and Features (unified under shogun/network)
   REPUTATION: 'shogun/network/reputation',
@@ -48,6 +50,10 @@ export const GUN_PATHS = {
   // Anna's Archive (torrent preservation network) - unified under shogun/
   ANNAS_ARCHIVE: 'shogun/annas-archive',
   
+  // Legacy paths (for backwards compatibility)
+  SHOGUN_DEALS: 'shogun-deals',
+  FROZEN_STORAGE_DEALS_LEGACY: 'frozen-storage-deals',
+
   // Wormhole
   SHOGUN_WORMHOLE: 'shogun/wormhole',
   WORMHOLE_TRANSFERS: 'transfers',              // Relative to SHOGUN_WORMHOLE

@@ -1,5 +1,6 @@
 import express, { Request, Response, Router } from "express";
 import { loggers } from "../utils/logger";
+import { GUN_PATHS } from "../utils/gun-paths";
 
 const router: Router = express.Router();
 
@@ -17,8 +18,7 @@ async function getOffChainMBUsage(userAddress: string, req: Request): Promise<nu
     }, 10000);
 
     gun
-      .get("shogun")
-      .get("mbUsage")
+      .get(GUN_PATHS.MB_USAGE)
       .get(userAddress)
       .once((data: any) => {
         clearTimeout(timeoutId);
@@ -40,7 +40,7 @@ router.get("/mb-usage/:userAddress", async (req: Request, res: Response) => {
     loggers.server.debug({ userAddress }, `🔍 Debug MB usage`);
 
     // Get MB usage data
-    const mbUsageNode = gun.get("shogun").get("mbUsage").get(userAddress);
+    const mbUsageNode = gun.get(GUN_PATHS.MB_USAGE).get(userAddress);
 
     const getDebugData = (): Promise<any> => {
       return new Promise((resolve, reject) => {
@@ -111,7 +111,7 @@ router.get("/user-mb-usage/:identifier", async (req: Request, res: Response) => 
 
     loggers.server.debug({ identifier }, `📊 MB usage request`);
 
-    const mbUsageNode = gun.get("shogun").get("mbUsage").get(identifier);
+    const mbUsageNode = gun.get(GUN_PATHS.MB_USAGE).get(identifier);
 
     const getMBUsage = (): Promise<number> => {
       return new Promise((resolve, reject) => {
@@ -173,7 +173,7 @@ router.get("/user-uploads/:identifier", async (req: Request, res: Response) => {
 
     loggers.server.debug({ identifier }, `🔍 Debug: Caricando contenuto Gun`);
 
-    const uploadsNode = gun.get("shogun").get("uploads").get(identifier);
+    const uploadsNode = gun.get(GUN_PATHS.UPLOADS).get(identifier);
 
     const getDebugData = (): Promise<any> => {
       return new Promise((resolve, reject) => {
@@ -252,8 +252,7 @@ router.post("/user-mb-usage/:identifier/reset", async (req: Request, res: Respon
 
     // Reset MB usage to 0
     gun
-      .get("shogun")
-      .get("mbUsage")
+      .get(GUN_PATHS.MB_USAGE)
       .get(identifier)
       .put(
         {
@@ -306,7 +305,7 @@ router.get("/test-gun", async (req: Request, res: Response) => {
       message: "Gun test successful",
     };
 
-    const testNode = gun.get("shogun").get("test");
+    const testNode = gun.get(GUN_PATHS.TEST);
 
     const writeTest = () => {
       return new Promise((resolve, reject) => {
@@ -380,7 +379,7 @@ router.get("/test-gun-save/:identifier/:hash", async (req: Request, res: Respons
       test: true,
     };
 
-    const testNode = gun.get("shogun").get("uploads").get(identifier).get(hash);
+    const testNode = gun.get(GUN_PATHS.UPLOADS).get(identifier).get(hash);
 
     const writeTest = () => {
       return new Promise((resolve, reject) => {

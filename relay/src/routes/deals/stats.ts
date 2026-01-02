@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import * as StorageDeals from "../../utils/storage-deals";
 import { registryConfig } from "../../config";
+import { GUN_PATHS } from "../../utils/gun-paths";
 
 const router: Router = Router();
 
@@ -30,7 +31,7 @@ router.get("/stats", async (req: Request, res: Response) => {
       // Get deals from frozen space (deals are saved via FrozenData.createFrozenEntry)
       // Note: deals are stored in 'frozen-storage-deals' node by createFrozenEntry()
       gun
-        .get("frozen-storage-deals")
+        .get(GUN_PATHS.FROZEN_STORAGE_DEALS_LEGACY)
         .map()
         .once((entry: any, hash: string) => {
           if (entry && entry.data && typeof entry.data === "object" && entry.data.cid) {
@@ -42,7 +43,7 @@ router.get("/stats", async (req: Request, res: Response) => {
 
       // Also check legacy 'shogun-deals' node for backwards compatibility
       gun
-        .get("shogun-deals")
+        .get(GUN_PATHS.SHOGUN_DEALS)
         .map()
         .once((deal: any, dealId: string) => {
           if (deal && typeof deal === "object" && deal.cid) {
@@ -201,7 +202,7 @@ router.get("/leaderboard", async (req: Request, res: Response) => {
 
       // Get deals grouped by relay
       gun
-        .get("shogun-deals")
+        .get(GUN_PATHS.SHOGUN_DEALS)
         .map()
         .once((deal: any, dealId: string) => {
           if (deal && typeof deal === "object" && deal.relayPub) {
