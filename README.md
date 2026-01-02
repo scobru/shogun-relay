@@ -7,6 +7,8 @@
 [![Tests](https://img.shields.io/badge/tests-127%20passing-brightgreen)]()
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/scobru/shogun-relay) 
 
+***
+
 **Shogun Relay** is a production-ready connection hub that unifies **GunDB** and **IPFS** into a single solution.
 
 ## Features
