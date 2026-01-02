@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Graph from 'react-vis-network-graph'
 import { useAuth } from '../context/AuthContext'
+import { GUN_PATHS } from '../utils/gun-paths'
 
 
 interface GraphNode {
@@ -22,7 +23,7 @@ function VisualGraph() {
   const { isAuthenticated, getAuthHeaders } = useAuth()
   const [graphData, setGraphData] = useState<{ nodes: GraphNode[], edges: GraphEdge[] }>({ nodes: [], edges: [] })
   const [loading, setLoading] = useState(false)
-  const [path, setPath] = useState('shogun')
+  const [path, setPath] = useState(GUN_PATHS.SHOGUN)
   const [peerUrl, setPeerUrl] = useState('')
   const [nodeCount, setNodeCount] = useState(0)
 
@@ -162,7 +163,7 @@ function VisualGraph() {
 
   useEffect(() => {
     // Initial exploration
-    exploreData('shogun')
+    exploreData(GUN_PATHS.SHOGUN)
   }, [])
 
   return (
@@ -215,13 +216,13 @@ function VisualGraph() {
 
             <div className="flex flex-wrap gap-2 mt-4 items-center">
                 <span className="text-xs font-bold opacity-60 uppercase tracking-wider">Quick Load:</span>
-                <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun'); exploreData('shogun') }}>Root</button>
-                <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun/network/relays'); exploreData('shogun/network/relays') }}>Relays</button>
-                <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun/network/torrents'); exploreData('shogun/network/torrents') }}>Torrents</button>
-                <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun/wormhole'); exploreData('shogun/wormhole') }}>Wormhole</button>
-                <button className="btn btn-xs btn-outline" onClick={() => { setPath('shogun/index'); exploreData('shogun/index') }}>Index</button>
-                <button className="btn btn-xs btn-outline" onClick={() => { setPath('frozen/storage-deals'); exploreData('frozen/storage-deals') }}>Deals</button>
-                <button className="btn btn-xs btn-outline" onClick={() => { setPath('annas-archive'); exploreData('annas-archive') }}>Anna's Archive</button>
+                <button className="btn btn-xs btn-outline" onClick={() => { setPath(GUN_PATHS.SHOGUN); exploreData(GUN_PATHS.SHOGUN) }}>Root</button>
+                <button className="btn btn-xs btn-outline" onClick={() => { setPath(GUN_PATHS.RELAYS); exploreData(GUN_PATHS.RELAYS) }}>Relays</button>
+                <button className="btn btn-xs btn-outline" onClick={() => { setPath(GUN_PATHS.TORRENTS); exploreData(GUN_PATHS.TORRENTS) }}>Torrents</button>
+                <button className="btn btn-xs btn-outline" onClick={() => { setPath(GUN_PATHS.SHOGUN_WORMHOLE); exploreData(GUN_PATHS.SHOGUN_WORMHOLE) }}>Wormhole</button>
+                <button className="btn btn-xs btn-outline" onClick={() => { setPath(GUN_PATHS.SHOGUN_INDEX); exploreData(GUN_PATHS.SHOGUN_INDEX) }}>Index</button>
+                <button className="btn btn-xs btn-outline" onClick={() => { setPath(GUN_PATHS.FROZEN_STORAGE_DEALS); exploreData(GUN_PATHS.FROZEN_STORAGE_DEALS) }}>Deals</button>
+                <button className="btn btn-xs btn-outline" onClick={() => { setPath(GUN_PATHS.ANNAS_ARCHIVE); exploreData(GUN_PATHS.ANNAS_ARCHIVE) }}>Anna's Archive</button>
             </div>
         </div>
       </div>

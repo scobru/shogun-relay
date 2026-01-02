@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { GUN_PATHS } from '../utils/gun-paths'
 
 interface NodeData {
   [key: string]: any
@@ -7,7 +8,7 @@ interface NodeData {
 
 function GraphExplorer() {
   const { isAuthenticated, getAuthHeaders } = useAuth()
-  const [currentPath, setCurrentPath] = useState('shogun')
+  const [currentPath, setCurrentPath] = useState(GUN_PATHS.SHOGUN)
   const [data, setData] = useState<NodeData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -53,14 +54,14 @@ function GraphExplorer() {
   }
 
   const handleJumpToRoot = () => {
-    setCurrentPath('shogun')
+    setCurrentPath(GUN_PATHS.SHOGUN)
   }
 
   const handleBack = () => {
-    if (!currentPath || currentPath === 'shogun') return
+    if (!currentPath || currentPath === GUN_PATHS.SHOGUN) return
     const parts = currentPath.split('/')
     parts.pop()
-    setCurrentPath(parts.join('/') || 'shogun')
+    setCurrentPath(parts.join('/') || GUN_PATHS.SHOGUN)
   }
 
   const handleWrite = async (e: React.FormEvent) => {
@@ -196,13 +197,13 @@ function GraphExplorer() {
             {/* Quick Paths */}
             <div className="flex flex-wrap gap-2 mt-3 items-center">
                 <span className="text-xs font-bold opacity-60 uppercase tracking-wider">Quick Load:</span>
-                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun')}>Root</button>
-                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun/network/relays')}>Relays</button>
-                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun/network/torrents')}>Torrents</button>
-                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun/wormhole')}>Wormhole</button>
-                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('shogun/index')}>Index</button>
-                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('frozen/storage-deals')}>Deals</button>
-                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath('annas-archive')}>Anna's Archive</button>
+                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath(GUN_PATHS.SHOGUN)}>Root</button>
+                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath(GUN_PATHS.RELAYS)}>Relays</button>
+                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath(GUN_PATHS.TORRENTS)}>Torrents</button>
+                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath(GUN_PATHS.SHOGUN_WORMHOLE)}>Wormhole</button>
+                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath(GUN_PATHS.SHOGUN_INDEX)}>Index</button>
+                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath(GUN_PATHS.FROZEN_STORAGE_DEALS)}>Deals</button>
+                <button className="btn btn-xs btn-outline" onClick={() => setCurrentPath(GUN_PATHS.ANNAS_ARCHIVE)}>Anna's Archive</button>
             </div>
         </div>
       </div>
