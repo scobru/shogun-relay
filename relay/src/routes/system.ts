@@ -246,20 +246,42 @@ router.get("/node/*", async (req, res) => {
     const gun = getGunInstance(req);
 
     const node = getGunNode(gun, path);
-    // @ts-ignore
-    node.once((data: any) => {
-      res.json({
-        success: true,
-        path,
-        data: data,
-        timestamp: Date.now(),
+    
+    // Promisify with timeout
+    const data = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        resolve(undefined); // Resolve with undefined on timeout to avoid 500 error for empty nodes
+      }, 5000); // 5 second timeout
+
+      node.once((data: any) => {
+        clearTimeout(timer);
+        resolve(data);
       });
     });
+
+    if (data === undefined) {
+      // If data is undefined, it might be empty or timed out
+      // We return an empty object or null to indicate "no data found" but success
+      return res.json({
+        success: true,
+        path,
+        data: null,
+        message: "Node not found or timed out",
+        timestamp: Date.now(),
+      });
+    }
+
+    res.json({
+      success: true,
+      path,
+      data: data,
+      timestamp: Date.now(),
+    });
   } catch (error: any) {
-    loggers.server.error({ err: error }, "❌ Gun node GET error");
+    loggers.server.error({ err: error, path: req.params as any[0] }, "❌ Gun node GET error");
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 });
