@@ -11,7 +11,7 @@ services:
       - "4001:4001" # IPFS Swarm
       - "6881:6881" # BitTorrent/WebTorrent peer connections (Anna's Archive)
       - "6881:6881/udp" # BitTorrent UDP (DHT)
-      - "8767:8767" # LocalTunnel TCP connections
+      - "8767-8776:8767-8776" # LocalTunnel TCP connections (10 tunnels max)
     volumes:
       # Persist IPFS data (repository, pins, blocks)
       - ipfs-data:/data/ipfs

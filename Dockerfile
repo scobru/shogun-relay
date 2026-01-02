@@ -379,8 +379,8 @@ RUN chown -R node:node /app || true \
 
 # Expose ports
 # 8765 = Relay server, 5001 = IPFS API, 8080 = IPFS Gateway, 4001 = IPFS Swarm
-# 6881 = BitTorrent/WebTorrent peer connections, 8767 = LocalTunnel TCP
-EXPOSE 8765 5001 8080 4001 6881 8767
+# 6881 = BitTorrent/WebTorrent, 8767-8776 = LocalTunnel TCP (10 tunnels max)
+EXPOSE 8765 5001 8080 4001 6881 8767 8768 8769 8770 8771 8772 8773 8774 8775 8776
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
