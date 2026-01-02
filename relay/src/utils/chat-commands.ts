@@ -109,6 +109,23 @@ export class ChatCommandHandler {
         }
     });
 
+    // /reindex
+    this.register({
+      name: "reindex",
+      description: "Force re-indexing of all torrents to global registry",
+      usage: "/reindex",
+      execute: async () => {
+        try {
+            const result = await torrentManager.refreshCatalog(true);
+            return `✅ **Re-index Complete**\n` +
+                   `Active Torrents: ${result.catalogSize}\n` +
+                   `Removed Inactive: ${result.removed}`;
+        } catch (err: any) {
+            return `❌ Re-index failed: ${err.message}`;
+        }
+      }
+    });
+
     // /list [limit]
     this.register({
       name: "list",
