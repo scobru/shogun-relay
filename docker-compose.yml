@@ -127,7 +127,26 @@ services:
     networks:
       - shogun-network
 
+  # Srv.us SSH Tunnel
+  tunnel:
+    image: alpine:latest
+    container_name: shogun-tunnel
+    restart: unless-stopped
+    depends_on:
+      - shogun-relay
+    volumes:
+      - ./scripts/srv-tunnel.sh:/tunnel.sh
+      - tunnel_data:/root/.ssh
+    command: /bin/sh -c "apk add --no-cache openssh-client bash && chmod +x /tunnel.sh && /tunnel.sh"
+    networks:
+      - shogun-network
+
 volumes:
+  radata:
+  ipfs_staging:
+  ipfs_data:
+  tunnel_data:
+    driver: local
   # IPFS repository - contains all IPFS data (blocks, pins, config)
   ipfs-data:
     driver: local

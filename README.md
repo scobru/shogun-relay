@@ -83,7 +83,23 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 
 ---
 
-## Documentation
+## Public Access (SSH Tunnel)
+
+The relay includes a built-in SSH tunnel to **srv.us** for public access without configuring router ports.
+
+### Enabling the Tunnel
+1. The tunnel service starts automatically with `docker-compose`.
+2. To find your public URL, check the tunnel logs:
+   ```bash
+   docker-compose logs -f tunnel
+   # Look for lines like:
+   # https://<random-id>.srv.us
+   ```
+3. The URL remains stable as long as the `tunnel_data` volume is preserved.
+
+---
+
+## Development
 
 | Document | Description |
 |----------|-------------|
