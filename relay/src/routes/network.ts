@@ -75,7 +75,7 @@ router.get("/relays", async (req, res) => {
       gun
         .get(GUN_PATHS.RELAYS)
         .map()
-        .once((data: { pulse: any }, host: any) => {
+        .once((data: any, host: string) => {
           if (!data || typeof data !== "object") return;
 
           const pulse = data.pulse;
@@ -302,7 +302,7 @@ router.get("/stats", async (req, res) => {
         gun
           .get(GUN_PATHS.RELAYS)
           .get(currentRelayHost)
-          .once((data: { pulse: any } | undefined) => {
+          .once((data: any) => {
             if (data && data.pulse && typeof data.pulse === "object") {
               const pulse = data.pulse;
               if (pulse.timestamp && pulse.timestamp > fiveMinutesAgo) {
@@ -338,7 +338,7 @@ router.get("/stats", async (req, res) => {
       gun
         .get(GUN_PATHS.RELAYS)
         .map()
-        .once((data: { pulse: any }, host: any) => {
+        .once((data: any, host: any) => {
           if (processedHosts.has(host)) {
             return; // Skip duplicates
           }
