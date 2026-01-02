@@ -124,6 +124,15 @@ ARG CORS_ORIGINS
 ARG CORS_CREDENTIALS
 ARG STRICT_SESSION_IP
 
+# --- LocalTunnel Server ---
+ARG TUNNEL_ENABLED
+ARG TUNNEL_DOMAIN
+ARG TUNNEL_PORT
+ARG TUNNEL_SECURE
+ARG TUNNEL_MAX_SOCKETS
+ARG TUNNEL_LANDING_PAGE
+ARG TUNNEL_REQUIRE_AUTH
+
 # =============================================================================
 # ENVIRONMENT VARIABLES (Persist ARGs to Runtime)
 # =============================================================================
@@ -223,6 +232,15 @@ ENV AUTO_REPLICATION=${AUTO_REPLICATION} \
     CORS_ORIGINS=${CORS_ORIGINS} \
     CORS_CREDENTIALS=${CORS_CREDENTIALS} \
     STRICT_SESSION_IP=${STRICT_SESSION_IP}
+
+# LocalTunnel Server
+ENV TUNNEL_ENABLED=${TUNNEL_ENABLED} \
+    TUNNEL_DOMAIN=${TUNNEL_DOMAIN} \
+    TUNNEL_PORT=${TUNNEL_PORT} \
+    TUNNEL_SECURE=${TUNNEL_SECURE} \
+    TUNNEL_MAX_SOCKETS=${TUNNEL_MAX_SOCKETS} \
+    TUNNEL_LANDING_PAGE=${TUNNEL_LANDING_PAGE} \
+    TUNNEL_REQUIRE_AUTH=${TUNNEL_REQUIRE_AUTH}
 
 # Install required system packages
 # Using apt-get for Debian-based image

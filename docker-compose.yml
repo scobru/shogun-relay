@@ -115,6 +115,16 @@ services:
       - AUTO_REPLICATION=true
       - CORS_ORIGINS=https://shogun-deals.vercel.app,https://shogun-l2.vercel.app
       - CORS_CREDENTIALS=true
+      # ============================================================================
+      # LOCALTUNNEL SERVER
+      # ============================================================================
+      - TUNNEL_ENABLED=${TUNNEL_ENABLED:-false}
+      # - TUNNEL_DOMAIN=your-domain.com
+      # - TUNNEL_PORT=0
+      # - TUNNEL_SECURE=false
+      - TUNNEL_MAX_SOCKETS=10
+      # - TUNNEL_LANDING_PAGE=https://shogun.network
+      # - TUNNEL_REQUIRE_AUTH=false
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
