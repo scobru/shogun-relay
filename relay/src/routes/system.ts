@@ -4,7 +4,7 @@ import path from "path";
 import { loggers } from "../utils/logger";
 import { packageConfig } from "../config";
 import { config } from "../config/env-config";
-import { GUN_PATHS } from "../utils/gun-paths";
+import { GUN_PATHS, getGunNode } from "../utils/gun-paths";
 
 const router: Router = express.Router();
 
@@ -51,7 +51,7 @@ router.get("/alldata", (req, res) => {
     const gun = getGunInstance(req);
 
     // Get all data from Gun database
-    gun.get(GUN_PATHS.SHOGUN).once((data: any) => {
+    getGunNode(gun, GUN_PATHS.SHOGUN).once((data: any) => {
       res.json({
         success: true,
         data: data,
@@ -245,19 +245,8 @@ router.get("/node/*", async (req, res) => {
     const path: string = req.params[0] as string;
     const gun = getGunInstance(req);
 
-    const getGunNodeFromPath = (pathString: string): any => {
-      const pathParts = pathString.split("/").filter(Boolean);
-      let node = gun;
-
-      for (const part of pathParts) {
-        node = node.get(part);
-      }
-
-      return node;
-    };
-
-    const node = getGunNodeFromPath(path);
-
+    const node = getGunNode(gun, path);
+    // @ts-ignore
     node.once((data: any) => {
       res.json({
         success: true,
@@ -297,18 +286,7 @@ router.post("/node/*", async (req, res) => {
 
     loggers.server.debug({ path, data }, `📝 Creating node`);
 
-    const getGunNodeFromPath = (pathString: string): any => {
-      const pathParts = pathString.split("/").filter(Boolean);
-      let node = gun;
-
-      for (const part of pathParts) {
-        node = node.get(part);
-      }
-
-      return node;
-    };
-
-    const node = getGunNodeFromPath(path);
+    const node = getGunNode(gun, path);
 
     try {
       // Properly promisify the Gun put operation
@@ -363,18 +341,7 @@ router.delete("/node/*", async (req, res) => {
 
     loggers.server.debug({ path }, `🗑️ Deleting node`);
 
-    const getGunNodeFromPath = (pathString: string): any => {
-      const pathParts = pathString.split("/").filter(Boolean);
-      let node = gun;
-
-      for (const part of pathParts) {
-        node = node.get(part);
-      }
-
-      return node;
-    };
-
-    const node = getGunNodeFromPath(path);
+    const node = getGunNode(gun, path);
 
     try {
       // Properly promisify the Gun delete operation
@@ -555,7 +522,7 @@ router.get("/logs", (req, res) => {
 router.delete("/logs", (req, res) => {
   try {
     const gun = getGunInstance(req);
-    const logsNode = gun.get(GUN_PATHS.LOGS);
+    const logsNode = getGunNode(gun, GUN_PATHS.LOGS);
 
     try {
       // Clear GunDB logs only (file logs are managed by the system)

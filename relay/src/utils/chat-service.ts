@@ -3,7 +3,7 @@ import Gun from 'gun';
 import 'gun/sea';
 import { loggers } from './logger';
 import { getRelayUser, getRelayKeyPair } from './relay-user';
-import { GUN_PATHS } from './gun-paths';
+import { GUN_PATHS, getGunNode } from './gun-paths';
 
 const log = loggers.server;
 
@@ -87,7 +87,7 @@ class ChatService {
       log.info(`💬 Subscribing to chat ${chatId} with ${peerPub.substring(0, 8)}...`);
 
       // Subscribe to the shared chat path: shogun/chats/<chatId>
-      this.gun.get(GUN_PATHS.CHATS).get(chatId).map().on(async (data: any, msgId: string) => {
+      getGunNode(this.gun, GUN_PATHS.CHATS).get(chatId).map().on(async (data: any, msgId: string) => {
           if (!data || !data.content) return;
           
           try {
@@ -189,7 +189,7 @@ class ChatService {
                       encrypted: true
                   };
 
-                  this.gun.get(GUN_PATHS.CHATS).get(chatId).get(msgId).put(messageData);
+                  getGunNode(this.gun, GUN_PATHS.CHATS).get(chatId).get(msgId).put(messageData);
 
                   // 4. Cache immediately
                   const sentMsg: ChatMessage = {
@@ -274,7 +274,7 @@ class ChatService {
    */
   private startLobbyListener() {
       // Unified Path: shogun/chat/lobby
-      this.gun.get(GUN_PATHS.LOBBY).map().on((data: any, msgId: string) => {
+      getGunNode(this.gun, GUN_PATHS.LOBBY).map().on((data: any, msgId: string) => {
           if (!data || !data.text || !data.from) return;
           
           const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
@@ -309,7 +309,7 @@ class ChatService {
           timestamp: Date.now()
       };
 
-      this.gun.get(GUN_PATHS.LOBBY).get(msgId).put(lobbyMsg);
+      getGunNode(this.gun, GUN_PATHS.LOBBY).get(msgId).put(lobbyMsg);
 
       // Cache our own message
       this.lobbyCache.set(msgId, {

@@ -12,7 +12,7 @@
 
 import { createRegistryClient } from "./registry-client";
 import { loggers } from "./logger";
-import { GUN_PATHS } from "./gun-paths";
+import { GUN_PATHS, getGunNode } from "./gun-paths";
 import { chatService } from "./chat-service";
 import type { IGunInstance } from "gun";
 
@@ -141,10 +141,10 @@ export function announceRelayPresence(
   };
 
   // Write to unified relays path
-  gun.get(GUN_PATHS.RELAYS).get(pubKey).put(presenceData);
+  getGunNode(gun, GUN_PATHS.RELAYS).get(pubKey).put(presenceData);
   
   // Also announce to PEERS path so Mules can find us as a generic peer
-  gun.get(GUN_PATHS.PEERS).get(pubKey).put(presenceData);
+  getGunNode(gun, GUN_PATHS.PEERS).get(pubKey).put(presenceData);
   
   log.info({ pubKey, endpoint: relayInfo.endpoint }, "Announced relay presence on GunDB");
 }
@@ -157,7 +157,7 @@ export function announceRelayPresence(
 export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): void {
   log.info("Starting GunDB peer discovery...");
   
-  gun.get(GUN_PATHS.RELAYS).map().on((data: any, pubKey: string) => {
+  getGunNode(gun, GUN_PATHS.RELAYS).map().on((data: any, pubKey: string) => {
     if (!data || !data.endpoint) return;
 
     // Validate endpoint (basic check)
@@ -201,7 +201,7 @@ export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): voi
 export function syncMulePeers(gun: IGunInstance): void {
   log.info("Starting GunDB Mule peer discovery...");
   
-  gun.get(GUN_PATHS.PEERS).map().on((data: any, pubKey: string) => {
+  getGunNode(gun, GUN_PATHS.PEERS).map().on((data: any, pubKey: string) => {
     if (!data) return;
     
     // Auto-subscribe to chat with this peer (Mule)

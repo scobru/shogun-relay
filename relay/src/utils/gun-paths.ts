@@ -61,3 +61,20 @@ export const GUN_PATHS = {
 } as const;
 
 export type GunPath = typeof GUN_PATHS[keyof typeof GUN_PATHS];
+
+/**
+ * Helper to get a Gun node from a unified path string
+ * Handles splitting path by '/' and traversing the graph hierarchically
+ * 
+ * @param gun - Gun instance
+ * @param path - Path string (e.g. 'shogun/network/relays')
+ * @returns - Gun node at the end of the path
+ */
+export const getGunNode = (gun: any, path: string): any => {
+  const parts = path.split('/');
+  let node = gun;
+  for (const part of parts) {
+    node = node.get(part);
+  }
+  return node;
+};
