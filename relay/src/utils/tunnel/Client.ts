@@ -3,9 +3,7 @@ import { EventEmitter } from "events";
 import { Socket } from "net";
 import { loggers } from "../logger";
 import TunnelAgent from "./TunnelAgent";
-
-// Use dynamic import for pump since it might not have proper TS types
-const pump = require("pump");
+import pump from "pump";
 
 /**
  * Client - Encapsulates req/res handling using a TunnelAgent

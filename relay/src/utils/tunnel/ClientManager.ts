@@ -1,9 +1,7 @@
 import { loggers } from "../logger";
 import Client from "./Client";
 import TunnelAgent from "./TunnelAgent";
-
-// Use dynamic import for human-readable-ids
-const hri = require("human-readable-ids").hri;
+import { hri } from "human-readable-ids";
 
 interface ClientManagerOptions {
   maxTcpSockets?: number;
