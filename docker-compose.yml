@@ -11,6 +11,7 @@ services:
       - "4001:4001" # IPFS Swarm
       - "6881:6881" # BitTorrent/WebTorrent peer connections (Anna's Archive)
       - "6881:6881/udp" # BitTorrent UDP (DHT)
+      - "8767:8767" # LocalTunnel TCP connections
     volumes:
       # Persist IPFS data (repository, pins, blocks)
       - ipfs-data:/data/ipfs
@@ -120,7 +121,7 @@ services:
       # ============================================================================
       - TUNNEL_ENABLED=${TUNNEL_ENABLED:-false}
       # - TUNNEL_DOMAIN=your-domain.com
-      # - TUNNEL_PORT=0
+      - TUNNEL_PORT=8767
       # - TUNNEL_SECURE=false
       - TUNNEL_MAX_SOCKETS=10
       # - TUNNEL_LANDING_PAGE=https://shogun.network
