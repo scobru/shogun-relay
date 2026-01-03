@@ -43,16 +43,22 @@ echo "Public Key (add to srv.us):"
 cat "$SSH_DIR/id_ed25519.pub"
 
 # Start the tunnel loop
+# Start the tunnel loop
 while true; do
     # Use -N (no remote command) -R (remote port forwarding)
-    # We forward remote (srv.us) port to local RELAY_PORT
+    # We forward remote (TUNNEL_HOST) port to local RELAY_PORT
+    TUNNEL_HOST=${TUNNEL_HOST:-srv.us}
+    TUNNEL_REMOTE_PORT=${TUNNEL_REMOTE_PORT:-1}
     
-    ssh -N -R 1:localhost:${RELAY_PORT:-8765} \
+    echo "Starting tunnel to $TUNNEL_HOST on remote port $TUNNEL_REMOTE_PORT..."
+
+    ssh -N -R ${TUNNEL_REMOTE_PORT}:localhost:${RELAY_PORT:-8765} \
         -o ServerAliveInterval=60 \
+        -o ServerAliveCountMax=3 \
         -o UserKnownHostsFile="$SSH_DIR/known_hosts" \
         -o ExitOnForwardFailure=yes \
         -i "$SSH_DIR/id_ed25519" \
-        srv.us
+        $TUNNEL_HOST
         
     echo "Tunnel lost. Reconnecting in 5s..."
     sleep 5
