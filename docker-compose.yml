@@ -27,7 +27,7 @@ services:
       # SERVER/RELAY IDENTITY
       # ============================================================================
       - NODE_ENV=production
-      - NODE_OPTIONS=--max-old-space-size=4096
+      - NODE_OPTIONS=--max-old-space-size=4096 --expose-gc
       - RELAY_HOST=localhost
       - RELAY_PORT=8765
       - RELAY_NAME=shogun-relay

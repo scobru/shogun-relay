@@ -33,9 +33,33 @@ function getRelayUserWithKeyPair(): any {
   return user;
 }
 
+
 // Helper to safely get signing keypair
 function getSigningKeyPair(): any {
   return getRelayKeyPair() || null;
+}
+
+/**
+ * Safely parse a number from IPFS API response
+ * Handles empty strings, undefined, null, and invalid values
+ * that cause "strconv.ParseFloat: parsing \"\": invalid syntax" errors
+ */
+function safeParseNumber(value: unknown, defaultValue = 0): number {
+  if (value === undefined || value === null || value === '') {
+    return defaultValue;
+  }
+  if (typeof value === 'number') {
+    return isNaN(value) ? defaultValue : value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') {
+      return defaultValue;
+    }
+    const parsed = parseInt(trimmed, 10);
+    return isNaN(parsed) ? defaultValue : parsed;
+  }
+  return defaultValue;
 }
 
 const router: Router = express.Router();
@@ -442,11 +466,9 @@ router.get("/stats", async (req, res) => {
             if (repoStats && typeof repoStats === "object") {
               let repoSize = 0;
               if ("RepoSize" in repoStats) {
-                const size = (repoStats as { RepoSize?: number | string }).RepoSize;
-                repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
+                repoSize = safeParseNumber((repoStats as { RepoSize?: unknown }).RepoSize);
               } else if ("repoSize" in repoStats) {
-                const size = (repoStats as { repoSize?: number | string }).repoSize;
-                repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
+                repoSize = safeParseNumber((repoStats as { repoSize?: unknown }).repoSize);
               }
 
               if (repoSize > 0) {
@@ -501,11 +523,9 @@ router.get("/stats", async (req, res) => {
               if (repoStats && typeof repoStats === "object") {
                 let repoSize = 0;
                 if ("RepoSize" in repoStats) {
-                  const size = (repoStats as { RepoSize?: number | string }).RepoSize;
-                  repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
+                  repoSize = safeParseNumber((repoStats as { RepoSize?: unknown }).RepoSize);
                 } else if ("repoSize" in repoStats) {
-                  const size = (repoStats as { repoSize?: number | string }).repoSize;
-                  repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
+                  repoSize = safeParseNumber((repoStats as { repoSize?: unknown }).repoSize);
                 }
 
                 if (repoSize > 0) {
@@ -765,14 +785,12 @@ router.get("/stats", async (req, res) => {
         // Get IPFS repo stats
         const repoStats = await ipfsRequest("/api/v0/repo/stat");
         if (repoStats && typeof repoStats === "object") {
-          // Try multiple field names for RepoSize
+          // Try multiple field names for RepoSize - using safeParseNumber to handle empty values
           let repoSize = 0;
           if ("RepoSize" in repoStats) {
-            const size = (repoStats as { RepoSize?: number | string }).RepoSize;
-            repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
+            repoSize = safeParseNumber((repoStats as { RepoSize?: unknown }).RepoSize);
           } else if ("repoSize" in repoStats) {
-            const size = (repoStats as { repoSize?: number | string }).repoSize;
-            repoSize = typeof size === "string" ? parseInt(size, 10) || 0 : size || 0;
+            repoSize = safeParseNumber((repoStats as { repoSize?: unknown }).repoSize);
           }
 
           if (repoSize > 0) {

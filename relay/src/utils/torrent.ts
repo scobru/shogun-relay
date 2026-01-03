@@ -6,6 +6,7 @@ import { loggers } from './logger';
 import { GUN_PATHS, getGunNode } from "./gun-paths";
 import { torrentConfig, relayConfig, ipfsConfig } from '../config/env-config';
 import { generateAACID, createAACRecord, generateDataFolderName, AACMetadataRecord } from './aac-utils';
+import { logMemoryUsage, performMemoryCleanup, checkAndWarnMemory } from './memory-utils';
 
 // Create require for CJS modules
 const require = createRequire(import.meta.url);
@@ -1085,12 +1086,19 @@ export class TorrentManager {
 
   /**
    * Handle torrent completion - catalog files
-   * 
+   * Uses batch processing for large torrents to prevent memory issues
    */
   private async onTorrentComplete(torrent: any): Promise<void> {
     try {
+      const fileCount = torrent.files?.length || 0;
       loggers.server.info(`📚 onTorrentComplete called for: ${torrent.name}`);
-      loggers.server.info(`📚 Torrent has ${torrent.files?.length || 0} files`);
+      loggers.server.info(`📚 Torrent has ${fileCount} files`);
+
+      // Log memory for large torrents
+      if (fileCount > 200) {
+        logMemoryUsage(`torrent-start-${torrent.name.substring(0, 30)}`);
+        checkAndWarnMemory('large torrent cataloging');
+      }
 
       // Normalize infoHash to lowercase
       const normalizedHash = torrent.infoHash.toLowerCase();
@@ -1104,23 +1112,36 @@ export class TorrentManager {
         files: []
       };
 
-      // Catalog each file (no auto-pin - user can pin manually via dashboard)
-      if (torrent.files && torrent.files.length > 0) {
-        for (const file of torrent.files) {
-          // Check if file already has IPFS CID from previous pin (use normalized hash)
-          const existingEntry = this.catalog.get(normalizedHash);
-          const existingFile = existingEntry?.files.find(f => f.path === file.path);
+      // Catalog each file with batch processing for large torrents
+      if (torrent.files && fileCount > 0) {
+        const BATCH_SIZE = 100; // Process files in batches to reduce memory pressure
+        const existingEntry = this.catalog.get(normalizedHash);
+        
+        for (let i = 0; i < fileCount; i += BATCH_SIZE) {
+          const batch = torrent.files.slice(i, i + BATCH_SIZE);
           
-          // Generate AACID for this file
-          const aacid = generateAACID('files', file.name);
+          for (const file of batch) {
+            // Check if file already has IPFS CID from previous pin
+            const existingFile = existingEntry?.files.find((f: { path: string }) => f.path === file.path);
+            
+            // Generate AACID for this file
+            const aacid = generateAACID('files', file.name);
+            
+            entry.files.push({
+              name: file.name,
+              path: file.path,
+              size: file.length,
+              ipfsCid: existingFile?.ipfsCid, // Preserve existing CID if any
+              aacid: existingFile?.aacid || aacid // Preserve existing AACID or generate new
+            });
+          }
           
-          entry.files.push({
-            name: file.name,
-            path: file.path,
-            size: file.length,
-            ipfsCid: existingFile?.ipfsCid, // Preserve existing CID if any
-            aacid: existingFile?.aacid || aacid // Preserve existing AACID or generate new
-          });
+          // Trigger GC between batches for large torrents
+          if (fileCount > 200 && i + BATCH_SIZE < fileCount) {
+            performMemoryCleanup(`batch-${Math.floor(i / BATCH_SIZE) + 1}`);
+            // Small yield to allow event loop to process
+            await new Promise(resolve => setImmediate(resolve));
+          }
         }
       } else {
         loggers.server.warn(`📚 Torrent ${torrent.name} has no files! Cannot catalog.`);
@@ -1133,6 +1154,12 @@ export class TorrentManager {
 
       loggers.server.info(`📚 Cataloged ${entry.files.length} files from torrent ${torrent.name}`);
       loggers.server.info(`📚 Catalog now has ${this.catalog.size} entries`);
+      
+      // Final memory cleanup for large torrents
+      if (fileCount > 200) {
+        performMemoryCleanup('torrent-complete');
+        logMemoryUsage(`torrent-done-${torrent.name.substring(0, 30)}`);
+      }
     } catch (error: any) {
       loggers.server.error({ err: error }, `📚 ERROR in onTorrentComplete: ${error.message}`);
     }
