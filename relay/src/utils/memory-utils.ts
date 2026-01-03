@@ -129,8 +129,3 @@ export function checkAndWarnMemory(operation: string): boolean {
   return false;
 }
 
-// Add gc to global type for TypeScript
-declare global {
-  // eslint-disable-next-line no-var
-  var gc: undefined | (() => void);
-}

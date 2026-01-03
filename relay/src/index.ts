@@ -1114,6 +1114,21 @@ See docs/RELAY_KEYS.md for more information.
 
   // --- Modular Routes ---
   app.use("/api/v1/auth", authRoutes);
+  
+  // Initialize API Keys Manager before registering api-keys routes
+  app.use("/api/v1/api-keys", async (req: any, res: any, next: any) => {
+    const { initApiKeysManager, getApiKeysManager } = await import("./middleware/api-keys-auth");
+    if (!getApiKeysManager()) {
+      const gun = req.app.get("gunInstance");
+      const relayPub = req.app.get("relayUserPub");
+      const relayUser = getRelayUser();
+      if (gun && relayPub && relayUser) {
+        initApiKeysManager(gun, relayPub, relayUser);
+        loggers.server.info("🔑 API Keys Manager initialized on first request");
+      }
+    }
+    next();
+  });
   app.use("/api/v1/api-keys", apiKeysRoutes);
   app.use("/api/v1/network", networkRoutes);
   app.use("/api/v1/uploads", uploadsRoutes);
