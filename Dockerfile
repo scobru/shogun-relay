@@ -3,7 +3,7 @@
 
 FROM node:20-slim
 # delete cache
-ARG CACHEBUST=1
+ARG CACHEBUST=2
 
 # =============================================================================
 # BUILD ARGUMENTS (passed by CapRover or docker build)
