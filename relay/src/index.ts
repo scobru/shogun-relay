@@ -674,7 +674,34 @@ async function initializeServer() {
   // The data is still saved correctly - this is just GunDB's internal verification
   // These warnings don't affect functionality and can be safely ignored
 
-  // Initialize Relay User for x402 subscriptions
+    // Force initialize drive public links manager if relay user is ready
+    setTimeout(async () => {
+      try {
+        const { initDrivePublicLinks, isPublicLinksInitialized } = await import("./routes/drive");
+        
+        // If already initialized, skip
+        if (isPublicLinksInitialized()) return;
+
+        const { getRelayUser, isRelayUserInitialized, getRelayPub } = await import("./utils/relay-user");
+        
+        if (isRelayUserInitialized()) {
+          const relayUser = getRelayUser();
+          const relayPub = getRelayPub();
+          const gun = app.get("gunInstance");
+          
+          if (gun && relayPub && relayUser) {
+             initDrivePublicLinks(gun, relayPub, relayUser);
+             loggers.server.info("✅ DrivePublicLinksManager initialized via delayed startup check");
+          } else {
+             loggers.server.info("✅ Relay User ready. Drive Manager will initialize on first request.");
+          }
+        }
+      } catch (err) {
+        loggers.server.error({ err }, "Failed to verify drive init status");
+      }
+    }, 10000);
+
+    // Initialize Relay User for x402 subscriptions
   // This user owns the subscription data in GunDB
   // REQUIRED: Must use direct SEA keypair (prevents "Signature did not match" errors)
 

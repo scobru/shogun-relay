@@ -470,7 +470,7 @@ router.get("/stats", driveAuthMiddleware, async (req: Request, res: Response) =>
  * GET /links
  * List all public links
  */
-router.get("/links", driveAuthMiddleware, async (req: Request, res: Response) => {
+router.get("/links", driveAuthMiddleware, ensurePublicLinksInitialized, async (req: Request, res: Response) => {
   try {
     const manager = getPublicLinksManager();
     if (!manager) {
@@ -498,7 +498,7 @@ router.get("/links", driveAuthMiddleware, async (req: Request, res: Response) =>
  * POST /links
  * Create a new public link for a file
  */
-router.post("/links", driveAuthMiddleware, express.json(), async (req: Request, res: Response) => {
+router.post("/links", driveAuthMiddleware, ensurePublicLinksInitialized, express.json(), async (req: Request, res: Response) => {
   try {
     const { filePath, expiresInDays } = req.body;
 
@@ -549,7 +549,7 @@ router.post("/links", driveAuthMiddleware, express.json(), async (req: Request, 
  * DELETE /links/:linkId
  * Revoke a public link
  */
-router.delete("/links/:linkId", driveAuthMiddleware, async (req: Request, res: Response) => {
+router.delete("/links/:linkId", driveAuthMiddleware, ensurePublicLinksInitialized, async (req: Request, res: Response) => {
   try {
     const { linkId } = req.params;
 
