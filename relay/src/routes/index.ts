@@ -672,42 +672,36 @@ export default (app: express.Application) => {
   loggers.server.info(`✅ API Keys routes registered`);
   
   // Route per Drive (always enabled, admin-only)
-  // Initialize public links manager lazily on first request
-  app.use(`${baseRoute}/drive`, async (req: Request, res: Response, next: NextFunction) => {
-    const { ensurePublicLinksInitialized } = await import("./drive");
-    ensurePublicLinksInitialized(req, res, next);
-  });
-  
-  app.use(`${baseRoute}/drive`, driveRouter);
-  
-  // Public endpoint for accessing files via share links (NO AUTH REQUIRED)
-  // This must be registered separately to bypass authentication
-  app.get(`${baseRoute}/drive/public/:linkId`, async (req: Request, res: Response) => {
-    const driveRouter = (await import("./drive")).default;
-    driveRouter(req, res, () => {
-      res.status(404).json({ success: false, error: "Not found" });
-    });
-  });
-  
-  // Initialize Drive Public Links Manager after routes are set up
-  // This will be called when GunDB and relay user are initialized in index.ts
-  app.use(`${baseRoute}/drive`, async (req: Request, res: Response, next: NextFunction) => {
-    // Try to initialize if not already done
+  // Initialize public links manager on EVERY drive request (middleware runs before router)
+  const driveInitMiddleware = async (req: Request, res: Response, next: NextFunction) => {
     const gun = req.app.get("gunInstance");
     const relayPub = req.app.get("relayUserPub");
     if (gun && relayPub) {
       try {
         const { initDrivePublicLinks } = await import("./drive");
-        const { getRelayUser } = await import("../utils/relay-user");
-        const relayUser = getRelayUser();
-        if (relayUser) {
-          initDrivePublicLinks(gun, relayPub, relayUser);
+        const { getRelayUser, isRelayUserInitialized } = await import("../utils/relay-user");
+        if (isRelayUserInitialized()) {
+          const relayUser = getRelayUser();
+          if (relayUser) {
+            initDrivePublicLinks(gun, relayPub, relayUser);
+          }
         }
       } catch (error) {
-        // Ignore if already initialized or not ready
+        // Silently ignore if already initialized
       }
     }
     next();
+  };
+  
+  // Apply initialization middleware to all drive routes
+  app.use(`${baseRoute}/drive`, driveInitMiddleware);
+  app.use(`${baseRoute}/drive`, driveRouter);
+  
+  // Public endpoint for accessing files via share links (NO AUTH REQUIRED)
+  // This uses the same initialization middleware to ensure manager is ready
+  app.get(`${baseRoute}/drive/public/:linkId`, driveInitMiddleware, async (req: Request, res: Response) => {
+    const { handlePublicLinkAccess } = await import("./drive");
+    handlePublicLinkAccess(req, res);
   });
   
   loggers.server.info(`✅ Drive routes registered`);

@@ -31,26 +31,36 @@ export async function ensurePublicLinksInitialized(req: Request, res: Response, 
   const gun = req.app.get("gunInstance");
   const relayPub = req.app.get("relayUserPub");
   
-  loggers.server.debug({ 
-    hasGun: !!gun, 
-    hasRelayPub: !!relayPub, 
-    publicLinksInitialized 
-  }, "ensurePublicLinksInitialized check");
+  // Only log at debug level to avoid spam
+  if (!publicLinksInitialized) {
+    loggers.server.debug({ 
+      hasGun: !!gun, 
+      hasRelayPub: !!relayPub, 
+      publicLinksInitialized 
+    }, "ensurePublicLinksInitialized check");
+  }
   
   if (gun && relayPub && !publicLinksInitialized) {
     try {
-      const { getRelayUser } = await import("../utils/relay-user");
+      const { getRelayUser, isRelayUserInitialized } = await import("../utils/relay-user");
+      
+      // Check if relay user is initialized
+      if (!isRelayUserInitialized()) {
+        loggers.server.debug("Relay user not yet initialized, skipping public links manager init");
+        next();
+        return;
+      }
+      
       const relayUser = getRelayUser();
-      loggers.server.debug({ hasRelayUser: !!relayUser }, "Checking relayUser for public links");
       
       if (relayUser) {
         initDrivePublicLinks(gun, relayPub, relayUser);
-        loggers.server.info("DrivePublicLinksManager initialized successfully via middleware");
+        loggers.server.info({ relayPub }, "🔗 DrivePublicLinksManager initialized on first request");
       } else {
-        loggers.server.warn("relayUser not yet available for DrivePublicLinksManager");
+        loggers.server.warn("relayUser returned undefined even though isRelayUserInitialized was true");
       }
     } catch (error) {
-      loggers.server.warn({ err: error }, "Failed to initialize public links manager");
+      loggers.server.error({ err: error }, "Failed to initialize public links manager");
     }
   }
   
