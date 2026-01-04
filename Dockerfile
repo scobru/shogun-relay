@@ -2,8 +2,8 @@
 # Includes: IPFS, Relay Server
 
 FROM node:20-slim
-# use cache
-
+# delete cache
+ARG CACHEBUST=1
 
 # =============================================================================
 # BUILD ARGUMENTS (passed by CapRover or docker build)
