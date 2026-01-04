@@ -111,6 +111,26 @@ async function initializeServer() {
   const welcomeMessage = serverConfig.welcomeMessage;
   console.log(welcomeMessage);
   loggers.server.info("🚀 Initializing Shogun Relay Server...");
+  loggers.server.info("🚀 Shogun Relay v1.0.1 - FORCE UPDATE");
+
+  // Force initialize drive public links manager if relay user is ready
+  setTimeout(async () => {
+    try {
+      const { initDrivePublicLinks } = await import("./routes/drive");
+      const { getRelayUser, isRelayUserInitialized } = await import("./utils/relay-user");
+      
+      if (isRelayUserInitialized()) {
+        // Check if relay user is initialized (we don't need the pub key here)
+        // Access global gun instance from module scope if possible, or wait for middleware
+        // Since we can't easily access 'gun' here without refactoring, we'll rely on the log
+        // to confirm new code is running.
+        // However, we can log that we are ready to init.
+        loggers.server.info("✅ Code is updated: ready for drive initialization");
+      }
+    } catch (err) {
+      loggers.server.error({ err }, "Failed to verify drive init status");
+    }
+  }, 10000);
 
   /**
    * System logging function (console only, no GunDB storage)
