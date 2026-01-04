@@ -113,33 +113,9 @@ async function initializeServer() {
   loggers.server.info("🚀 Initializing Shogun Relay Server...");
   loggers.server.info("🚀 Shogun Relay v1.0.1 - FORCE UPDATE");
 
-  // Force initialize drive public links manager if relay user is ready
-  // Force initialize drive public links manager if relay user is ready
-  setTimeout(async () => {
-    try {
-      const { initDrivePublicLinks, isPublicLinksInitialized } = await import("./routes/drive");
-      
-      // If already initialized, skip
-      if (isPublicLinksInitialized()) return;
 
-      const { getRelayUser, isRelayUserInitialized, getRelayPub } = await import("./utils/relay-user");
-      
-      if (isRelayUserInitialized()) {
-        const relayUser = getRelayUser();
-        const relayPub = getRelayPub();
-        const gun = app.get("gunInstance"); // Access from app instance we have here in scope closure? No, 'app' is defined later.
-        
-        // We can get gun from the module if we exported it, or wait for the first request middleware to handle it.
-        // But better is to try to get it if we can.
-        // Actually, 'app' is defined in lines below. This setTimeout runs later, so 'app' variable from outer scope might be available if we move this block down?
-        // Ah, 'app' is const defined on line 208. We are at line 117. We can't access 'app' yet.
-        
-        loggers.server.info("✅ Relay User ready. Drive Manager will initialize on first request.");
-      }
-    } catch (err) {
-      loggers.server.error({ err }, "Failed to verify drive init status");
-    }
-  }, 10000);
+  // Moved drive public links init to after app declaration
+
 
   /**
    * System logging function (console only, no GunDB storage)

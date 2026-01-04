@@ -6,6 +6,7 @@ import { loggers } from "../utils/logger";
 import { adminAuthMiddleware } from "../middleware/admin-auth";
 import { driveAuthMiddleware } from "../middleware/drive-auth";
 import { DrivePublicLinksManager } from "../utils/drive-public-links";
+import { getRelayUser, isRelayUserInitialized, initRelayUser } from "../utils/relay-user";
 
 const router = express.Router();
 
@@ -50,23 +51,26 @@ export async function ensurePublicLinksInitialized(req: Request, res: Response, 
     return next();
   }
 
+
   const gun = req.app.get("gunInstance");
   const relayPub = req.app.get("relayUserPub");
   
   if (gun && relayPub) {
     try {
-      const { getRelayUser, isRelayUserInitialized, initRelayUser } = await import("../utils/relay-user");
+      // Use top-level import or same import as index.ts to ensure singleton
+      // const { getRelayUser, isRelayUserInitialized, initRelayUser } = await import("../utils/relay-user");
       
       // Check if relay user is initialized
-      if (!isRelayUserInitialized()) {
-        loggers.server.debug("Relay user not yet initialized, attempting lazy init or skipping");
+      const isInit = isRelayUserInitialized();
+      if (!isInit) {
+        loggers.server.warn("Relay user not yet initialized in drive middleware (isRelayUserInitialized=false)");
         
         // Try to get keypair directly if available in config
         // This is a last-ditch effort to init if the server logic hasn't yet
         const { relayKeysConfig } = await import("../config/env-config");
         if (relayKeysConfig.seaKeypair) {
              // We can't easily init here without async issues, so we just log and wait
-             loggers.server.debug("Has keypair config but relay user not ready");
+             loggers.server.debug("Has keypair config but relay user not ready - cannot init drive links");
         }
         
         // If we can't get the user, we can't init drive links manager
@@ -87,7 +91,8 @@ export async function ensurePublicLinksInitialized(req: Request, res: Response, 
     }
   } else {
       // Only log once per minute to avoid spamming if configuration is broken
-      loggers.server.warn({ hasGun: !!gun, hasRelayPub: !!relayPub }, "Cannot init Drive Public Links - missing Gun or Relay Pub");
+      if (!gun) loggers.server.warn("Cannot init Drive Public Links - Gun instance missing on app");
+      if (!relayPub) loggers.server.warn("Cannot init Drive Public Links - Relay Pub missing on app");
   }
   
   next();

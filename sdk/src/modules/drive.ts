@@ -77,8 +77,12 @@ export class DriveModule {
 
     const url = path ? `/api/v1/drive/upload/${encodeURIComponent(path)}` : "/api/v1/drive/upload";
     
+    const headers = (typeof (formData as any).getHeaders === "function") 
+      ? (formData as any).getHeaders() 
+      : undefined;
+
     return this.client.post(url, formData, {
-      headers: formData.getHeaders(),
+      headers: headers,
     } as any);
   }
 
@@ -96,8 +100,12 @@ export class DriveModule {
 
     const url = path ? `/api/v1/drive/upload/${encodeURIComponent(path)}` : "/api/v1/drive/upload";
     
+    const headers = (typeof (formData as any).getHeaders === "function") 
+      ? (formData as any).getHeaders() 
+      : undefined;
+
     return this.client.post(url, formData, {
-      headers: formData.getHeaders(),
+      headers: headers,
     } as any);
   }
 
