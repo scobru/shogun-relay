@@ -31,12 +31,23 @@ export async function ensurePublicLinksInitialized(req: Request, res: Response, 
   const gun = req.app.get("gunInstance");
   const relayPub = req.app.get("relayUserPub");
   
+  loggers.server.debug({ 
+    hasGun: !!gun, 
+    hasRelayPub: !!relayPub, 
+    publicLinksInitialized 
+  }, "ensurePublicLinksInitialized check");
+  
   if (gun && relayPub && !publicLinksInitialized) {
     try {
       const { getRelayUser } = await import("../utils/relay-user");
       const relayUser = getRelayUser();
+      loggers.server.debug({ hasRelayUser: !!relayUser }, "Checking relayUser for public links");
+      
       if (relayUser) {
         initDrivePublicLinks(gun, relayPub, relayUser);
+        loggers.server.info("DrivePublicLinksManager initialized successfully via middleware");
+      } else {
+        loggers.server.warn("relayUser not yet available for DrivePublicLinksManager");
       }
     } catch (error) {
       loggers.server.warn({ err: error }, "Failed to initialize public links manager");
