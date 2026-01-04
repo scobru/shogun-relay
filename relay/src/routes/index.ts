@@ -112,8 +112,12 @@ export default (app: express.Application) => {
     }
   });
 
-  // Applica rate limiting generale
-  app.use(generalLimiter);
+
+  // Redirect root to dashboard
+  app.get("/", (req, res) => {
+    res.redirect("/dashboard/");
+  });
+
 
   // --- IPFS Desktop Proxy Configuration ---
   const IPFS_GATEWAY_URL = ipfsConfig.gatewayUrl;
