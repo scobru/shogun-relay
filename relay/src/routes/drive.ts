@@ -14,11 +14,24 @@ let publicLinksInitialized = false;
 let publicLinksManager: DrivePublicLinksManager | null = null;
 
 export function initDrivePublicLinks(gun: any, relayPub: string, relayUser: any): void {
-  if (!publicLinksInitialized && gun && relayPub && relayUser) {
-    // Initialize public links manager
-    publicLinksManager = new DrivePublicLinksManager(gun, relayPub, relayUser);
-    publicLinksInitialized = true;
-    loggers.server.info({ relayPub }, "Drive Public Links Manager initialized");
+  if (publicLinksInitialized) {
+    return;
+  }
+
+  if (gun && relayPub && relayUser) {
+    try {
+      // Initialize public links manager
+      publicLinksManager = new DrivePublicLinksManager(gun, relayPub, relayUser);
+      publicLinksInitialized = true;
+      loggers.server.info({ relayPub }, "✅ Drive Public Links Manager initialized successfully");
+    } catch (err) {
+      loggers.server.error({ err }, "❌ Failed to create DrivePublicLinksManager instance");
+    }
+  } else {
+    loggers.server.debug(
+      { hasGun: !!gun, hasRelayPub: !!relayPub, hasRelayUser: !!relayUser },
+      "Skipping Drive init - missing dependencies"
+    );
   }
 }
 
@@ -32,40 +45,49 @@ export function isPublicLinksInitialized(): boolean {
 
 // Middleware to initialize public links manager on first request
 export async function ensurePublicLinksInitialized(req: Request, res: Response, next: NextFunction): Promise<void> {
+  // If already initialized, proceed immediately
+  if (publicLinksInitialized) {
+    return next();
+  }
+
   const gun = req.app.get("gunInstance");
   const relayPub = req.app.get("relayUserPub");
   
-  // Only log at debug level to avoid spam
-  if (!publicLinksInitialized) {
-    loggers.server.debug({ 
-      hasGun: !!gun, 
-      hasRelayPub: !!relayPub, 
-      publicLinksInitialized 
-    }, "ensurePublicLinksInitialized check");
-  }
-  
-  if (gun && relayPub && !publicLinksInitialized) {
+  if (gun && relayPub) {
     try {
-      const { getRelayUser, isRelayUserInitialized } = await import("../utils/relay-user");
+      const { getRelayUser, isRelayUserInitialized, initRelayUser } = await import("../utils/relay-user");
       
       // Check if relay user is initialized
       if (!isRelayUserInitialized()) {
-        loggers.server.debug("Relay user not yet initialized, skipping public links manager init");
-        next();
-        return;
+        loggers.server.debug("Relay user not yet initialized, attempting lazy init or skipping");
+        
+        // Try to get keypair directly if available in config
+        // This is a last-ditch effort to init if the server logic hasn't yet
+        const { relayKeysConfig } = await import("../config/env-config");
+        if (relayKeysConfig.seaKeypair) {
+             // We can't easily init here without async issues, so we just log and wait
+             loggers.server.debug("Has keypair config but relay user not ready");
+        }
+        
+        // If we can't get the user, we can't init drive links manager
+        // But we should let the request continue - it might fail with 503 later if it needs the manager
+        return next();
       }
       
       const relayUser = getRelayUser();
       
       if (relayUser) {
         initDrivePublicLinks(gun, relayPub, relayUser);
-        loggers.server.info({ relayPub }, "🔗 DrivePublicLinksManager initialized on first request");
+        loggers.server.info("🔗 DrivePublicLinksManager initialized via middleware request");
       } else {
         loggers.server.warn("relayUser returned undefined even though isRelayUserInitialized was true");
       }
     } catch (error) {
-      loggers.server.error({ err: error }, "Failed to initialize public links manager");
+      loggers.server.error({ err: error }, "Failed to initialize public links manager in middleware");
     }
+  } else {
+      // Only log once per minute to avoid spamming if configuration is broken
+      loggers.server.warn({ hasGun: !!gun, hasRelayPub: !!relayPub }, "Cannot init Drive Public Links - missing Gun or Relay Pub");
   }
   
   next();

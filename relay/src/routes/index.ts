@@ -677,42 +677,17 @@ export default (app: express.Application) => {
   
   // Route per Drive (always enabled, admin-only)
   // Initialize public links manager on EVERY drive request (middleware runs before router)
+  // Route per Drive (always enabled, admin-only)
+  // Initialize public links manager on EVERY drive request (middleware runs before router)
   const driveInitMiddleware = async (req: Request, res: Response, next: NextFunction) => {
-    const gun = req.app.get("gunInstance");
-    const relayPub = req.app.get("relayUserPub");
-    
-    if (gun && relayPub) {
-      try {
-        const { initDrivePublicLinks, isPublicLinksInitialized } = await import("./drive");
-        
-        // Skip if already initialized
-        if (isPublicLinksInitialized()) {
-          next();
-          return;
-        }
-        
-        const { getRelayUser, isRelayUserInitialized } = await import("../utils/relay-user");
-        
-        if (!isRelayUserInitialized()) {
-          loggers.server.warn("Drive init middleware: relay user not initialized yet");
-          next();
-          return;
-        }
-        
-        const relayUser = getRelayUser();
-        if (relayUser) {
-          initDrivePublicLinks(gun, relayPub, relayUser);
-          loggers.server.info("🔗 DrivePublicLinksManager initialized via middleware");
-        } else {
-          loggers.server.warn("Drive init middleware: relayUser is null");
-        }
-      } catch (error) {
-        loggers.server.error({ err: error }, "Drive init middleware error");
-      }
-    } else {
-      loggers.server.warn({ hasGun: !!gun, hasRelayPub: !!relayPub }, "Drive init middleware: missing gun or relayPub");
+    // Delegate to the robust middleware exported from drive.ts
+    try {
+        const { ensurePublicLinksInitialized } = await import("./drive");
+        await ensurePublicLinksInitialized(req, res, next);
+    } catch (err) {
+        loggers.server.error({ err }, "Error in driveInitMiddleware wrapper");
+        next();
     }
-    next();
   };
   
   // Apply initialization middleware to all drive routes
