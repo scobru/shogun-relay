@@ -26,6 +26,10 @@ function getPublicLinksManager(): DrivePublicLinksManager | null {
   return publicLinksManager;
 }
 
+export function isPublicLinksInitialized(): boolean {
+  return publicLinksInitialized;
+}
+
 // Middleware to initialize public links manager on first request
 export async function ensurePublicLinksInitialized(req: Request, res: Response, next: NextFunction): Promise<void> {
   const gun = req.app.get("gunInstance");

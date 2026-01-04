@@ -676,19 +676,37 @@ export default (app: express.Application) => {
   const driveInitMiddleware = async (req: Request, res: Response, next: NextFunction) => {
     const gun = req.app.get("gunInstance");
     const relayPub = req.app.get("relayUserPub");
+    
     if (gun && relayPub) {
       try {
-        const { initDrivePublicLinks } = await import("./drive");
+        const { initDrivePublicLinks, isPublicLinksInitialized } = await import("./drive");
+        
+        // Skip if already initialized
+        if (isPublicLinksInitialized()) {
+          next();
+          return;
+        }
+        
         const { getRelayUser, isRelayUserInitialized } = await import("../utils/relay-user");
-        if (isRelayUserInitialized()) {
-          const relayUser = getRelayUser();
-          if (relayUser) {
-            initDrivePublicLinks(gun, relayPub, relayUser);
-          }
+        
+        if (!isRelayUserInitialized()) {
+          loggers.server.warn("Drive init middleware: relay user not initialized yet");
+          next();
+          return;
+        }
+        
+        const relayUser = getRelayUser();
+        if (relayUser) {
+          initDrivePublicLinks(gun, relayPub, relayUser);
+          loggers.server.info("🔗 DrivePublicLinksManager initialized via middleware");
+        } else {
+          loggers.server.warn("Drive init middleware: relayUser is null");
         }
       } catch (error) {
-        // Silently ignore if already initialized
+        loggers.server.error({ err: error }, "Drive init middleware error");
       }
+    } else {
+      loggers.server.warn({ hasGun: !!gun, hasRelayPub: !!relayPub }, "Drive init middleware: missing gun or relayPub");
     }
     next();
   };
