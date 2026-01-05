@@ -372,6 +372,19 @@ export const config = {
     dataDir:
       process.env.DRIVE_DATA_DIR ||
       path.join(process.cwd(), "data", "drive"),
+
+    // Storage backend: "fs" (local filesystem) or "minio" (S3-compatible)
+    storageType: (process.env.DRIVE_STORAGE_TYPE || "fs") as "fs" | "minio",
+
+    // MinIO/S3 configuration (only used when storageType is "minio")
+    minio: {
+      endpoint: process.env.MINIO_ENDPOINT || "https://cloud.scobrudot.dev",
+      accessKey: process.env.MINIO_ACCESS_KEY || "",
+      secretKey: process.env.MINIO_SECRET_KEY || "",
+      bucket: process.env.MINIO_BUCKET || "shogun-drive",
+      useSSL: process.env.MINIO_USE_SSL !== "false",
+      region: process.env.MINIO_REGION || "us-east-1",
+    },
   },
 
   package: {

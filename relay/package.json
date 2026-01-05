@@ -34,6 +34,7 @@
   "author": "Shogun Team",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.962.0",
     "@mblaney/holster": "^1.0.35",
     "@types/vis": "^4.21.27",
     "better-sqlite3": "^11.0.0",
