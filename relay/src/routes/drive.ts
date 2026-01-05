@@ -54,32 +54,32 @@ export async function ensurePublicLinksInitialized(req: Request, res: Response, 
 
   const gun = req.app.get("gunInstance");
   const relayPub = req.app.get("relayUserPub");
-  
+
   if (gun && relayPub) {
     try {
       // Use top-level import or same import as index.ts to ensure singleton
       // const { getRelayUser, isRelayUserInitialized, initRelayUser } = await import("../utils/relay-user");
-      
+
       // Check if relay user is initialized
       const isInit = isRelayUserInitialized();
       if (!isInit) {
         loggers.server.warn("Relay user not yet initialized in drive middleware (isRelayUserInitialized=false)");
-        
+
         // Try to get keypair directly if available in config
         // This is a last-ditch effort to init if the server logic hasn't yet
         const { relayKeysConfig } = await import("../config/env-config");
         if (relayKeysConfig.seaKeypair) {
-             // We can't easily init here without async issues, so we just log and wait
-             loggers.server.debug("Has keypair config but relay user not ready - cannot init drive links");
+          // We can't easily init here without async issues, so we just log and wait
+          loggers.server.debug("Has keypair config but relay user not ready - cannot init drive links");
         }
-        
+
         // If we can't get the user, we can't init drive links manager
         // But we should let the request continue - it might fail with 503 later if it needs the manager
         return next();
       }
-      
+
       const relayUser = getRelayUser();
-      
+
       if (relayUser) {
         initDrivePublicLinks(gun, relayPub, relayUser);
         loggers.server.info("🔗 DrivePublicLinksManager initialized via middleware request");
@@ -90,11 +90,11 @@ export async function ensurePublicLinksInitialized(req: Request, res: Response, 
       loggers.server.error({ err: error }, "Failed to initialize public links manager in middleware");
     }
   } else {
-      // Only log once per minute to avoid spamming if configuration is broken
-      if (!gun) loggers.server.warn("Cannot init Drive Public Links - Gun instance missing on app");
-      if (!relayPub) loggers.server.warn("Cannot init Drive Public Links - Relay Pub missing on app");
+    // Only log once per minute to avoid spamming if configuration is broken
+    if (!gun) loggers.server.warn("Cannot init Drive Public Links - Gun instance missing on app");
+    if (!relayPub) loggers.server.warn("Cannot init Drive Public Links - Relay Pub missing on app");
   }
-  
+
   next();
 }
 
@@ -111,7 +111,7 @@ const upload = multer({
 router.get("/list/:path(*)?", driveAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const relativePath = req.params.path || "";
-    const items = driveManager.listDirectory(relativePath);
+    const items = await driveManager.listDirectoryAsync(relativePath);
 
     res.json({
       success: true,
@@ -152,14 +152,14 @@ router.post(
       // Handle single file upload (field name: "file")
       if (files.file && files.file.length > 0) {
         const file = files.file[0];
-        driveManager.uploadFile(relativePath, file.buffer, file.originalname);
+        await driveManager.uploadFileAsync(relativePath, file.buffer, file.originalname);
         uploadedFiles.push(file.originalname);
       }
 
       // Handle multiple files upload (field name: "files")
       if (files.files && files.files.length > 0) {
         for (const file of files.files) {
-          driveManager.uploadFile(relativePath, file.buffer, file.originalname);
+          await driveManager.uploadFileAsync(relativePath, file.buffer, file.originalname);
           uploadedFiles.push(file.originalname);
         }
       }
@@ -194,7 +194,7 @@ router.get("/download/:path(*)", driveAuthMiddleware, async (req: Request, res: 
       });
     }
 
-    const { buffer, filename, size } = driveManager.downloadFile(relativePath);
+    const { buffer, filename, size } = await driveManager.downloadFileAsync(relativePath);
 
     // Detect content type based on file extension
     const ext = path.extname(filename).toLowerCase();
@@ -225,7 +225,7 @@ router.get("/download/:path(*)", driveAuthMiddleware, async (req: Request, res: 
     res.send(buffer);
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to download file");
-    
+
     if (error.message.includes("does not exist")) {
       res.status(404).json({
         success: false,
@@ -255,7 +255,7 @@ router.delete("/delete/:path(*)", driveAuthMiddleware, async (req: Request, res:
       });
     }
 
-    driveManager.deleteItem(relativePath);
+    await driveManager.deleteItemAsync(relativePath);
 
     res.json({
       success: true,
@@ -263,7 +263,7 @@ router.delete("/delete/:path(*)", driveAuthMiddleware, async (req: Request, res:
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to delete item");
-    
+
     if (error.message.includes("does not exist")) {
       res.status(404).json({
         success: false,
@@ -303,7 +303,7 @@ router.post("/mkdir/:path(*)?", driveAuthMiddleware, express.json(), async (req:
     }
 
     const relativePath = parentPath ? `${parentPath}/${name}` : name;
-    driveManager.createDirectory(relativePath);
+    await driveManager.createDirectoryAsync(relativePath);
 
     res.json({
       success: true,
@@ -312,7 +312,7 @@ router.post("/mkdir/:path(*)?", driveAuthMiddleware, express.json(), async (req:
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to create directory");
-    
+
     if (error.message.includes("already exists")) {
       res.status(409).json({
         success: false,
@@ -357,7 +357,7 @@ router.post("/rename", driveAuthMiddleware, express.json(), async (req: Request,
       });
     }
 
-    driveManager.renameItem(oldPath, newName);
+    await driveManager.renameItemAsync(oldPath, newName);
 
     res.json({
       success: true,
@@ -365,7 +365,7 @@ router.post("/rename", driveAuthMiddleware, express.json(), async (req: Request,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to rename item");
-    
+
     if (error.message.includes("does not exist")) {
       res.status(404).json({
         success: false,
@@ -407,7 +407,7 @@ router.post("/move", driveAuthMiddleware, express.json(), async (req: Request, r
       });
     }
 
-    driveManager.moveItem(sourcePath, destPath);
+    await driveManager.moveItemAsync(sourcePath, destPath);
 
     res.json({
       success: true,
@@ -415,7 +415,7 @@ router.post("/move", driveAuthMiddleware, express.json(), async (req: Request, r
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to move item");
-    
+
     if (error.message.includes("does not exist")) {
       res.status(404).json({
         success: false,
@@ -441,7 +441,7 @@ router.post("/move", driveAuthMiddleware, express.json(), async (req: Request, r
  */
 router.get("/stats", driveAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const stats = driveManager.getStorageStats();
+    const stats = await driveManager.getStorageStatsAsync();
 
     res.json({
       success: true,
