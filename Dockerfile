@@ -332,9 +332,14 @@ RUN dos2unix /app/docker/init-ipfs.sh \
     && cp /app/docker/relay.env /app/relay/.env
 
 # Copy package files and scripts (needed for postinstall)
+# Note: We copy package-lock.json but remove it before install to avoid cross-platform issues
 COPY relay/package*.json /app/relay/
 COPY relay/scripts/ /app/relay/scripts/
 WORKDIR /app/relay
+
+# Remove package-lock.json to avoid cross-platform issues with native binaries (rollup, esbuild)
+# The lock file from Windows includes Windows-specific optional deps that break Linux builds
+RUN rm -f package-lock.json
 
 # Install ALL dependencies first (including devDependencies for dashboard build)
 RUN npm install
