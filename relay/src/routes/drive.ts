@@ -627,8 +627,8 @@ export async function handlePublicLinkAccess(req: Request, res: Response): Promi
       return;
     }
 
-    // Download the file using driveManager
-    const { buffer, filename, size } = driveManager.downloadFile(link.filePath);
+    // Download the file using driveManager (async version for MinIO compatibility)
+    const { buffer, filename, size } = await driveManager.downloadFileAsync(link.filePath);
 
     // Detect content type based on file extension
     const ext = path.extname(filename).toLowerCase();
