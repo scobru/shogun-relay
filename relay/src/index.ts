@@ -593,14 +593,15 @@ async function initializeServer() {
   const peers = relayConfig.peers;
   loggers.server.info({ peers }, "🔍 Peers");
 
-  // Initialize Gun with storage (SQLite or radisk)
+  // Initialize Gun with storage (SQLite, radisk, or S3)
   const dataDir = storageConfig.dataDir;
   loggers.server.info({ dataDir }, "📁 Data directory");
 
   // Choose storage type from environment variable
-  // Options: "sqlite" (default) or "radisk"
+  // Options: "sqlite" (default), "radisk", or "s3"
   const storageType = storageConfig.storageType;
   let sqliteStore: any = null;
+  let s3Config: any = null;
 
   if (storageType === "sqlite") {
     const dbPath = path.join(dataDir, "gun.db");
@@ -609,11 +610,31 @@ async function initializeServer() {
       file: "radata",
     });
     loggers.server.info("📁 Using SQLite storage for Gun");
+  } else if (storageType === "s3") {
+    // Import rs3.js adapter for S3/MinIO storage
+    require("gun/lib/rs3");
+
+    const s3Conf = storageConfig.s3;
+    if (!s3Conf?.endpoint || !s3Conf?.accessKeyId || !s3Conf?.secretAccessKey) {
+      loggers.server.warn("⚠️ S3 storage configured but credentials missing. Falling back to radisk.");
+    } else {
+      s3Config = {
+        bucket: s3Conf.bucket,
+        region: s3Conf.region,
+        accessKeyId: s3Conf.accessKeyId,
+        secretAccessKey: s3Conf.secretAccessKey,
+        endpoint: s3Conf.endpoint,  // For MinIO/S3-compatible services
+      };
+      loggers.server.info({
+        endpoint: s3Conf.endpoint,
+        bucket: s3Conf.bucket
+      }, "🪣 Using S3/MinIO storage for Gun");
+    }
   } else {
     loggers.server.info("📁 Using file-based radisk storage");
   }
 
-  const gunConfig = {
+  const gunConfig: any = {
     super: true,
     file: dataDir,
     radisk: !storageConfig.disableRadisk, // Allow disabling radisk via env var
@@ -633,10 +654,19 @@ async function initializeServer() {
     jsonify: true, // Disable automatic JSON parsing to prevent errors
   };
 
+  // Add S3 config if available (rs3.js will pick it up)
+  if (s3Config) {
+    gunConfig.s3 = s3Config;
+    // Disable SQLite store when using S3
+    gunConfig.store = null;
+  }
+
   if (storageConfig.disableRadisk) {
     loggers.server.info("📁 Radisk disabled via environment variable");
   } else if (storageType === "sqlite") {
     loggers.server.info("📁 Using SQLite storage with radisk");
+  } else if (storageType === "s3") {
+    loggers.server.info("📁 Using S3/MinIO storage with radisk");
   } else {
     loggers.server.info("📁 Using local file storage with radisk");
   }
