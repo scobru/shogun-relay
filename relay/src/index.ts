@@ -2103,14 +2103,14 @@ See docs/RELAY_KEYS.md for more information.
     loggers.server.info("⏳ Waiting for in-flight operations to complete...");
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // Close SQLite store if it exists
-    // The SQLiteStore will now gracefully handle any remaining GunDB operations
-    if (sqliteStore) {
+    // Close storage store if it exists (SQLite or S3)
+    // The store will gracefully handle any remaining GunDB operations
+    if (store) {
       try {
-        sqliteStore.close();
-        loggers.server.info("✅ SQLite store closed");
+        store.close();
+        loggers.server.info("✅ Storage store closed");
       } catch (err: any) {
-        loggers.server.error({ err }, "Error closing SQLite store");
+        loggers.server.error({ err }, "Error closing storage store");
       }
     }
 
