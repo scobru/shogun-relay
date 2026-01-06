@@ -161,12 +161,6 @@ async function initializeServer() {
       return true;
     }
 
-    // Allow ALL public PUT operations (no path restriction)
-    // GUN_PATHS is kept for code organization only, not for access control
-    if (msg.put) {
-      return true;
-    }
-
     // Se ha headers, verifica il token
     if (msg && msg.headers && msg.headers.token) {
       const hasValidAuth = msg.headers.token === authConfig.adminPassword;
