@@ -161,19 +161,10 @@ async function initializeServer() {
       return true;
     }
 
-    // Allow public registry writes (discovery & torrents)
-    // This enables the Global Registry and Peer Discovery to work even in protected mode
+    // Allow ALL public PUT operations (no path restriction)
+    // GUN_PATHS is kept for code organization only, not for access control
     if (msg.put) {
-      const souls = Object.keys(msg.put);
-      const isPublicRegistry = souls.some(soul => 
-        // Check against all unified GUN_PATHS
-        Object.values(GUN_PATHS).some(path => soul === path || soul.startsWith(path + '/'))
-      );
-      
-      if (isPublicRegistry) {
-        // loggers.server.debug(`🔍 PUT allowed for public registry: ${souls.join(', ')}`);
-        return true;
-      }
+      return true;
     }
 
     // Se ha headers, verifica il token
@@ -185,7 +176,7 @@ async function initializeServer() {
       }
     }
 
-    loggers.server.warn(`❌ PUT denied - no valid auth: ${JSON.stringify(msg.headers)}`);
+    loggers.server.warn(`❌ Operation denied - no valid auth: ${JSON.stringify(msg.headers)}`);
     return false;
   }
 
@@ -199,20 +190,20 @@ async function initializeServer() {
     origin: authConfig.corsOrigins.includes("*")
       ? true // Allow all origins if '*' is configured
       : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-          // Allow requests with no origin (like mobile apps or curl requests)
-          if (!origin) return callback(null, true);
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
 
-          if (
-            authConfig.corsOrigins.some(
-              (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
-            )
-          ) {
-            callback(null, true);
-          } else {
-            loggers.server.warn({ origin }, "CORS blocked request from origin");
-            callback(new Error("Not allowed by CORS"));
-          }
-        },
+        if (
+          authConfig.corsOrigins.some(
+            (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
+          )
+        ) {
+          callback(null, true);
+        } else {
+          loggers.server.warn({ origin }, "CORS blocked request from origin");
+          callback(new Error("Not allowed by CORS"));
+        }
+      },
     credentials: authConfig.corsCredentials,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: [
@@ -674,34 +665,34 @@ async function initializeServer() {
   // The data is still saved correctly - this is just GunDB's internal verification
   // These warnings don't affect functionality and can be safely ignored
 
-    // Force initialize drive public links manager if relay user is ready
-    setTimeout(async () => {
-      try {
-        const { initDrivePublicLinks, isPublicLinksInitialized } = await import("./routes/drive");
-        
-        // If already initialized, skip
-        if (isPublicLinksInitialized()) return;
+  // Force initialize drive public links manager if relay user is ready
+  setTimeout(async () => {
+    try {
+      const { initDrivePublicLinks, isPublicLinksInitialized } = await import("./routes/drive");
 
-        const { getRelayUser, isRelayUserInitialized, getRelayPub } = await import("./utils/relay-user");
-        
-        if (isRelayUserInitialized()) {
-          const relayUser = getRelayUser();
-          const relayPub = getRelayPub();
-          const gun = app.get("gunInstance");
-          
-          if (gun && relayPub && relayUser) {
-             initDrivePublicLinks(gun, relayPub, relayUser);
-             loggers.server.info("✅ DrivePublicLinksManager initialized via delayed startup check");
-          } else {
-             loggers.server.info("✅ Relay User ready. Drive Manager will initialize on first request.");
-          }
+      // If already initialized, skip
+      if (isPublicLinksInitialized()) return;
+
+      const { getRelayUser, isRelayUserInitialized, getRelayPub } = await import("./utils/relay-user");
+
+      if (isRelayUserInitialized()) {
+        const relayUser = getRelayUser();
+        const relayPub = getRelayPub();
+        const gun = app.get("gunInstance");
+
+        if (gun && relayPub && relayUser) {
+          initDrivePublicLinks(gun, relayPub, relayUser);
+          loggers.server.info("✅ DrivePublicLinksManager initialized via delayed startup check");
+        } else {
+          loggers.server.info("✅ Relay User ready. Drive Manager will initialize on first request.");
         }
-      } catch (err) {
-        loggers.server.error({ err }, "Failed to verify drive init status");
       }
-    }, 10000);
+    } catch (err) {
+      loggers.server.error({ err }, "Failed to verify drive init status");
+    }
+  }, 10000);
 
-    // Initialize Relay User for x402 subscriptions
+  // Initialize Relay User for x402 subscriptions
   // This user owns the subscription data in GunDB
   // REQUIRED: Must use direct SEA keypair (prevents "Signature did not match" errors)
 
@@ -725,13 +716,13 @@ async function initializeServer() {
 
       // Determine the actual keypair file path
       let keypairFilePath = relayKeysConfig.seaKeypairPath;
-      
+
       // Check if the path is a directory - if so, append default filename
       if (fs.existsSync(keypairFilePath) && fs.statSync(keypairFilePath).isDirectory()) {
         loggers.server.info(`📁 RELAY_SEA_KEYPAIR_PATH is a directory, using default filename`);
         keypairFilePath = path.join(keypairFilePath, "relay-keypair.json");
       }
-      
+
       // Also handle case where path ends with / (directory notation) but doesn't exist
       if (keypairFilePath.endsWith("/") || keypairFilePath.endsWith("\\")) {
         keypairFilePath = path.join(keypairFilePath, "relay-keypair.json");
@@ -1146,7 +1137,7 @@ See docs/RELAY_KEYS.md for more information.
 
   // --- Modular Routes ---
   app.use("/api/v1/auth", authRoutes);
-  
+
   // Initialize API Keys Manager before registering api-keys routes
   app.use("/api/v1/api-keys", async (req: any, res: any, next: any) => {
     const { initApiKeysManager, getApiKeysManager } = await import("./middleware/api-keys-auth");
@@ -1801,7 +1792,7 @@ See docs/RELAY_KEYS.md for more information.
         // Only warn once every ~100 pulses to avoid spam, or warn at startup (but this is a loop)
         // Check random chance or just debug log
         if (Math.random() < 0.05) {
-             loggers.server.warn({ host }, "⚠️  Relay host is configured as localhost. External relays will not be able to connect to you. Set RELAY_HOST in .env");
+          loggers.server.warn({ host }, "⚠️  Relay host is configured as localhost. External relays will not be able to connect to you. Set RELAY_HOST in .env");
         }
       }
 
@@ -2044,15 +2035,15 @@ See docs/RELAY_KEYS.md for more information.
         version: packageConfig.version,
         alias: relayConfig.name,
       };
-      
+
       // Announce immediately
       announceRelayPresence(gun, relayInfo, relayKeyPair.pub);
-      
+
       // And periodically to update 'lastSeen'
       setInterval(() => {
         announceRelayPresence(gun, relayInfo, relayKeyPair.pub);
       }, 60 * 1000); // Every minute
-      
+
       loggers.server.info({ pubKey: relayKeyPair.pub }, "📢 Relay presence announced on GunDB");
     }
 
