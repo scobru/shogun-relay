@@ -46,7 +46,7 @@ export const config = {
   relay: {
     name: process.env.RELAY_NAME || "shogun-relay",
     environment: process.env.NODE_ENV || "development",
-    protected: process.env.RELAY_PROTECTED === "true" || false,
+    protected: process.env.RELAY_PROTECTED || false,
     endpoint: process.env.RELAY_ENDPOINT || process.env.RELAY_HOST + ":" + process.env.RELAY_PORT,
     // GunDB peers - supports both RELAY_PEERS and GUN_PEERS for backward compatibility
     peers: (() => {

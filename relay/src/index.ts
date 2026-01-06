@@ -86,6 +86,7 @@ const processedPinRequests = new Map();
 const PIN_REQUEST_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour - don't reprocess within this time
 
 const isProtectedRelay = relayConfig.protected;
+loggers.server.info({ isProtectedRelay }, "Relay protection enabled");
 
 // ES Module equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url);
