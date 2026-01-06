@@ -20,6 +20,7 @@ import { initRelayUser, getRelayUser } from "./utils/relay-user";
 import * as Reputation from "./utils/relay-reputation";
 import * as FrozenData from "./utils/frozen-data";
 import SQLiteStore from "./utils/sqlite-store";
+import S3Store from "./utils/s3-store";
 import { loggers } from "./utils/logger";
 import {
   config,
@@ -600,31 +601,27 @@ async function initializeServer() {
   // Choose storage type from environment variable
   // Options: "sqlite" (default), "radisk", or "s3"
   const storageType = storageConfig.storageType;
-  let sqliteStore: any = null;
-  let s3Config: any = null;
+  let store: any = null;
 
   if (storageType === "sqlite") {
     const dbPath = path.join(dataDir, "gun.db");
-    sqliteStore = new SQLiteStore({
+    store = new SQLiteStore({
       dbPath: dbPath,
       file: "radata",
     });
     loggers.server.info("📁 Using SQLite storage for Gun");
   } else if (storageType === "s3") {
-    // Import rs3.js adapter for S3/MinIO storage
-    require("gun/lib/rs3");
-
     const s3Conf = storageConfig.s3;
     if (!s3Conf?.endpoint || !s3Conf?.accessKeyId || !s3Conf?.secretAccessKey) {
       loggers.server.warn("⚠️ S3 storage configured but credentials missing. Falling back to radisk.");
     } else {
-      s3Config = {
-        bucket: s3Conf.bucket,
-        region: s3Conf.region,
+      store = new S3Store({
+        endpoint: s3Conf.endpoint,
         accessKeyId: s3Conf.accessKeyId,
         secretAccessKey: s3Conf.secretAccessKey,
-        endpoint: s3Conf.endpoint,  // For MinIO/S3-compatible services
-      };
+        bucket: s3Conf.bucket,
+        region: s3Conf.region,
+      });
       loggers.server.info({
         endpoint: s3Conf.endpoint,
         bucket: s3Conf.bucket
@@ -638,11 +635,11 @@ async function initializeServer() {
     super: true,
     file: dataDir,
     radisk: !storageConfig.disableRadisk, // Allow disabling radisk via env var
-    store: sqliteStore, // Use SQLite store if available
+    store: store, // Use SQLite or S3 store if available
     web: server,
     isValid: hasValidToken,
     uuid: relayConfig.name,
-    localStorage: false, // Abilita localStorage per persistenza
+    localStorage: false,
     wire: true,
     axe: false,
     rfs: true,
@@ -651,15 +648,8 @@ async function initializeServer() {
     peers: peers,
     chunk: 1000,
     pack: 1000,
-    jsonify: true, // Disable automatic JSON parsing to prevent errors
+    jsonify: true,
   };
-
-  // Add S3 config if available (rs3.js will pick it up)
-  if (s3Config) {
-    gunConfig.s3 = s3Config;
-    // Disable SQLite store when using S3
-    gunConfig.store = null;
-  }
 
   if (storageConfig.disableRadisk) {
     loggers.server.info("📁 Radisk disabled via environment variable");
