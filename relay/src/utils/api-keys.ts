@@ -60,10 +60,25 @@ export class ApiKeysManager {
     this.gun = gun;
     this.relayPub = relayPub;
     this.relayUser = relayUser;
+
+    // Diagnostic logging
+    const userAuthenticated = relayUser && relayUser.is;
     loggers.server.info(
-      { relayPub },
+      {
+        relayPub,
+        userAuthenticated,
+        relayUserExists: !!relayUser,
+        relayUserIs: relayUser?.is ? 'authenticated' : 'not authenticated'
+      },
       "API Keys Manager initialized (using relay user space)"
     );
+
+    if (!userAuthenticated) {
+      loggers.server.warn(
+        { relayPub },
+        "⚠️ API Keys Manager initialized but relay user is NOT authenticated yet!"
+      );
+    }
   }
 
   /**
@@ -89,6 +104,28 @@ export class ApiKeysManager {
   async saveApiKey(keyData: Omit<ApiKey, "lastUsedAt">): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+        // Diagnostic: Check relay user authentication before saving
+        const isAuthenticated = this.relayUser && this.relayUser.is;
+        loggers.server.debug(
+          {
+            keyId: keyData.keyId,
+            name: keyData.name,
+            relayPub: this.relayPub,
+            userAuthenticated: isAuthenticated,
+            hashPreview: keyData.hash.substring(0, 16) + "..."
+          },
+          "💾 Attempting to save API key"
+        );
+
+        if (!isAuthenticated) {
+          loggers.server.error(
+            { keyId: keyData.keyId, relayPub: this.relayPub },
+            "❌ Cannot save API key - relay user is NOT authenticated!"
+          );
+          reject(new Error("Relay user is not authenticated"));
+          return;
+        }
+
         const keysNode = this.getUserSpaceKeysNode();
         const keyNode = keysNode.get(keyData.keyId);
 
@@ -105,13 +142,13 @@ export class ApiKeysManager {
           if (ack && "err" in ack && ack.err) {
             loggers.server.error(
               { err: ack.err, keyId: keyData.keyId },
-              "Failed to save API key to GunDB"
+              "❌ Failed to save API key to GunDB"
             );
             reject(new Error(`Failed to save API key: ${ack.err}`));
           } else {
             loggers.server.info(
-              { keyId: keyData.keyId, name: keyData.name },
-              "API key saved to relay user space"
+              { keyId: keyData.keyId, name: keyData.name, relayPub: this.relayPub },
+              "✅ API key saved to relay user space"
             );
             resolve();
           }
@@ -173,18 +210,37 @@ export class ApiKeysManager {
    */
   async validateApiKey(token: string): Promise<ApiKey | null> {
     if (!token || !token.startsWith("shogun-api-")) {
+      loggers.server.debug("❌ Invalid token format (must start with 'shogun-api-')");
       return null;
     }
 
     const tokenHash = hashApiKey(token);
+    const tokenPreview = token.substring(0, 20) + "...";
+    const hashPreview = tokenHash.substring(0, 16) + "...";
 
     return new Promise((resolve, reject) => {
       try {
+        // Diagnostic: Log validation attempt
+        loggers.server.debug(
+          {
+            tokenPreview,
+            hashPreview,
+            relayPub: this.relayPub,
+            publicNodePath: `~${this.relayPub}/api-keys`
+          },
+          "🔍 Attempting to validate API key"
+        );
+
         const keysNode = this.getPublicKeysNode();
         let found = false;
+        let keysChecked = 0;
 
         const timeout = setTimeout(() => {
           if (!found) {
+            loggers.server.warn(
+              { keysChecked, tokenPreview, relayPub: this.relayPub },
+              "⏱️ API key validation timeout - no matching key found"
+            );
             resolve(null);
           }
         }, 3000);
@@ -192,6 +248,20 @@ export class ApiKeysManager {
         keysNode.map().once((data: ApiKey | undefined, keyId: string) => {
           if (found) return;
           if (!data || typeof data !== "object" || keyId.startsWith("_")) return;
+
+          keysChecked++;
+
+          // Diagnostic: Log each key checked
+          loggers.server.debug(
+            {
+              keyId,
+              dataHash: data.hash?.substring(0, 16) + "...",
+              searchHash: hashPreview,
+              matches: data.hash === tokenHash,
+              keyName: data.name
+            },
+            `🔑 Checking API key #${keysChecked}`
+          );
 
           if (data.hash === tokenHash) {
             // Check expiration
