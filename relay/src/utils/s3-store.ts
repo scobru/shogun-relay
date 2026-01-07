@@ -17,6 +17,7 @@ import {
     HeadBucketCommand,
     CreateBucketCommand,
 } from "@aws-sdk/client-s3";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { loggers } from "./logger";
 
 const log = loggers.server;
@@ -74,6 +75,20 @@ class S3Store {
                 secretAccessKey: options.secretAccessKey,
             },
             forcePathStyle: true, // Required for MinIO and most S3-compatible services
+            // Limit concurrent connections to prevent socket exhaustion
+            requestHandler: new NodeHttpHandler({
+                connectionTimeout: 5000,
+                socketTimeout: 30000,
+                // Limit max sockets to prevent queue buildup
+                httpsAgent: {
+                    maxSockets: 25,
+                    keepAlive: true,
+                },
+                httpAgent: {
+                    maxSockets: 25,
+                    keepAlive: true,
+                },
+            }),
             ...(useSSL ? {} : { tls: false }),
         });
 
@@ -243,6 +258,47 @@ class S3Store {
                 log.error({ err }, "Error listing S3 objects");
                 cb(null); // Signal completion on error
             });
+    }
+
+    /**
+     * Get storage statistics from S3 bucket
+     * @returns Promise with bytes and files count
+     */
+    async getStorageStats(): Promise<{ bytes: number; files: number }> {
+        if (this.isClosed) {
+            return { bytes: 0, files: 0 };
+        }
+
+        try {
+            await this.ensureBucket();
+
+            let totalBytes = 0;
+            let fileCount = 0;
+            let continuationToken: string | undefined;
+
+            do {
+                const response = await this.client.send(
+                    new ListObjectsV2Command({
+                        Bucket: this.bucket,
+                        ContinuationToken: continuationToken,
+                    })
+                );
+
+                for (const obj of response.Contents || []) {
+                    if (obj.Key && obj.Size !== undefined) {
+                        fileCount++;
+                        totalBytes += obj.Size;
+                    }
+                }
+
+                continuationToken = response.NextContinuationToken;
+            } while (continuationToken);
+
+            return { bytes: totalBytes, files: fileCount };
+        } catch (err) {
+            log.error({ err }, "Failed to get storage stats from S3");
+            return { bytes: 0, files: 0 };
+        }
     }
 
     /**

@@ -182,6 +182,45 @@ class SQLiteStore {
   }
 
   /**
+   * Get storage statistics
+   * @returns Object with bytes and files count
+   */
+  getStorageStats(): { bytes: number; files: number } {
+    if (this.isClosed) {
+      return { bytes: 0, files: 0 };
+    }
+
+    try {
+      // Get file count
+      const countResult = this.db.prepare("SELECT COUNT(*) as count FROM radisk_files").get() as { count: number } | undefined;
+      const files = countResult?.count ?? 0;
+
+      // Get total data size (length of JSON strings stored)
+      const sizeResult = this.db.prepare("SELECT SUM(LENGTH(data)) as total FROM radisk_files").get() as { total: number | null } | undefined;
+      const bytes = sizeResult?.total ?? 0;
+
+      // Also get actual database file size
+      let dbFileSize = 0;
+      try {
+        const stats = fs.statSync(this.dbPath);
+        dbFileSize = stats.size;
+      } catch {
+        // Ignore if file not accessible
+      }
+
+      // Return the larger of: actual DB file size or data content size
+      // DB file size is more accurate as it includes SQLite overhead
+      return {
+        bytes: Math.max(bytes, dbFileSize),
+        files
+      };
+    } catch (err) {
+      log.error({ err }, "Failed to get storage stats from SQLite");
+      return { bytes: 0, files: 0 };
+    }
+  }
+
+  /**
    * Close database connection
    */
   close(): void {

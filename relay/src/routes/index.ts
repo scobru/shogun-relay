@@ -7,6 +7,7 @@ import fs from "fs";
 import multer from "multer";
 import FormData from "form-data";
 import { secureCompare, hashToken } from "../utils/security";
+import { getGunStorageStats } from "../utils/gun-storage-stats";
 // http import removed
 
 const __filename = fileURLToPath(import.meta.url);
@@ -357,10 +358,10 @@ export default (app: express.Application) => {
           details: err.message,
           fallback: hash
             ? {
-                publicGateway: `https://ipfs.io/ipfs/${hash}`,
-                cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${hash}`,
-                dweb: `https://dweb.link/ipfs/${hash}`,
-              }
+              publicGateway: `https://ipfs.io/ipfs/${hash}`,
+              cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${hash}`,
+              dweb: `https://dweb.link/ipfs/${hash}`,
+            }
             : undefined,
         });
       },
@@ -445,7 +446,7 @@ export default (app: express.Application) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "stats.html"));
   });
-  
+
   app.get("/charts", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "charts.html"));
@@ -671,10 +672,10 @@ export default (app: express.Application) => {
     }
     next();
   });
-  
+
   app.use(`${baseRoute}/api-keys`, apiKeysRouter);
   loggers.server.info(`✅ API Keys routes registered`);
-  
+
   // Route per Drive (always enabled, admin-only)
   // Initialize public links manager on EVERY drive request (middleware runs before router)
   // Route per Drive (always enabled, admin-only)
@@ -682,25 +683,25 @@ export default (app: express.Application) => {
   const driveInitMiddleware = async (req: Request, res: Response, next: NextFunction) => {
     // Delegate to the robust middleware exported from drive.ts
     try {
-        const { ensurePublicLinksInitialized } = await import("./drive");
-        await ensurePublicLinksInitialized(req, res, next);
+      const { ensurePublicLinksInitialized } = await import("./drive");
+      await ensurePublicLinksInitialized(req, res, next);
     } catch (err) {
-        loggers.server.error({ err }, "Error in driveInitMiddleware wrapper");
-        next();
+      loggers.server.error({ err }, "Error in driveInitMiddleware wrapper");
+      next();
     }
   };
-  
+
   // Apply initialization middleware to all drive routes
   app.use(`${baseRoute}/drive`, driveInitMiddleware);
   app.use(`${baseRoute}/drive`, driveRouter);
-  
+
   // Public endpoint for accessing files via share links (NO AUTH REQUIRED)
   // This uses the same initialization middleware to ensure manager is ready
   app.get(`${baseRoute}/drive/public/:linkId`, driveInitMiddleware, async (req: Request, res: Response) => {
     const { handlePublicLinkAccess } = await import("./drive");
     handlePublicLinkAccess(req, res);
   });
-  
+
   loggers.server.info(`✅ Drive routes registered`);
 
   // Route di test per verificare se le route sono registrate correttamente
@@ -721,8 +722,8 @@ export default (app: express.Application) => {
       adminPasswordLength: authConfig.adminPassword ? authConfig.adminPassword.length : 0,
       adminPasswordPreview: authConfig.adminPassword
         ? authConfig.adminPassword.substring(0, 4) +
-          "..." +
-          authConfig.adminPassword.substring(authConfig.adminPassword.length - 4)
+        "..." +
+        authConfig.adminPassword.substring(authConfig.adminPassword.length - 4)
         : "N/A",
       timestamp: Date.now(),
     });
@@ -940,8 +941,12 @@ export default (app: express.Application) => {
       const radataStats = getDirSize(radataDir);
       const torrentsStats = getDirSize(path.join(dataDir, "torrents"));
       const ipfsStats = getDirSize(path.join(dataDir, "ipfs"));
-      const gundbStats = getDirSize(path.join(dataDir, "gun"));
       const dealsStats = getDirSize(path.join(dataDir, "deals"));
+
+      // Get GunDB storage stats from the configured backend (sqlite, s3, or radisk)
+      // Pass the store instance if available for accurate stats
+      const gunStore = req.app.get("gunStore");
+      const gundbStats = await getGunStorageStats(gunStore);
 
       const totalBytes = dataStats.bytes + radataStats.bytes;
 
@@ -973,8 +978,11 @@ export default (app: express.Application) => {
             },
             gundb: {
               ...formatSize(gundbStats.bytes),
-              path: path.join(dataDir, "gun"),
+              backend: gundbStats.backend,
               files: gundbStats.files,
+              description: gundbStats.description,
+              ...(gundbStats.path ? { path: gundbStats.path } : {}),
+              ...(gundbStats.bucket ? { bucket: gundbStats.bucket, endpoint: gundbStats.endpoint } : {}),
             },
             deals: {
               ...formatSize(dealsStats.bytes),
@@ -1002,9 +1010,9 @@ export default (app: express.Application) => {
   app.get(`${baseRoute}/admin/config`, tokenAuthMiddleware, async (req: Request, res: Response) => {
     try {
       const { getAllConfig, HOT_RELOADABLE_KEYS, RESTART_REQUIRED_KEYS } = await import("../utils/runtime-config");
-      
+
       const config = getAllConfig();
-      
+
       // Group by category
       const grouped: Record<string, typeof config> = {};
       for (const item of config) {
@@ -1013,7 +1021,7 @@ export default (app: express.Application) => {
         }
         grouped[item.category].push(item);
       }
-      
+
       res.json({
         success: true,
         config: grouped,
@@ -1038,28 +1046,28 @@ export default (app: express.Application) => {
     try {
       const { setRuntimeValue, isHotReloadable, HOT_RELOADABLE_KEYS } = await import("../utils/runtime-config");
       const updates = req.body as Record<string, string>;
-      
+
       if (!updates || typeof updates !== 'object') {
         return res.status(400).json({
           success: false,
           error: "Request body must be an object with key-value pairs",
         });
       }
-      
+
       const results: Record<string, { success: boolean; error?: string }> = {};
       const successful: string[] = [];
       const failed: string[] = [];
-      
+
       for (const [key, value] of Object.entries(updates)) {
         if (!isHotReloadable(key)) {
-          results[key] = { 
-            success: false, 
-            error: `Key '${key}' is not hot-reloadable. Modify .env and restart server.` 
+          results[key] = {
+            success: false,
+            error: `Key '${key}' is not hot-reloadable. Modify .env and restart server.`
           };
           failed.push(key);
           continue;
         }
-        
+
         const success = setRuntimeValue(key as any, String(value));
         results[key] = { success };
         if (success) {
@@ -1068,7 +1076,7 @@ export default (app: express.Application) => {
           failed.push(key);
         }
       }
-      
+
       res.json({
         success: failed.length === 0,
         message: `Updated ${successful.length} config(s)${failed.length > 0 ? `, ${failed.length} failed` : ''}`,
@@ -1093,18 +1101,18 @@ export default (app: express.Application) => {
     try {
       const { updateEnvFile, isHotReloadable, requiresRestart } = await import("../utils/runtime-config");
       const updates = req.body as Record<string, string>;
-      
+
       if (!updates || typeof updates !== 'object') {
         return res.status(400).json({
           success: false,
           error: "Request body must be an object with key-value pairs",
         });
       }
-      
+
       // Identify which keys require restart
       const restartRequired: string[] = [];
       const hotReloadable: string[] = [];
-      
+
       for (const key of Object.keys(updates)) {
         if (requiresRestart(key)) {
           restartRequired.push(key);
@@ -1112,23 +1120,23 @@ export default (app: express.Application) => {
           hotReloadable.push(key);
         }
       }
-      
+
       const success = updateEnvFile(updates);
-      
+
       if (!success) {
         return res.status(500).json({
           success: false,
           error: "Failed to write to .env file",
         });
       }
-      
+
       res.json({
         success: true,
         message: ".env file updated",
         restartRequired: restartRequired.length > 0,
         restartRequiredKeys: restartRequired,
         hotReloadableKeys: hotReloadable,
-        warning: restartRequired.length > 0 
+        warning: restartRequired.length > 0
           ? `⚠️ Server restart required for: ${restartRequired.join(', ')}`
           : undefined,
       });
@@ -1149,7 +1157,7 @@ export default (app: express.Application) => {
   app.get(`${baseRoute}/admin/config/env`, tokenAuthMiddleware, async (req: Request, res: Response) => {
     try {
       const { readEnvFile, parseEnvFile } = await import("../utils/runtime-config");
-      
+
       const content = readEnvFile();
       if (content === null) {
         return res.status(404).json({
@@ -1157,9 +1165,9 @@ export default (app: express.Application) => {
           error: ".env file not found",
         });
       }
-      
+
       const parsed = parseEnvFile(content);
-      
+
       res.json({
         success: true,
         raw: content,

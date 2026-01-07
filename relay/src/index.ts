@@ -667,6 +667,8 @@ async function initializeServer() {
 
   // Store gun instance in express app for access from routes
   app.set("gunInstance", gun);
+  // Store the gun storage adapter for stats access
+  app.set("gunStore", store);
   // Start wormhole cleanup scheduler for orphaned transfer cleanup
   if (wormholeConfig.enabled) {
     startWormholeCleanup(gun);

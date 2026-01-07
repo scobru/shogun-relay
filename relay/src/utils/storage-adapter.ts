@@ -22,6 +22,7 @@ import {
     CreateBucketCommand,
     ListObjectsV2CommandOutput,
 } from "@aws-sdk/client-s3";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { driveConfig } from "../config/env-config";
 import { loggers } from "./logger";
 
@@ -385,6 +386,19 @@ export class MinioStorageAdapter implements IStorageAdapter {
                 secretAccessKey: minioConfig.secretKey,
             },
             forcePathStyle: true, // Required for MinIO
+            // Limit concurrent connections to prevent socket exhaustion
+            requestHandler: new NodeHttpHandler({
+                connectionTimeout: 5000,
+                socketTimeout: 30000,
+                httpsAgent: {
+                    maxSockets: 25,
+                    keepAlive: true,
+                },
+                httpAgent: {
+                    maxSockets: 25,
+                    keepAlive: true,
+                },
+            }),
         });
 
         loggers.server.info(
