@@ -1,4 +1,28 @@
 import { NavLink } from 'react-router-dom'
+import logoSvg from './logo.svg'
+
+// Using Lucide-style icon names for professional look
+const iconMap: Record<string, string> = {
+  status: '◉',
+  stats: '▤',
+  services: '◈',
+  files: '▢',
+  drive: '◫',
+  explore: '◎',
+  network: '◇',
+  chat: '◆',
+  registry: '▣',
+  deals: '◊',
+  x402: '▧',
+  torrents: '▥',
+  apiKeys: '◈',
+  charts: '▦',
+  visualGraph: '◬',
+  graphExplorer: '◎',
+  rpcConsole: '▩',
+  apiDocs: '▤',
+  settings: '◎',
+}
 
 interface NavItem {
   path: string
@@ -8,41 +32,33 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { path: '/', icon: '📊', label: 'Status', group: 'main' },
-  { path: '/stats', icon: '📈', label: 'Live Stats', group: 'main' },
-  { path: '/services', icon: '⚡', label: 'Services', group: 'main' },
-  { path: '/files', icon: '📁', label: 'Files', group: 'storage' },
-  { path: '/drive', icon: '💾', label: 'Drive', group: 'storage' },
-  { path: '/explore', icon: '🔍', label: 'Explore', group: 'storage' },
-  { path: '/network', icon: '🌐', label: 'Network', group: 'blockchain' },
-  { path: '/chat', icon: '💬', label: 'Chat', group: 'blockchain' },
-  { path: '/registry', icon: '🖥️', label: 'Registry', group: 'blockchain' },
-  { path: '/deals', icon: '💼', label: 'Deals', group: 'blockchain' },
-  { path: '/x402', icon: '💳', label: 'x402', group: 'blockchain' },
-  { path: '/torrents', icon: '📥', label: 'Torrents', group: 'blockchain' },
-  { path: '/api-keys', icon: '🔑', label: 'API Keys', group: 'tools' },
-  { path: '/charts', icon: '📉', label: 'Charts', group: 'tools' },
-  { path: '/visual-graph', icon: '🕸️', label: 'Visual Graph', group: 'tools' },
-  { path: '/graph-explorer', icon: '🔍', label: 'Graph Explorer', group: 'tools' },
-  { path: '/rpc-console', icon: '💻', label: 'RPC Console', group: 'tools' },
-  { path: '/api-docs', icon: '📄', label: 'API Docs', group: 'tools' },
-  { path: '/settings', icon: '⚙️', label: 'Settings', group: 'system' },
+  { path: '/', icon: iconMap.status, label: 'Status', group: 'main' },
+  { path: '/stats', icon: iconMap.stats, label: 'Live Stats', group: 'main' },
+  { path: '/services', icon: iconMap.services, label: 'Services', group: 'main' },
+  { path: '/files', icon: iconMap.files, label: 'Files', group: 'storage' },
+  { path: '/drive', icon: iconMap.drive, label: 'Drive', group: 'storage' },
+  { path: '/explore', icon: iconMap.explore, label: 'Explore', group: 'storage' },
+  { path: '/network', icon: iconMap.network, label: 'Network', group: 'blockchain' },
+  { path: '/chat', icon: iconMap.chat, label: 'Chat', group: 'blockchain' },
+  { path: '/registry', icon: iconMap.registry, label: 'Registry', group: 'blockchain' },
+  { path: '/deals', icon: iconMap.deals, label: 'Deals', group: 'blockchain' },
+  { path: '/x402', icon: iconMap.x402, label: 'x402', group: 'blockchain' },
+  { path: '/torrents', icon: iconMap.torrents, label: 'Torrents', group: 'blockchain' },
+  { path: '/api-keys', icon: iconMap.apiKeys, label: 'API Keys', group: 'tools' },
+  { path: '/charts', icon: iconMap.charts, label: 'Charts', group: 'tools' },
+  { path: '/visual-graph', icon: iconMap.visualGraph, label: 'Visual Graph', group: 'tools' },
+  { path: '/graph-explorer', icon: iconMap.graphExplorer, label: 'Graph Explorer', group: 'tools' },
+  { path: '/rpc-console', icon: iconMap.rpcConsole, label: 'RPC Console', group: 'tools' },
+  { path: '/api-docs', icon: iconMap.apiDocs, label: 'API Docs', group: 'tools' },
+  { path: '/settings', icon: iconMap.settings, label: 'Settings', group: 'system' },
 ]
 
 const groupLabels: Record<string, string> = {
-  main: 'Dashboard',
-  storage: 'Storage',
-  blockchain: 'Blockchain',
-  tools: 'Tools',
-  system: 'System'
-}
-
-const groupIcons: Record<string, string> = {
-  main: '🏠',
-  storage: '💿',
-  blockchain: '⛓️',
-  tools: '🛠️',
-  system: '⚙️'
+  main: 'DASHBOARD',
+  storage: 'STORAGE',
+  blockchain: 'BLOCKCHAIN',
+  tools: 'TOOLS',
+  system: 'SYSTEM'
 }
 
 function Sidebar() {
@@ -54,7 +70,7 @@ function Sidebar() {
       <aside className="bg-base-200 min-h-screen w-64 flex flex-col border-r border-base-300">
         {/* Logo */}
         <div className="p-4 flex items-center gap-3 bg-base-300">
-          <img src="./logo.svg" alt="Logo" className="w-10 h-10" />
+          <img src={logoSvg} alt="Shogun Relay" className="w-10 h-10" />
           <div>
             <span className="font-bold text-lg">Relay</span>
             <p className="text-xs text-base-content/60">Relay Dashboard</p>
@@ -64,12 +80,11 @@ function Sidebar() {
         {/* Navigation */}
         <ul className="menu menu-sm flex-1 p-2 gap-1 overflow-y-auto">
           {groups.map((group) => (
-            <li key={group} className="mt-2 first:mt-0">
-              <h2 className="menu-title flex items-center gap-2 text-xs uppercase tracking-wider opacity-60">
-                <span>{groupIcons[group]}</span>
+            <li key={group} className="mt-3 first:mt-0">
+              <h2 className="menu-title text-xs uppercase tracking-wider opacity-50 font-semibold">
                 {groupLabels[group]}
               </h2>
-              <ul className="ml-1">
+              <ul className="ml-0">
                 {navItems
                   .filter((item) => item.group === group)
                   .map((item) => (
@@ -77,11 +92,11 @@ function Sidebar() {
                       <NavLink
                         to={item.path}
                         className={({ isActive }: { isActive: boolean }) => 
-                          `flex items-center gap-2 rounded-lg transition-all ${isActive ? 'bg-primary text-primary-content font-medium' : 'hover:bg-base-300'}`
+                          `flex items-center gap-3 rounded-lg transition-all ${isActive ? 'bg-primary text-primary-content font-medium' : 'hover:bg-base-300'}`
                         }
                         end={item.path === '/'}
                       >
-                        <span className="text-base">{item.icon}</span>
+                        <span className="text-sm opacity-70 w-4 text-center">{item.icon}</span>
                         <span className="text-sm">{item.label}</span>
                       </NavLink>
                     </li>
@@ -99,8 +114,7 @@ function Sidebar() {
             rel="noopener noreferrer"
             className="btn btn-ghost btn-sm w-full justify-start gap-2 text-base-content/70"
           >
-            <span>📦</span>
-            <span className="text-xs">View on GitHub</span>
+            <span className="text-sm">GitHub</span>
           </a>
         </div>
       </aside>
