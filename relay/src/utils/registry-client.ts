@@ -189,8 +189,13 @@ export function createRegistryClient(
     throw new Error(`Registry not deployed on chain ${chainId}`);
   }
 
-  // Use RPC from config if not provided
-  const provider = new ethers.JsonRpcProvider(rpcUrl || config.rpc);
+  // Use RPC from config if not provided, with timeout to prevent hanging
+  const rpcEndpoint = rpcUrl || config.rpc;
+  const fetchRequest = new ethers.FetchRequest(rpcEndpoint);
+  fetchRequest.timeout = 15000; // 15 second timeout to prevent cascading hangs
+  const provider = new ethers.JsonRpcProvider(fetchRequest, chainId, {
+    staticNetwork: true, // Skip network detection to avoid initial timeout
+  });
   const sdk = new ShogunSDK({ provider, chainId });
   const relayRegistry = sdk.getRelayRegistry();
 
@@ -893,8 +898,13 @@ export function createStorageDealRegistryClient(
     throw new Error(`StorageDealRegistry not deployed on chain ${chainId}`);
   }
 
-  // Use RPC from config if not provided
-  const provider = new ethers.JsonRpcProvider(rpcUrl || config.rpc);
+  // Use RPC from config if not provided, with timeout to prevent hanging
+  const rpcEndpoint = rpcUrl || config.rpc;
+  const fetchRequest = new ethers.FetchRequest(rpcEndpoint);
+  fetchRequest.timeout = 15000; // 15 second timeout to prevent cascading hangs
+  const provider = new ethers.JsonRpcProvider(fetchRequest, chainId, {
+    staticNetwork: true, // Skip network detection to avoid initial timeout
+  });
   const sdk = new ShogunSDK({ provider, chainId });
   const storageDealRegistry = sdk.getStorageDealRegistry();
 

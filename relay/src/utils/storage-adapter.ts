@@ -386,16 +386,16 @@ export class MinioStorageAdapter implements IStorageAdapter {
                 secretAccessKey: minioConfig.secretKey,
             },
             forcePathStyle: true, // Required for MinIO
-            // Limit concurrent connections to prevent socket exhaustion
+            // Increase concurrent connections to handle high load
             requestHandler: new NodeHttpHandler({
                 connectionTimeout: 5000,
                 socketTimeout: 30000,
                 httpsAgent: {
-                    maxSockets: 25,
+                    maxSockets: 100,
                     keepAlive: true,
                 },
                 httpAgent: {
-                    maxSockets: 25,
+                    maxSockets: 100,
                     keepAlive: true,
                 },
             }),

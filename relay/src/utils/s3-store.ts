@@ -79,13 +79,13 @@ class S3Store {
             requestHandler: new NodeHttpHandler({
                 connectionTimeout: 5000,
                 socketTimeout: 30000,
-                // Limit max sockets to prevent queue buildup
+                // Increase max sockets to handle GunDB radisk load
                 httpsAgent: {
-                    maxSockets: 25,
+                    maxSockets: 100,
                     keepAlive: true,
                 },
                 httpAgent: {
-                    maxSockets: 25,
+                    maxSockets: 100,
                     keepAlive: true,
                 },
             }),
