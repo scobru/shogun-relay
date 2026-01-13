@@ -30,23 +30,28 @@ function Deals() {
   const [activeTab, setActiveTab] = useState<'stats' | 'active' | 'all'>('stats')
 
   useEffect(() => {
-    if (isAuthenticated) { fetchStats(); fetchDeals() }
+    if (isAuthenticated) { fetchDeals() }
   }, [isAuthenticated])
-
-  const fetchStats = async () => {
-    try {
-      const res = await fetch('/api/v1/deals/stats', { headers: getAuthHeaders() })
-      const data = await res.json()
-      if (data.success) setStats(data.stats)
-    } catch (error) { console.error('Failed to fetch deal stats:', error) }
-  }
 
   const fetchDeals = async () => {
     setLoading(true)
     try {
       const res = await fetch('/api/v1/deals/relay/active', { headers: getAuthHeaders() })
       const data = await res.json()
-      if (data.success) setDeals(data.activeDeals || [])
+      if (data.success) {
+        setDeals(data.activeDeals || [])
+        // Use stats from the same endpoint to ensure consistency
+        if (data.stats) {
+          setStats({
+            total: data.stats.total || 0,
+            active: data.stats.active || 0,
+            completed: data.stats.completed || 0,
+            expired: data.stats.expired || 0,
+            totalSizeMB: data.stats.totalSizeMB || 0,
+            totalRevenue: data.stats.totalRevenue || 0,
+          })
+        }
+      }
     } catch (error) { console.error('Failed to fetch deals:', error) }
     finally { setLoading(false) }
   }
@@ -67,7 +72,7 @@ function Deals() {
             <h2 className="card-title">💼 Storage Deals</h2>
             <p className="text-base-content/60">Manage and monitor decentralized storage agreements</p>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => { fetchStats(); fetchDeals() }}>
+          <button className="btn btn-primary btn-sm" onClick={() => { fetchDeals() }}>
             🔄 Refresh
           </button>
         </div>

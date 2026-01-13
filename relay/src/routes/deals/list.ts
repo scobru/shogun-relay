@@ -265,6 +265,7 @@ router.get("/by-client/:address", async (req: Request, res: Response) => {
  * GET /api/v1/deals/relay/active
  *
  * Get active deals for this relay.
+ * Includes deals from both GunDB and on-chain registry.
  * Admin only.
  */
 router.get("/relay/active", async (req: Request, res: Response) => {
@@ -283,14 +284,97 @@ router.get("/relay/active", async (req: Request, res: Response) => {
       return res.status(503).json({ success: false, error: "Relay not initialized" });
     }
 
-    const deals = await StorageDeals.getActiveDealsForRelay(gun, relayPub);
-    const stats = StorageDeals.getDealStats(deals);
+    // Get deals from GunDB
+    const gunDeals = await StorageDeals.getActiveDealsForRelay(gun, relayPub);
+    const dealMap = new Map<string, StorageDeals.Deal>();
+
+    // Add GunDB deals to map
+    for (const deal of gunDeals) {
+      if (deal.id) {
+        dealMap.set(deal.id, deal);
+      }
+    }
+
+    // Also fetch deals from on-chain registry if configured
+    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+    const REGISTRY_CHAIN_ID = registryConfig.chainId;
+
+    if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
+      try {
+        const { createStorageDealRegistryClient, createRegistryClientWithSigner } =
+          await import("../../utils/registry-client.js");
+        const registryClient = createRegistryClientWithSigner(
+          RELAY_PRIVATE_KEY,
+          REGISTRY_CHAIN_ID
+        );
+        const relayAddress = registryClient.wallet.address;
+        const storageDealRegistryClient = createStorageDealRegistryClient(REGISTRY_CHAIN_ID);
+
+        const onChainDeals = await storageDealRegistryClient.getRelayDeals(relayAddress);
+
+        // Convert on-chain deals to GunDB format and add to map
+        for (const onChainDeal of onChainDeals) {
+          if (onChainDeal.active && new Date(onChainDeal.expiresAt) > new Date()) {
+            const deal: StorageDeals.Deal = {
+              id: onChainDeal.dealId,
+              version: 1,
+              cid: onChainDeal.cid,
+              clientAddress: onChainDeal.client,
+              providerPub: relayAddress, // Use relay address as providerPub for on-chain deals
+              tier: "standard",
+              sizeMB: onChainDeal.sizeMB,
+              durationDays: 0,
+              pricing: {
+                tier: "standard",
+                sizeMB: onChainDeal.sizeMB,
+                durationDays: 0,
+                months: 0,
+                pricePerMBMonth: 0,
+                basePrice: 0,
+                storageOverheadPercent: 0,
+                replicationFactor: 1,
+                totalPriceUSDC: parseFloat(String(onChainDeal.priceUSDC || 0)),
+                features: {
+                  erasureCoding: false,
+                  slaGuarantee: false,
+                },
+              },
+              createdAt: new Date(onChainDeal.createdAt).getTime(),
+              activatedAt: new Date(onChainDeal.createdAt).getTime(),
+              expiresAt: new Date(onChainDeal.expiresAt).getTime(),
+              paymentRequired: 0,
+              paymentVerified: true,
+              erasureCoding: false,
+              replicationFactor: 1,
+              replicas: {},
+              replicaCount: 0,
+              status: StorageDeals.DEAL_STATUS.ACTIVE,
+            };
+
+            // Only add if not already in map (GunDB deals take precedence)
+            if (!dealMap.has(deal.id)) {
+              dealMap.set(deal.id, deal);
+            }
+          }
+        }
+      } catch (onChainError) {
+        // Log error but continue - on-chain is optional
+        loggers.server.warn(
+          { err: onChainError },
+          "Failed to fetch on-chain deals for relay/active endpoint"
+        );
+      }
+    }
+
+    // Convert map to array and calculate stats
+    const allDeals = Array.from(dealMap.values());
+    const stats = StorageDeals.getDealStats(allDeals);
 
     res.json({
       success: true,
       relayPub,
       stats,
-      activeDeals: deals,
+      activeDeals: allDeals,
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
