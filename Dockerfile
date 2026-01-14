@@ -3,8 +3,8 @@
 
 FROM node:20-slim
 # delete cache
-ARG CACHEBUST=2
-
+ARG CACHE_BUST
+RUN echo "Cache bust: $CACHE_BUST"
 # =============================================================================
 # BUILD ARGUMENTS (passed by CapRover or docker build)
 # =============================================================================
@@ -134,7 +134,7 @@ ARG CORS_ORIGINS
 ARG CORS_CREDENTIALS
 ARG STRICT_SESSION_IP
 
-# --- LocalTunnel Server ---
+
 
 
 # =============================================================================
