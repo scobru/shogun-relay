@@ -15,12 +15,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
-    "paths": {
-      "react": ["../../../node_modules/react"],
-      "react-dom": ["../../../node_modules/react-dom"],
-      "react-router-dom": ["../../../node_modules/react-router-dom"]
-    }
+    "baseUrl": "."
   },
   "include": ["src"]
 }

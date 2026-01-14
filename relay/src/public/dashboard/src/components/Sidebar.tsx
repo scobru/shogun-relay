@@ -38,12 +38,12 @@ const navItems: NavItem[] = [
   { path: '/files', icon: iconMap.files, label: 'Files', group: 'storage' },
   { path: '/drive', icon: iconMap.drive, label: 'Drive', group: 'storage' },
   { path: '/explore', icon: iconMap.explore, label: 'Explore', group: 'storage' },
-  { path: '/network', icon: iconMap.network, label: 'Network', group: 'blockchain' },
-  { path: '/chat', icon: iconMap.chat, label: 'Chat', group: 'blockchain' },
-  { path: '/registry', icon: iconMap.registry, label: 'Registry', group: 'blockchain' },
+  { path: '/network', icon: iconMap.network, label: 'Network', group: 'network' },
+  { path: '/chat', icon: iconMap.chat, label: 'Chat', group: 'network' },
+  { path: '/torrents', icon: iconMap.torrents, label: 'Torrents', group: 'network' },
   { path: '/deals', icon: iconMap.deals, label: 'Deals', group: 'blockchain' },
   { path: '/x402', icon: iconMap.x402, label: 'x402', group: 'blockchain' },
-  { path: '/torrents', icon: iconMap.torrents, label: 'Torrents', group: 'blockchain' },
+  { path: '/registry', icon: iconMap.registry, label: 'Registry', group: 'registry' },
   { path: '/api-keys', icon: iconMap.apiKeys, label: 'API Keys', group: 'tools' },
   { path: '/charts', icon: iconMap.charts, label: 'Charts', group: 'tools' },
   { path: '/visual-graph', icon: iconMap.visualGraph, label: 'Visual Graph', group: 'tools' },
@@ -56,13 +56,15 @@ const navItems: NavItem[] = [
 const groupLabels: Record<string, string> = {
   main: 'DASHBOARD',
   storage: 'STORAGE',
+  network: 'NETWORK',
   blockchain: 'BLOCKCHAIN',
+  registry: 'REGISTRY',
   tools: 'TOOLS',
   system: 'SYSTEM'
 }
 
 function Sidebar() {
-  const groups = ['main', 'storage', 'blockchain', 'tools', 'system']
+  const groups = ['main', 'storage', 'network', 'blockchain', 'registry', 'tools', 'system']
 
   return (
     <div className="drawer-side z-40">

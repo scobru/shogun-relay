@@ -11,14 +11,27 @@ interface ReputationEntry {
   uptimePercent?: number; proofsSuccessful?: number; proofsTotal?: number
 }
 
-interface RegistryParams { chainId?: string; registryAddress?: string; minStake?: string }
+interface GunPeerEntry {
+  pubKey: string
+  alias?: string | null
+  lastSeen?: number
+  type?: string
+  torrentsCount?: number
+}
+
+interface GunRelayEntry {
+  host: string
+  endpoint?: string | null
+  lastSeen?: number
+}
+
 interface DealStats { totalDeals?: number; activeDeals?: number; totalSizeMB?: number; totalRevenueUSDC?: number }
 
 function Network() {
   const [stats, setStats] = useState<NetworkStats>({})
   const [leaderboard, setLeaderboard] = useState<ReputationEntry[]>([])
-  const [registry, setRegistry] = useState<RegistryParams>({})
-  const [registeredRelays, setRegisteredRelays] = useState<number>(0)
+  const [gunPeers, setGunPeers] = useState<GunPeerEntry[]>([])
+  const [gunRelays, setGunRelays] = useState<GunRelayEntry[]>([])
   const [dealStats, setDealStats] = useState<DealStats>({})
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -42,11 +55,11 @@ function Network() {
     setLoading(true)
     try {
       // Execute all API calls in parallel for faster loading
-      const [statsResult, repResult, regResult, relaysResult, dealsResult] = await Promise.allSettled([
+      const [statsResult, repResult, peersResult, relaysResult, dealsResult] = await Promise.allSettled([
         fetch('/api/v1/network/stats').then(r => r.json()),
         fetch('/api/v1/network/reputation?limit=20').then(r => r.json()),
-        fetch('/api/v1/registry/params').then(r => r.json()),
-        fetch('/api/v1/network/onchain/relays?chainId=84532').then(r => r.json()),
+        fetch('/api/v1/network/peers?maxAge=3600000').then(r => r.json()),
+        fetch('/api/v1/network/relays?maxAge=300000').then(r => r.json()),
         fetch('/api/v1/deals/stats').then(r => r.json())
       ])
 
@@ -57,15 +70,15 @@ function Network() {
       if (repResult.status === 'fulfilled' && repResult.value.success && repResult.value.leaderboard) {
         setLeaderboard(repResult.value.leaderboard)
       }
-      if (regResult.status === 'fulfilled' && regResult.value.success) {
-        setRegistry({ 
-          chainId: regResult.value.chainId, 
-          registryAddress: regResult.value.registryAddress, 
-          minStake: regResult.value.params?.minStake 
-        })
+      if (peersResult.status === 'fulfilled' && peersResult.value.success && Array.isArray(peersResult.value.peers)) {
+        setGunPeers(peersResult.value.peers)
+      } else {
+        setGunPeers([])
       }
-      if (relaysResult.status === 'fulfilled' && relaysResult.value.success) {
-        setRegisteredRelays(relaysResult.value.relayCount || 0)
+      if (relaysResult.status === 'fulfilled' && relaysResult.value.success && Array.isArray(relaysResult.value.relays)) {
+        setGunRelays(relaysResult.value.relays)
+      } else {
+        setGunRelays([])
       }
       if (dealsResult.status === 'fulfilled' && dealsResult.value.success && dealsResult.value.stats) {
         setDealStats(dealsResult.value.stats)
@@ -81,6 +94,28 @@ function Network() {
 
   const storageGB = (stats.totalStorageBytes || 0) / (1024 * 1024 * 1024)
   const storageMB = stats.totalStorageMB || (stats.totalStorageBytes || 0) / (1024 * 1024)
+
+  const formatTimeAgo = (ts?: number) => {
+    if (!ts) return '-'
+    const deltaMs = Date.now() - ts
+    if (deltaMs < 0) return 'now'
+    const s = Math.floor(deltaMs / 1000)
+    if (s < 60) return `${s}s ago`
+    const m = Math.floor(s / 60)
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    const d = Math.floor(h / 24)
+    return `${d}d ago`
+  }
+
+  const recentPeers = [...gunPeers]
+    .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0))
+    .slice(0, 6)
+
+  const recentRelays = [...gunRelays]
+    .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0))
+    .slice(0, 6)
 
   return (
     <div className="flex flex-col gap-6 max-w-6xl">
@@ -101,10 +136,82 @@ function Network() {
         </div>
       </div>
 
+      {/* GunDB Info */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+          <h2 className="card-title">🧩 GunDB Info</h2>
+          <div className="stats stats-vertical lg:stats-horizontal w-full">
+            <div className="stat">
+              <div className="stat-title">Peers (mules)</div>
+              <div className="stat-value text-primary">{formatNumber(gunPeers.length)}</div>
+              <div className="stat-desc">seen last 1h</div>
+            </div>
+            <div className="stat">
+              <div className="stat-title">Relays (discovered)</div>
+              <div className="stat-value text-secondary">{formatNumber(gunRelays.length)}</div>
+              <div className="stat-desc">seen last 5m</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+            <div className="bg-base-200 p-4 rounded-lg">
+              <div className="font-semibold mb-2">Recent peers</div>
+              {loading ? (
+                <div className="flex justify-center p-2"><span className="loading loading-spinner"></span></div>
+              ) : recentPeers.length === 0 ? (
+                <div className="text-sm text-base-content/60">No peers found</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="table table-xs">
+                    <thead>
+                      <tr><th>Alias</th><th>Type</th><th>Last seen</th></tr>
+                    </thead>
+                    <tbody>
+                      {recentPeers.map((p) => (
+                        <tr key={p.pubKey}>
+                          <td className="font-mono text-xs">{p.alias || p.pubKey.slice(0, 10) + '…'}</td>
+                          <td className="text-xs">{p.type || '-'}</td>
+                          <td className="text-xs">{formatTimeAgo(p.lastSeen)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-base-200 p-4 rounded-lg">
+              <div className="font-semibold mb-2">Recent relays</div>
+              {loading ? (
+                <div className="flex justify-center p-2"><span className="loading loading-spinner"></span></div>
+              ) : recentRelays.length === 0 ? (
+                <div className="text-sm text-base-content/60">No relays found</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="table table-xs">
+                    <thead>
+                      <tr><th>Host</th><th>Last seen</th></tr>
+                    </thead>
+                    <tbody>
+                      {recentRelays.map((r) => (
+                        <tr key={r.host}>
+                          <td className="font-mono text-xs">{r.host}</td>
+                          <td className="text-xs">{formatTimeAgo(r.lastSeen)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Reputation Leaderboard */}
       <div className="card bg-base-100 shadow">
         <div className="card-body">
-          <h2 className="card-title">⭐ Reputation Leaderboard</h2>
+          <h2 className="card-title">⭐ GunDB Reputation Leaderboard</h2>
           {loading ? (
             <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>
           ) : leaderboard.length === 0 ? (
@@ -114,7 +221,7 @@ function Network() {
               <table className="table table-zebra">
                 <thead><tr><th>Rank</th><th>Relay Host</th><th>Score</th><th>Tier</th><th>Uptime</th><th>Proofs</th></tr></thead>
                 <tbody>
-                  {leaderboard.map((relay, i) => {
+                  {leaderboard.map((relay: ReputationEntry, i: number) => {
                     const score = relay.calculatedScore?.total || 0
                     const tier = getTier(score)
                     return (
@@ -137,19 +244,6 @@ function Network() {
               </table>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Registry Information */}
-      <div className="card bg-base-100 shadow">
-        <div className="card-body">
-          <h2 className="card-title">📋 Registry Information</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-            <div className="bg-base-200 p-4 rounded-lg"><div className="text-sm text-base-content/60">Chain ID</div><div className="font-bold">{registry.chainId || '-'}</div></div>
-            <div className="bg-base-200 p-4 rounded-lg"><div className="text-sm text-base-content/60">Registry</div><div className="font-mono text-xs">{registry.registryAddress ? `${registry.registryAddress.substring(0, 10)}...` : '-'}</div></div>
-            <div className="bg-base-200 p-4 rounded-lg"><div className="text-sm text-base-content/60">Min Stake</div><div className="font-bold">{registry.minStake || '-'}</div></div>
-            <div className="bg-base-200 p-4 rounded-lg"><div className="text-sm text-base-content/60">Registered Relays</div><div className="font-bold text-primary">{formatNumber(registeredRelays)}</div></div>
-          </div>
         </div>
       </div>
 
