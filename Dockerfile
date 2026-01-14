@@ -357,8 +357,10 @@ COPY relay/ /app/relay/
 
 # Build React Dashboard (SPA) using relay's package.json
 # Vite and TypeScript are in devDependencies, so we need them installed
+# Run vite directly from node_modules to avoid npx version conflicts
 RUN echo "🔨 Building React Dashboard..." && \
-    npm run build:dashboard && \
+    cd src/public/dashboard && \
+    ../../../node_modules/.bin/vite build && \
     echo "✅ Dashboard built successfully" || \
     echo "⚠️ Dashboard build failed - check logs"
 
