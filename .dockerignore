@@ -71,4 +71,7 @@ test/
 tests/
 __tests__/
 *.test.js
-*.spec.js 
+*.spec.js
+
+# Built dashboard (rebuild in Docker)
+relay/src/public/dashboard/dist/

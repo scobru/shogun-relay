@@ -361,8 +361,9 @@ COPY relay/ /app/relay/
 RUN echo "🔨 Building React Dashboard..." && \
     cd src/public/dashboard && \
     ../../../node_modules/.bin/vite build && \
-    echo "✅ Dashboard built successfully" || \
-    echo "⚠️ Dashboard build failed - check logs"
+    echo "✅ Dashboard built successfully" && \
+    ls -la dist/ && \
+    test -f dist/index.html || (echo "❌ Dashboard build verification failed - dist/index.html not found" && exit 1)
 
 # Prune devDependencies to reduce image size
 RUN npm prune --omit=dev
