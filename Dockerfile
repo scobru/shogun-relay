@@ -332,7 +332,7 @@ RUN dos2unix /app/docker/init-ipfs.sh \
     && cp /app/docker/relay.env /app/relay/.env
 
 # Cache bust for relay copy - change this value to force rebuild
-ARG RELAY_CACHE_BUST=v4
+ARG RELAY_CACHE_BUST=v5
 RUN echo "Relay cache bust: $RELAY_CACHE_BUST"
 
 # Copy ALL relay source files first (before npm install)
@@ -399,10 +399,16 @@ RUN chown -R node:node /app || true \
     && chown -R node:node /app/relay/holster-data || true \
     && chown -R node:node /app/keys || true \
     && chown -R ipfs:ipfs /data/ipfs || true \
-    && chmod 755 /app/relay/src/public || true \
+    && chmod -R 755 /app/relay/src/public || true \
     && chmod 755 /app/relay/data || true \
     && chmod 755 /app/relay/holster-data || true \
     && chmod 755 /app/keys || true
+
+# Final verification - ensure dashboard is accessible
+RUN echo "🔍 Final dashboard verification..." && \
+    ls -la /app/relay/src/public/dashboard/dist/ && \
+    cat /app/relay/src/public/dashboard/dist/index.html | head -5 && \
+    echo "✅ Dashboard files verified and readable"
 
 # Expose ports
 # 8765 = Relay server, 5001 = IPFS API, 8080 = IPFS Gateway, 4001 = IPFS Swarm
