@@ -716,4 +716,16 @@ router.post("/deal/grief", async (req: Request, res: Response) => {
   }
 });
 
+// Log all registered routes for debugging
+if (process.env.NODE_ENV !== "production") {
+  const routes: string[] = [];
+  router.stack.forEach((middleware: any) => {
+    if (middleware.route) {
+      const methods = Object.keys(middleware.route.methods).join(",").toUpperCase();
+      routes.push(`${methods} ${middleware.route.path}`);
+    }
+  });
+  loggers.registry.debug({ routes }, "Registry routes registered");
+}
+
 export default router;
