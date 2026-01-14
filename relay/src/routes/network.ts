@@ -482,7 +482,7 @@ router.get("/stats", async (req, res) => {
 
           // Try to get IPFS stats from local node as fallback
           try {
-            const repoStats = await ipfsRequest("/api/v0/repo/stat?size-only=true");
+            const repoStats = await ipfsRequest("/api/v0/repo/stat?size-only=true&human=false");
             if (repoStats && typeof repoStats === "object") {
               let repoSize = 0;
               if ("RepoSize" in repoStats) {
@@ -539,7 +539,7 @@ router.get("/stats", async (req, res) => {
             (!currentRelayData.pulse.ipfs || !currentRelayData.pulse.ipfs.repoSize)
           ) {
             try {
-              const repoStats = await ipfsRequest("/api/v0/repo/stat?size-only=true");
+              const repoStats = await ipfsRequest("/api/v0/repo/stat?size-only=true&human=false");
               if (repoStats && typeof repoStats === "object") {
                 let repoSize = 0;
                 if ("RepoSize" in repoStats) {
@@ -801,9 +801,12 @@ router.get("/stats", async (req, res) => {
     // STEP 4: If pulse data is missing/old, try to sync directly from IPFS for this relay
     if (stats.totalStorageBytes === 0 && stats.totalPins === 0) {
       loggers.server.info(`📊 Pulse data missing/old, syncing directly from IPFS...`);
+
+      // Try to get repo stats first
+      let repoStatsSucceeded = false;
       try {
-        // Get IPFS repo stats
-        const repoStats = await ipfsRequest("/api/v0/repo/stat?size-only=true");
+        // Get IPFS repo stats with both parameters to avoid parsing errors
+        const repoStats = await ipfsRequest("/api/v0/repo/stat?size-only=true&human=false");
         if (repoStats && typeof repoStats === "object") {
           // Try multiple field names for RepoSize - using safeParseNumber to handle empty values
           let repoSize = 0;
@@ -816,10 +819,16 @@ router.get("/stats", async (req, res) => {
           if (repoSize > 0) {
             stats.totalStorageBytes += repoSize;
             loggers.server.info({ repoSize }, `   ✅ IPFS repo size: ${repoSize} bytes`);
+            repoStatsSucceeded = true;
           }
         }
+      } catch (ipfsError) {
+        // repo/stat failed, will try to get pin count as fallback
+        loggers.server.debug({ err: ipfsError }, `   ⚠️ repo/stat failed, trying pin count fallback`);
+      }
 
-        // Get pin count
+      // Get pin count (this usually works even when repo/stat fails)
+      try {
         const pinLs = await ipfsRequest("/api/v0/pin/ls?type=recursive");
         if (pinLs && typeof pinLs === "object" && "Keys" in pinLs) {
           const keys = (pinLs as { Keys?: Record<string, any> }).Keys;
@@ -831,9 +840,10 @@ router.get("/stats", async (req, res) => {
             );
           }
         }
-      } catch (ipfsError) {
-        const errorMessage = ipfsError instanceof Error ? ipfsError.message : String(ipfsError);
-        loggers.server.warn({ err: ipfsError }, `   ⚠️ Error syncing from IPFS: ${errorMessage}`);
+      } catch (pinError) {
+        if (!repoStatsSucceeded) {
+          loggers.server.warn(`   ⚠️ IPFS sync failed (both repo/stat and pin/ls). IPFS may be starting up.`);
+        }
       }
     }
 

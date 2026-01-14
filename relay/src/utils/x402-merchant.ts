@@ -1422,7 +1422,7 @@ export class X402Merchant {
       const requestOptions: any = {
         hostname: url.hostname,
         port: url.port || (isHttps ? 443 : 5001),
-        path: "/api/v0/repo/stat?size-only=true",
+        path: "/api/v0/repo/stat?size-only=true&human=false",
         method: "POST",
         headers: {
           "Content-Length": "0",

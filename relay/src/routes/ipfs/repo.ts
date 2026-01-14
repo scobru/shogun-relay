@@ -368,7 +368,7 @@ router.get("/repo/stat", adminOrApiKeyAuthMiddleware, async (req, res) => {
       const storageRequestOptions: IpfsRequestOptions = {
         hostname: "127.0.0.1",
         port: 5001,
-        path: "/api/v0/repo/stat?size-only=true",
+        path: "/api/v0/repo/stat?size-only=true&human=false",
         method: "POST",
         headers: { "Content-Length": "0" },
       };
