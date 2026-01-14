@@ -331,6 +331,10 @@ RUN dos2unix /app/docker/init-ipfs.sh \
     && chmod +x /usr/local/bin/entrypoint.sh \
     && cp /app/docker/relay.env /app/relay/.env
 
+# Cache bust for relay copy - change this value to force rebuild
+ARG RELAY_CACHE_BUST=v2
+RUN echo "Relay cache bust: $RELAY_CACHE_BUST"
+
 # Copy ALL relay source files first (before npm install)
 # This ensures node_modules won't be overwritten by a subsequent COPY
 COPY relay/ /app/relay/
@@ -338,8 +342,9 @@ WORKDIR /app/relay
 
 # Remove package-lock.json to avoid cross-platform issues with native binaries (rollup, esbuild)
 # The lock file from Windows includes Windows-specific optional deps that break Linux builds
-# Also remove any local node_modules that might have been copied
-RUN rm -f package-lock.json && rm -rf node_modules
+# Also remove any local node_modules that might have been copied (despite .dockerignore)
+RUN rm -f package-lock.json && rm -rf node_modules && \
+    echo "Cleaned up: node_modules and package-lock.json removed"
 
 # Install ALL dependencies (including devDependencies for dashboard build)
 RUN npm install
