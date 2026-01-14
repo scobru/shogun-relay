@@ -195,11 +195,11 @@ export const config = {
 
     // Relay private key for on-chain operations (PRIVATE_KEY is fallback)
     // NOTE: Use getRelayPrivateKey() to get fresh value instead of this cached property
-    relayPrivateKey: process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY,
+    relayPrivateKey: process.env.RELAY_PRIVATE_KEY,
 
     // Dynamic getter for relay private key to avoid caching issues
     getRelayPrivateKey: (): string | undefined => {
-      return process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY;
+      return process.env.RELAY_PRIVATE_KEY;
     },
   },
 
@@ -244,7 +244,7 @@ export const config = {
 
     // Payment configuration
     payToAddress: process.env.X402_PAY_TO_ADDRESS,
-    privateKey: process.env.X402_PRIVATE_KEY || process.env.PRIVATE_KEY,
+    privateKey: process.env.X402_PRIVATE_KEY,
     facilitatorUrl: process.env.X402_FACILITATOR_URL,
     facilitatorApiKey: process.env.X402_FACILITATOR_API_KEY,
     settlementMode: process.env.X402_SETTLEMENT_MODE as "facilitator" | "direct" | undefined,

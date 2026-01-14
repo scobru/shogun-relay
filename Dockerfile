@@ -67,7 +67,6 @@ ARG HOLSTER_RELAY_STORAGE_PATH
 ARG HOLSTER_MAX_CONNECTIONS
 
 # --- Blockchain/Wallet (shared) ---
-ARG PRIVATE_KEY
 ARG RELAY_PRIVATE_KEY
 
 # --- Global RPC Configuration ---
