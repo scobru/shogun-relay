@@ -332,7 +332,7 @@ RUN dos2unix /app/docker/init-ipfs.sh \
     && cp /app/docker/relay.env /app/relay/.env
 
 # Cache bust for relay copy - change this value to force rebuild
-ARG RELAY_CACHE_BUST=v2
+ARG RELAY_CACHE_BUST=v3
 RUN echo "Relay cache bust: $RELAY_CACHE_BUST"
 
 # Copy ALL relay source files first (before npm install)
@@ -347,7 +347,8 @@ RUN rm -f package-lock.json && rm -rf node_modules && \
     echo "Cleaned up: node_modules and package-lock.json removed"
 
 # Install ALL dependencies (including devDependencies for dashboard build)
-RUN npm install
+# Force include dev dependencies even if NODE_ENV=production is set
+RUN NODE_ENV=development npm install --include=dev
 
 # Build shogun-contracts SDK if needed (for local installations)
 # This ensures the SDK is compiled even if shogun-contracts is installed locally
