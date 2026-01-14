@@ -23,7 +23,15 @@ const router: Router = express.Router();
 
 // Get chain configuration from environment
 const REGISTRY_CHAIN_ID: number = registryConfig.chainId;
-const RELAY_PRIVATE_KEY: string | undefined = registryConfig.relayPrivateKey;
+
+/**
+ * Get the relay private key dynamically to avoid caching issues.
+ * This ensures that if the private key is changed and the server is restarted,
+ * the new key is used instead of a cached value.
+ */
+function getRelayPrivateKey(): string | undefined {
+  return process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY;
+}
 
 /**
  * GET /api/v1/registry/status
@@ -35,7 +43,8 @@ router.get("/status", async (req: Request, res: Response) => {
     const { getConfigByChainId } = await import("shogun-contracts-sdk");
     const config = getConfigByChainId(REGISTRY_CHAIN_ID);
 
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.json({
         success: true,
         registered: false,
@@ -46,7 +55,7 @@ router.get("/status", async (req: Request, res: Response) => {
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
     const relayAddress: string = client.wallet.address;
     const info = await client.getRelayInfo(relayAddress);
 
@@ -97,14 +106,15 @@ router.get("/status", async (req: Request, res: Response) => {
  */
 router.get("/balance", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
     const relayAddress: string = client.wallet.address;
 
     const [ethBalance, usdcBalance] = await Promise.all([
@@ -160,7 +170,8 @@ router.get("/params", async (req: Request, res: Response) => {
  */
 router.post("/register", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
@@ -176,7 +187,7 @@ router.post("/register", async (req: Request, res: Response) => {
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
 
     // Check if already registered
     const existing = await client.getRelayInfo(client.wallet.address);
@@ -212,7 +223,8 @@ router.post("/register", async (req: Request, res: Response) => {
  */
 router.post("/update", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
@@ -228,7 +240,7 @@ router.post("/update", async (req: Request, res: Response) => {
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
     const result = await client.updateRelay(newEndpoint || "", newGunPubKey || "");
 
     res.json({
@@ -248,7 +260,8 @@ router.post("/update", async (req: Request, res: Response) => {
  */
 router.post("/stake/increase", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
@@ -264,7 +277,7 @@ router.post("/stake/increase", async (req: Request, res: Response) => {
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
     const result = await client.increaseStake(amount);
 
     res.json({
@@ -284,14 +297,15 @@ router.post("/stake/increase", async (req: Request, res: Response) => {
  */
 router.post("/stake/unstake", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
 
     // Get current info
     const info = await client.getRelayInfo(client.wallet.address);
@@ -325,14 +339,15 @@ router.post("/stake/unstake", async (req: Request, res: Response) => {
  */
 router.post("/stake/withdraw", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
 
     // Check status
     const info = await client.getRelayInfo(client.wallet.address);
@@ -371,14 +386,15 @@ router.post("/stake/withdraw", async (req: Request, res: Response) => {
  */
 router.post("/unstake", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
 
     // Get current info
     const info = await client.getRelayInfo(client.wallet.address);
@@ -412,14 +428,15 @@ router.post("/unstake", async (req: Request, res: Response) => {
  */
 router.post("/withdraw", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
 
     // Check status
     const info = await client.getRelayInfo(client.wallet.address);
@@ -458,7 +475,8 @@ router.post("/withdraw", async (req: Request, res: Response) => {
  */
 router.post("/emergency-withdraw", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
@@ -473,7 +491,7 @@ router.post("/emergency-withdraw", async (req: Request, res: Response) => {
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
     const { ethers } = await import("ethers");
     const { ERC20_ABI } = await import("shogun-contracts-sdk");
 
@@ -511,7 +529,8 @@ router.post("/emergency-withdraw", async (req: Request, res: Response) => {
  */
 router.post("/deal/register", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
@@ -527,7 +546,7 @@ router.post("/deal/register", async (req: Request, res: Response) => {
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
 
     // Generate deal ID if not provided
     const finalDealId: string = dealId || generateDealId(cid, clientAddress);
@@ -563,7 +582,8 @@ router.post("/deal/register", async (req: Request, res: Response) => {
  */
 router.post("/deal/complete", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
@@ -579,7 +599,7 @@ router.post("/deal/complete", async (req: Request, res: Response) => {
       });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
     const result = await client.completeDeal(dealId);
 
     res.json({
@@ -601,7 +621,8 @@ router.post("/deal/complete", async (req: Request, res: Response) => {
  */
 router.get("/deals", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({
         success: false,
         error: "RELAY_PRIVATE_KEY not configured",
@@ -610,7 +631,7 @@ router.get("/deals", async (req: Request, res: Response) => {
 
     const { createStorageDealRegistryClient } = await import("../utils/registry-client.js");
     const storageDealRegistryClient = createStorageDealRegistryClient(REGISTRY_CHAIN_ID);
-    const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const registryClient = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
     const relayAddress: string = registryClient.wallet.address;
 
     // Get deals from StorageDealRegistry (not from RelayRegistry)
@@ -681,7 +702,7 @@ router.get("/config", async (req: Request, res: Response) => {
             : networkName,
       registryAddress: config.relayRegistry,
       usdcAddress: config.usdc,
-      configured: !!RELAY_PRIVATE_KEY,
+      configured: !!getRelayPrivateKey(),
       explorerUrl: config.explorer,
     });
   } catch (error: any) {
@@ -699,7 +720,8 @@ router.get("/config", async (req: Request, res: Response) => {
  */
 router.post("/grief/missed-proof", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({ success: false, error: "RELAY_PRIVATE_KEY not configured" });
     }
     const { relayAddress, dealId, evidence } = req.body;
@@ -709,7 +731,7 @@ router.post("/grief/missed-proof", async (req: Request, res: Response) => {
         .json({ success: false, error: "relayAddress, dealId, and evidence are required" });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
     const result = await client.griefMissedProof(relayAddress, dealId, evidence);
     res.json({ success: true, message: "Missed proof reported", ...result });
   } catch (error: any) {
@@ -724,7 +746,8 @@ router.post("/grief/missed-proof", async (req: Request, res: Response) => {
  */
 router.post("/grief/data-loss", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({ success: false, error: "RELAY_PRIVATE_KEY not configured" });
     }
     const { relayAddress, dealId, evidence } = req.body;
@@ -734,7 +757,7 @@ router.post("/grief/data-loss", async (req: Request, res: Response) => {
         .json({ success: false, error: "relayAddress, dealId, and evidence are required" });
     }
 
-    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
     const result = await client.griefDataLoss(relayAddress, dealId, evidence);
     res.json({ success: true, message: "Data loss reported", ...result });
   } catch (error: any) {
@@ -749,7 +772,8 @@ router.post("/grief/data-loss", async (req: Request, res: Response) => {
  */
 router.post("/deal/grief", async (req: Request, res: Response) => {
   try {
-    if (!RELAY_PRIVATE_KEY) {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
       return res.status(400).json({ success: false, error: "RELAY_PRIVATE_KEY not configured" });
     }
     const { dealId, slashAmount, reason } = req.body;
@@ -761,7 +785,7 @@ router.post("/deal/grief", async (req: Request, res: Response) => {
 
     const { createStorageDealRegistryClientWithSigner } =
       await import("../utils/registry-client.js");
-    const client = createStorageDealRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const client = createStorageDealRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
     const result = await client.grief(dealId, slashAmount, reason);
     res.json({ success: true, message: "Deal griefed", ...result });
   } catch (error: any) {

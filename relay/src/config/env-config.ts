@@ -194,7 +194,13 @@ export const config = {
     ),
 
     // Relay private key for on-chain operations (PRIVATE_KEY is fallback)
+    // NOTE: Use getRelayPrivateKey() to get fresh value instead of this cached property
     relayPrivateKey: process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY,
+
+    // Dynamic getter for relay private key to avoid caching issues
+    getRelayPrivateKey: (): string | undefined => {
+      return process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY;
+    },
   },
 
   // ============================================================================
