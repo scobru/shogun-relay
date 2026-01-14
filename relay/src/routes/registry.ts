@@ -365,6 +365,93 @@ router.post("/stake/withdraw", async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/v1/registry/unstake
+ *
+ * Alias for /stake/unstake (for backward compatibility)
+ */
+router.post("/unstake", async (req: Request, res: Response) => {
+  try {
+    if (!RELAY_PRIVATE_KEY) {
+      return res.status(400).json({
+        success: false,
+        error: "RELAY_PRIVATE_KEY not configured",
+      });
+    }
+
+    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+
+    // Get current info
+    const info = await client.getRelayInfo(client.wallet.address);
+    if (!info || info.status !== "Active") {
+      return res.status(400).json({
+        success: false,
+        error: "Relay must be Active to request unstake",
+        currentStatus: info?.status || "Not registered",
+      });
+    }
+
+    const result = await client.requestUnstake();
+    const params = await client.getRegistryParams();
+
+    res.json({
+      success: true,
+      message: "Unstake requested - stake will be available after delay period",
+      unstakingDelayDays: params.unstakingDelayDays,
+      stakedAmount: info.stakedAmount,
+      ...result,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/v1/registry/withdraw
+ *
+ * Alias for /stake/withdraw (for backward compatibility)
+ */
+router.post("/withdraw", async (req: Request, res: Response) => {
+  try {
+    if (!RELAY_PRIVATE_KEY) {
+      return res.status(400).json({
+        success: false,
+        error: "RELAY_PRIVATE_KEY not configured",
+      });
+    }
+
+    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+
+    // Check status
+    const info = await client.getRelayInfo(client.wallet.address);
+    if (!info || info.status !== "Unstaking") {
+      return res.status(400).json({
+        success: false,
+        error: "Relay must be in Unstaking status",
+        currentStatus: info?.status || "Not registered",
+      });
+    }
+
+    const result = await client.withdrawStake();
+
+    res.json({
+      success: true,
+      message: "Stake withdrawn successfully",
+      withdrawnAmount: info.stakedAmount,
+      ...result,
+    });
+  } catch (error: any) {
+    // Check for delay not passed error
+    if (error.message.includes("UnstakingDelayNotPassed")) {
+      return res.status(400).json({
+        success: false,
+        error: "Unstaking delay has not passed yet",
+      });
+    }
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * POST /api/v1/registry/deal/register
  *
  * Register a storage deal on-chain

@@ -279,6 +279,11 @@ async function initializeServer() {
     }
   });
 
+  // Root route - redirect to dashboard (registered early to avoid conflicts)
+  app.get("/", (req, res) => {
+    res.redirect("/dashboard/");
+  });
+
   // Route specifica per /admin - redirect to new dashboard
   app.get("/admin", (req, res) => {
     res.redirect("/dashboard/");

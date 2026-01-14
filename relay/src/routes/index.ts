@@ -113,13 +113,6 @@ export default (app: express.Application) => {
     }
   });
 
-
-  // Redirect root to dashboard
-  app.get("/", (req, res) => {
-    res.redirect("/dashboard/");
-  });
-
-
   // --- IPFS Desktop Proxy Configuration ---
   const IPFS_GATEWAY_URL = ipfsConfig.gatewayUrl;
   const IPFS_API_TOKEN = ipfsConfig.apiToken as string | undefined;
@@ -1271,6 +1264,24 @@ export default (app: express.Application) => {
           `${baseRoute}/deals/relay/active`,
           `${baseRoute}/deals/stats`,
           `${baseRoute}/deals/leaderboard`,
+          // Registry (on-chain relay management)
+          `${baseRoute}/registry/status`,
+          `${baseRoute}/registry/balance`,
+          `${baseRoute}/registry/params`,
+          `${baseRoute}/registry/config`,
+          `${baseRoute}/registry/register`,
+          `${baseRoute}/registry/update`,
+          `${baseRoute}/registry/stake/increase`,
+          `${baseRoute}/registry/stake/unstake`,
+          `${baseRoute}/registry/stake/withdraw`,
+          `${baseRoute}/registry/unstake`,
+          `${baseRoute}/registry/withdraw`,
+          `${baseRoute}/registry/deal/register`,
+          `${baseRoute}/registry/deal/complete`,
+          `${baseRoute}/registry/deal/grief`,
+          `${baseRoute}/registry/deals`,
+          `${baseRoute}/registry/grief/missed-proof`,
+          `${baseRoute}/registry/grief/data-loss`,
         ],
       },
     });
