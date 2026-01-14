@@ -332,7 +332,7 @@ RUN dos2unix /app/docker/init-ipfs.sh \
     && cp /app/docker/relay.env /app/relay/.env
 
 # Cache bust for relay copy - change this value to force rebuild
-ARG RELAY_CACHE_BUST=v3
+ARG RELAY_CACHE_BUST=v4
 RUN echo "Relay cache bust: $RELAY_CACHE_BUST"
 
 # Copy ALL relay source files first (before npm install)
@@ -370,6 +370,14 @@ RUN echo "🔨 Building React Dashboard..." && \
 
 # Prune devDependencies to reduce image size
 RUN npm prune --omit=dev
+
+# Verify dashboard still exists after prune (debugging)
+RUN echo "🔍 Verifying dashboard after prune..." && \
+    ls -la src/public/dashboard/ && \
+    ls -la src/public/dashboard/dist/ && \
+    test -f src/public/dashboard/dist/index.html && \
+    echo "✅ Dashboard verified at /app/relay/src/public/dashboard/dist/" && \
+    echo "📍 Full path: $(pwd)/src/public/dashboard/dist/index.html"
 
 # Optionally generate relay SEA keypair if requested
 # This creates the keypair during build time
