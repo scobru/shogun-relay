@@ -331,17 +331,17 @@ RUN dos2unix /app/docker/init-ipfs.sh \
     && chmod +x /usr/local/bin/entrypoint.sh \
     && cp /app/docker/relay.env /app/relay/.env
 
-# Copy package files and scripts (needed for postinstall)
-# Note: We copy package-lock.json but remove it before install to avoid cross-platform issues
-COPY relay/package*.json /app/relay/
-COPY relay/scripts/ /app/relay/scripts/
+# Copy ALL relay source files first (before npm install)
+# This ensures node_modules won't be overwritten by a subsequent COPY
+COPY relay/ /app/relay/
 WORKDIR /app/relay
 
 # Remove package-lock.json to avoid cross-platform issues with native binaries (rollup, esbuild)
 # The lock file from Windows includes Windows-specific optional deps that break Linux builds
-RUN rm -f package-lock.json
+# Also remove any local node_modules that might have been copied
+RUN rm -f package-lock.json && rm -rf node_modules
 
-# Install ALL dependencies first (including devDependencies for dashboard build)
+# Install ALL dependencies (including devDependencies for dashboard build)
 RUN npm install
 
 # Build shogun-contracts SDK if needed (for local installations)
@@ -351,9 +351,6 @@ RUN if [ -d "node_modules/shogun-contracts/sdk" ] && [ ! -f "node_modules/shogun
     cd node_modules/shogun-contracts && \
     npm run build:sdk 2>/dev/null || echo "⚠️  SDK build skipped (may already be compiled)"; \
     fi
-
-# Copy the rest of the application
-COPY relay/ /app/relay/
 
 # Build React Dashboard (SPA) using relay's package.json
 # Vite and TypeScript are in devDependencies, so we need them installed
