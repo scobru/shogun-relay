@@ -186,9 +186,9 @@ function Registry() {
     }
     setActionStatus(`Processing ${stakingMode}...`)
     try {
-        let endpointUrl = '/api/v1/registry/stake'
-        if (stakingMode === 'unstake') endpointUrl = '/api/v1/registry/unstake'
-        if (stakingMode === 'withdraw') endpointUrl = '/api/v1/registry/withdraw'
+        let endpointUrl = '/api/v1/registry/stake/increase'
+        if (stakingMode === 'unstake') endpointUrl = '/api/v1/registry/stake/unstake'
+        if (stakingMode === 'withdraw') endpointUrl = '/api/v1/registry/stake/withdraw'
 
         const res = await fetch(endpointUrl, {
             method: 'POST',
