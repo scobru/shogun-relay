@@ -28,9 +28,29 @@ const REGISTRY_CHAIN_ID: number = registryConfig.chainId;
  * Get the relay private key dynamically to avoid caching issues.
  * This ensures that if the private key is changed and the server is restarted,
  * the new key is used instead of a cached value.
+ * 
+ * Priority order:
+ * 1. RELAY_PRIVATE_KEY (preferred)
+ * 2. PRIVATE_KEY (fallback)
  */
 function getRelayPrivateKey(): string | undefined {
-  return process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY;
+  const key = process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY;
+  // Log the source for debugging (only first/last 4 chars for security)
+  if (key && key.length > 10) {
+    const masked = `${key.slice(0, 6)}...${key.slice(-4)}`;
+    const source = process.env.RELAY_PRIVATE_KEY ? 'RELAY_PRIVATE_KEY' : 'PRIVATE_KEY';
+    loggers.registry.debug({ source, masked }, 'Using private key');
+  }
+  return key;
+}
+
+/**
+ * Helper to compute wallet address from private key for debugging
+ */
+async function getWalletAddressFromKey(privateKey: string): Promise<string> {
+  const { ethers } = await import("ethers");
+  const wallet = new ethers.Wallet(privateKey);
+  return wallet.address;
 }
 
 /**
@@ -788,6 +808,114 @@ router.post("/deal/grief", async (req: Request, res: Response) => {
     const client = createStorageDealRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
     const result = await client.grief(dealId, slashAmount, reason);
     res.json({ success: true, message: "Deal griefed", ...result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/v1/registry/debug/wallet
+ *
+ * Debug endpoint to verify wallet address derivation from current private key.
+ * Shows where the key is coming from and what address it maps to.
+ * Useful for troubleshooting caching issues.
+ */
+router.get("/debug/wallet", async (req: Request, res: Response) => {
+  try {
+    const { ethers } = await import("ethers");
+    
+    // Read directly from process.env (no caching)
+    const relayPrivateKeyFromEnv = process.env.RELAY_PRIVATE_KEY;
+    const privateKeyFromEnv = process.env.PRIVATE_KEY;
+    const keyFromConfig = registryConfig.relayPrivateKey;
+    const keyFromGetter = getRelayPrivateKey();
+
+    const results: any = {
+      timestamp: new Date().toISOString(),
+      sources: {
+        RELAY_PRIVATE_KEY: relayPrivateKeyFromEnv ? {
+          present: true,
+          length: relayPrivateKeyFromEnv.length,
+          prefix: relayPrivateKeyFromEnv.slice(0, 6),
+          suffix: relayPrivateKeyFromEnv.slice(-4),
+        } : { present: false },
+        PRIVATE_KEY: privateKeyFromEnv ? {
+          present: true,
+          length: privateKeyFromEnv.length,
+          prefix: privateKeyFromEnv.slice(0, 6),
+          suffix: privateKeyFromEnv.slice(-4),
+        } : { present: false },
+        configCached: keyFromConfig ? {
+          present: true,
+          length: keyFromConfig.length,
+          prefix: keyFromConfig.slice(0, 6),
+          suffix: keyFromConfig.slice(-4),
+        } : { present: false },
+        getterFunction: keyFromGetter ? {
+          present: true,
+          length: keyFromGetter.length,
+          prefix: keyFromGetter.slice(0, 6),
+          suffix: keyFromGetter.slice(-4),
+        } : { present: false },
+      },
+      addresses: {} as any,
+      match: false,
+    };
+
+    // Compute addresses for each source
+    if (relayPrivateKeyFromEnv) {
+      try {
+        const wallet = new ethers.Wallet(relayPrivateKeyFromEnv);
+        results.addresses.fromRELAY_PRIVATE_KEY = wallet.address;
+      } catch (e: any) {
+        results.addresses.fromRELAY_PRIVATE_KEY = `Error: ${e.message}`;
+      }
+    }
+
+    if (privateKeyFromEnv) {
+      try {
+        const wallet = new ethers.Wallet(privateKeyFromEnv);
+        results.addresses.fromPRIVATE_KEY = wallet.address;
+      } catch (e: any) {
+        results.addresses.fromPRIVATE_KEY = `Error: ${e.message}`;
+      }
+    }
+
+    if (keyFromConfig) {
+      try {
+        const wallet = new ethers.Wallet(keyFromConfig);
+        results.addresses.fromConfigCached = wallet.address;
+      } catch (e: any) {
+        results.addresses.fromConfigCached = `Error: ${e.message}`;
+      }
+    }
+
+    if (keyFromGetter) {
+      try {
+        const wallet = new ethers.Wallet(keyFromGetter);
+        results.addresses.fromGetterFunction = wallet.address;
+      } catch (e: any) {
+        results.addresses.fromGetterFunction = `Error: ${e.message}`;
+      }
+    }
+
+    // Check if all addresses match
+    const addressValues = Object.values(results.addresses).filter(
+      (a: any) => typeof a === 'string' && a.startsWith('0x')
+    );
+    results.match = addressValues.length > 0 && 
+      addressValues.every((a: any) => a === addressValues[0]);
+    
+    results.activeAddress = results.addresses.fromGetterFunction || 
+      results.addresses.fromRELAY_PRIVATE_KEY || 
+      results.addresses.fromPRIVATE_KEY || 
+      'Not configured';
+
+    res.json({
+      success: true,
+      debug: results,
+      note: "If addresses don't match, there's a caching issue. Restart the container to refresh.",
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
