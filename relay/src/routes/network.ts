@@ -64,6 +64,19 @@ function safeParseNumber(value: unknown, defaultValue = 0): number {
 
 const router: Router = express.Router();
 
+// Stats cache for faster responses
+interface StatsCache {
+  data: any;
+  timestamp: number;
+  ttl: number;
+}
+
+const statsCache: StatsCache = {
+  data: null,
+  timestamp: 0,
+  ttl: 30000, // 30 seconds cache
+};
+
 // IPFS Configuration handled by ipfs-client.js
 
 /**
@@ -228,7 +241,7 @@ router.get("/peers", async (req, res) => {
       type: string;
       torrentsCount?: number;
     }[] = [];
-    
+
     const minLastSeen = Date.now() - (parseInt(String(req.query.maxAge)) || 3600000); // Default 1 hour
 
     await new Promise((resolve) => {
@@ -239,23 +252,23 @@ router.get("/peers", async (req, res) => {
         .map()
         .once((data: any, pubKey: string) => {
           if (!data || typeof data !== "object") return;
-          
+
           if (data.lastSeen && data.lastSeen > minLastSeen) {
-             peers.push({
-               pubKey,
-               alias: data.alias || null,
-               lastSeen: data.lastSeen,
-               type: data.type || 'unknown',
-               torrentsCount: data.torrentsCount
-             });
+            peers.push({
+              pubKey,
+              alias: data.alias || null,
+              lastSeen: data.lastSeen,
+              type: data.type || 'unknown',
+              torrentsCount: data.torrentsCount
+            });
           }
         });
-        
-        // Give GunDB time to collect
-        setTimeout(() => {
-          clearTimeout(timer);
-          resolve(undefined);
-        }, 1500);
+
+      // Give GunDB time to collect
+      setTimeout(() => {
+        clearTimeout(timer);
+        resolve(undefined);
+      }, 1500);
     });
 
     peers.sort((a, b) => b.lastSeen - a.lastSeen);
@@ -303,8 +316,15 @@ router.get("/stats", async (req, res) => {
     const currentRelayHost =
       relayConfig.endpoint?.replace(/^https?:\/\//, "").replace(/\/$/, "") || relayConfig.name;
 
+    // Check cache first for faster response
+    const now = Date.now();
+    if (statsCache.data && (now - statsCache.timestamp) < statsCache.ttl) {
+      loggers.server.debug("📊 Returning cached network stats");
+      return res.json(statsCache.data);
+    }
+
     // STEP 1: Collect stats from pulse data (real-time relay status)
-    // Increased timeout to 15 seconds to allow GunDB more time to sync pulse data from peers
+    // Reduced timeout to 5 seconds for faster response
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
         loggers.server.info(
@@ -312,7 +332,7 @@ router.get("/stats", async (req, res) => {
           `📊 Network stats collection timeout. Found ${relaysFound.length} relays`
         );
         resolve();
-      }, 15000); // Increased from 5s to 15s
+      }, 5000); // Reduced from 15s to 5s for faster response
 
       let processedCount = 0;
       const processedHosts = new Set<string>(); // Track processed hosts to avoid duplicates
@@ -423,13 +443,13 @@ router.get("/stats", async (req, res) => {
           } else if (data.endpoint && data.lastSeen) {
             // Handle simple announcement without pulse object
             const age = Date.now() - (data.lastSeen || 0);
-            
+
             if (data.lastSeen > fiveMinutesAgo) {
               stats.totalRelays++;
               // We count them as active if seen recently, even without full pulse
               stats.activeRelays++;
               relaysFound.push({ host, hasPulse: true }); // Treat as having presence
-              
+
               loggers.server.debug(
                 { host, age },
                 `   📡 Active relay (announcement): ${host}, age: ${age}ms`
@@ -462,7 +482,7 @@ router.get("/stats", async (req, res) => {
 
           // Try to get IPFS stats from local node as fallback
           try {
-            const repoStats = await ipfsRequest("/api/v0/repo/stat");
+            const repoStats = await ipfsRequest("/api/v0/repo/stat?size-only=true");
             if (repoStats && typeof repoStats === "object") {
               let repoSize = 0;
               if ("RepoSize" in repoStats) {
@@ -519,7 +539,7 @@ router.get("/stats", async (req, res) => {
             (!currentRelayData.pulse.ipfs || !currentRelayData.pulse.ipfs.repoSize)
           ) {
             try {
-              const repoStats = await ipfsRequest("/api/v0/repo/stat");
+              const repoStats = await ipfsRequest("/api/v0/repo/stat?size-only=true");
               if (repoStats && typeof repoStats === "object") {
                 let repoSize = 0;
                 if ("RepoSize" in repoStats) {
@@ -561,7 +581,7 @@ router.get("/stats", async (req, res) => {
           `📊 Network stats collection complete. Total relays: ${stats.totalRelays}, Active: ${stats.activeRelays}`
         );
         resolve(undefined);
-      }, 12000); // Increased from 4.5s to 12s
+      }, 4000); // Reduced from 12s to 4s for faster response
     });
 
     // STEP 2: Retroactive sync from GunDB deals (persistent across restarts)
@@ -725,7 +745,7 @@ router.get("/stats", async (req, res) => {
       if (relayUser) {
         const subscriptions: Array<{ expiresAt?: number; storageMB?: number }> = [];
         await new Promise<void>((resolve) => {
-          const timer = setTimeout(() => resolve(), 5000);
+          const timer = setTimeout(() => resolve(), 2000); // Reduced from 5s to 2s
 
           relayUser
             .get(GUN_PATHS.X402)
@@ -750,7 +770,7 @@ router.get("/stats", async (req, res) => {
           setTimeout(() => {
             clearTimeout(timer);
             resolve();
-          }, 4000);
+          }, 1500); // Reduced from 4s to 1.5s
         });
 
         stats.totalActiveSubscriptions = subscriptions.length;
@@ -783,7 +803,7 @@ router.get("/stats", async (req, res) => {
       loggers.server.info(`📊 Pulse data missing/old, syncing directly from IPFS...`);
       try {
         // Get IPFS repo stats
-        const repoStats = await ipfsRequest("/api/v0/repo/stat");
+        const repoStats = await ipfsRequest("/api/v0/repo/stat?size-only=true");
         if (repoStats && typeof repoStats === "object") {
           // Try multiple field names for RepoSize - using safeParseNumber to handle empty values
           let repoSize = 0;
@@ -829,7 +849,7 @@ router.get("/stats", async (req, res) => {
       totalSubscriptionStorageMB: stats.totalSubscriptionStorageMB,
     });
 
-    res.json({
+    const responseData = {
       success: true,
       stats: {
         ...stats,
@@ -849,7 +869,13 @@ router.get("/stats", async (req, res) => {
             stats.totalStorageBytes > 0 && stats.activeRelays === 0 ? "IPFS direct" : "not used",
         },
       },
-    });
+    };
+
+    // Update cache
+    statsCache.data = responseData;
+    statsCache.timestamp = Date.now();
+
+    res.json(responseData);
   } catch (error) {
     loggers.server.error({ err: error }, "❌ Network stats error");
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1308,8 +1334,8 @@ router.get("/reputation/:host", async (req, res) => {
     if (reputation.proofSuccessRate === undefined || reputation.proofSuccessRate === null) {
       reputation.proofSuccessRate =
         reputation.proofsTotal &&
-        reputation.proofsTotal > 0 &&
-        reputation.proofsSuccessful !== undefined
+          reputation.proofsTotal > 0 &&
+          reputation.proofsSuccessful !== undefined
           ? (reputation.proofsSuccessful / reputation.proofsTotal) * 100
           : undefined;
     }

@@ -1698,7 +1698,7 @@ See docs/RELAY_KEYS.md for more information.
         const options: any = {
           hostname: "127.0.0.1",
           port: 5001,
-          path: "/api/v0/repo/stat",
+          path: "/api/v0/repo/stat?size-only=true",
           method: "POST",
           headers: { "Content-Length": "0" },
         };

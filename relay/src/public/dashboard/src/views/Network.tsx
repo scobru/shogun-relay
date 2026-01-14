@@ -41,18 +41,41 @@ function Network() {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const statsRes = await fetch('/api/v1/network/stats')
-      const statsData = await statsRes.json()
-      if (statsData.success && statsData.stats) setStats(statsData.stats)
+      // Execute all API calls in parallel for faster loading
+      const [statsResult, repResult, regResult, relaysResult, dealsResult] = await Promise.allSettled([
+        fetch('/api/v1/network/stats').then(r => r.json()),
+        fetch('/api/v1/network/reputation?limit=20').then(r => r.json()),
+        fetch('/api/v1/registry/params').then(r => r.json()),
+        fetch('/api/v1/network/onchain/relays?chainId=84532').then(r => r.json()),
+        fetch('/api/v1/deals/stats').then(r => r.json())
+      ])
 
-      try { const repRes = await fetch('/api/v1/network/reputation?limit=20'); const repData = await repRes.json(); if (repData.success && repData.leaderboard) setLeaderboard(repData.leaderboard) } catch {}
-      try { const regRes = await fetch('/api/v1/registry/params'); const regData = await regRes.json(); if (regData.success) setRegistry({ chainId: regData.chainId, registryAddress: regData.registryAddress, minStake: regData.params?.minStake }) } catch {}
-      try { const relaysRes = await fetch('/api/v1/network/onchain/relays?chainId=84532'); const relaysData = await relaysRes.json(); if (relaysData.success) setRegisteredRelays(relaysData.relayCount || 0) } catch {}
-      try { const dealsRes = await fetch('/api/v1/deals/stats'); const dealsData = await dealsRes.json(); if (dealsData.success && dealsData.stats) setDealStats(dealsData.stats) } catch {}
+      // Process results - each call can fail independently
+      if (statsResult.status === 'fulfilled' && statsResult.value.success && statsResult.value.stats) {
+        setStats(statsResult.value.stats)
+      }
+      if (repResult.status === 'fulfilled' && repResult.value.success && repResult.value.leaderboard) {
+        setLeaderboard(repResult.value.leaderboard)
+      }
+      if (regResult.status === 'fulfilled' && regResult.value.success) {
+        setRegistry({ 
+          chainId: regResult.value.chainId, 
+          registryAddress: regResult.value.registryAddress, 
+          minStake: regResult.value.params?.minStake 
+        })
+      }
+      if (relaysResult.status === 'fulfilled' && relaysResult.value.success) {
+        setRegisteredRelays(relaysResult.value.relayCount || 0)
+      }
+      if (dealsResult.status === 'fulfilled' && dealsResult.value.success && dealsResult.value.stats) {
+        setDealStats(dealsResult.value.stats)
+      }
+      
       setLastUpdated(new Date())
     } catch (error) { console.error('Failed to fetch network data:', error) }
     finally { setLoading(false) }
   }, [])
+
 
   useEffect(() => { fetchAll(); const interval = setInterval(fetchAll, 30000); return () => clearInterval(interval) }, [fetchAll])
 
