@@ -1276,6 +1276,7 @@ export default (app: express.Application) => {
           `${baseRoute}/registry/stake/withdraw`,
           `${baseRoute}/registry/unstake`,
           `${baseRoute}/registry/withdraw`,
+          `${baseRoute}/registry/emergency-withdraw`,
           `${baseRoute}/registry/deal/register`,
           `${baseRoute}/registry/deal/complete`,
           `${baseRoute}/registry/deal/grief`,

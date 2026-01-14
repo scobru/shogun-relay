@@ -3,8 +3,9 @@
 
 FROM node:20-slim
 # delete cache
-ARG CACHE_BUST
-RUN echo "Cache bust: $CACHE_BUST"
+
+
+
 # =============================================================================
 # BUILD ARGUMENTS (passed by CapRover or docker build)
 # =============================================================================

@@ -452,6 +452,59 @@ router.post("/withdraw", async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/v1/registry/emergency-withdraw
+ *
+ * Owner-only rescue of tokens from registry contract
+ */
+router.post("/emergency-withdraw", async (req: Request, res: Response) => {
+  try {
+    if (!RELAY_PRIVATE_KEY) {
+      return res.status(400).json({
+        success: false,
+        error: "RELAY_PRIVATE_KEY not configured",
+      });
+    }
+
+    const { tokenAddress, amount, amountRaw } = req.body;
+    if (!tokenAddress || (!amount && !amountRaw)) {
+      return res.status(400).json({
+        success: false,
+        error: "tokenAddress and amount (or amountRaw) are required",
+      });
+    }
+
+    const client = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
+    const { ethers } = await import("ethers");
+    const { ERC20_ABI } = await import("shogun-contracts-sdk");
+
+    let amountWei: bigint;
+    if (amountRaw) {
+      amountWei = BigInt(amountRaw);
+    } else {
+      const token = new ethers.Contract(tokenAddress, ERC20_ABI, client.provider);
+      let decimals = 6;
+      try {
+        decimals = Number(await token.decimals());
+      } catch {}
+      amountWei = ethers.parseUnits(String(amount), decimals);
+    }
+
+    const registry = client.relayRegistry.getContract();
+    const tx = await registry.emergencyWithdraw(tokenAddress, amountWei);
+    const receipt = await tx.wait();
+
+    res.json({
+      success: true,
+      message: "Emergency withdraw sent",
+      txHash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * POST /api/v1/registry/deal/register
  *
  * Register a storage deal on-chain

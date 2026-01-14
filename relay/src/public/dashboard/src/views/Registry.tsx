@@ -7,6 +7,7 @@ interface RegistryConfig {
   chainName: string
   explorerUrl: string
   registryAddress?: string
+  usdcAddress?: string
 }
 
 interface RelayStatus {
@@ -59,6 +60,8 @@ function Registry() {
   const [stakeActionAmount, setStakeActionAmount] = useState('0')
   const [actionStatus, setActionStatus] = useState('')
   const [stakingMode, setStakingMode] = useState<'increase' | 'unstake' | 'withdraw'>('increase')
+  const [emergencyTokenAddress, setEmergencyTokenAddress] = useState('')
+  const [emergencyAmount, setEmergencyAmount] = useState('')
 
   const truncateAddress = (addr: string) => 
     addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
@@ -70,6 +73,9 @@ function Registry() {
       const configRes = await fetch('/api/v1/registry/config')
       const configData = await configRes.json()
       setConfig(configData)
+      if (configData?.usdcAddress && !emergencyTokenAddress) {
+        setEmergencyTokenAddress(configData.usdcAddress)
+      }
 
       // Status
       const statusRes = await fetch('/api/v1/registry/status')
@@ -204,6 +210,32 @@ function Registry() {
         }
     } catch (e) {
         setActionStatus('❌ Network error')
+    }
+  }
+
+  const handleEmergencyWithdraw = async () => {
+    if (!emergencyTokenAddress || !emergencyAmount || parseFloat(emergencyAmount) <= 0) {
+      setActionStatus('❌ Invalid token or amount')
+      return
+    }
+    setActionStatus('Processing emergency withdraw...')
+    try {
+      const res = await fetch('/api/v1/registry/emergency-withdraw', {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokenAddress: emergencyTokenAddress,
+          amount: emergencyAmount
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setActionStatus(`✅ Emergency withdraw sent! ` + (data.txHash ? `TX: ${data.txHash.slice(0, 10)}...` : ''))
+      } else {
+        setActionStatus('❌ Failed: ' + (data.error || 'Unknown error'))
+      }
+    } catch {
+      setActionStatus('❌ Network error')
     }
   }
 
@@ -346,6 +378,44 @@ function Registry() {
                 <p className="text-sm text-base-content/60 mt-2">
                   Current Stake: <strong>{status.relay?.stakedAmount} USDC</strong> • Pending Unstake: <strong>0 USDC</strong>
                 </p>
+              </div>
+            )}
+
+            {/* Emergency Withdraw */}
+            {status.registered && (
+              <div className="mt-6 pt-6 border-t border-base-300">
+                <h4 className="font-bold mb-2 text-error">Emergency Withdraw</h4>
+                <p className="text-sm text-base-content/70 mb-4">
+                  Owner-only rescue for tokens stuck in the registry contract. Uses the relay signer key.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="form-control">
+                    <label className="label"><span className="label-text">Token Address</span></label>
+                    <input
+                      type="text"
+                      className="input input-bordered"
+                      value={emergencyTokenAddress}
+                      onChange={e => setEmergencyTokenAddress(e.target.value)}
+                      placeholder="0x..."
+                    />
+                  </div>
+                  <div className="form-control">
+                    <label className="label"><span className="label-text">Amount</span></label>
+                    <input
+                      type="number"
+                      className="input input-bordered"
+                      value={emergencyAmount}
+                      onChange={e => setEmergencyAmount(e.target.value)}
+                      placeholder="0.0"
+                    />
+                  </div>
+                  <div className="form-control">
+                    <label className="label"><span className="label-text">Action</span></label>
+                    <button className="btn btn-error" onClick={handleEmergencyWithdraw}>
+                      🚨 Emergency Withdraw
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
             
