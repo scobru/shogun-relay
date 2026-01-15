@@ -219,11 +219,14 @@ router.post("/register", async (req: Request, res: Response) => {
       });
     }
 
+    // Convert stakeAmount to string if it's a number (for backward compatibility)
+    const stakeAmountStr = typeof stakeAmount === "number" ? stakeAmount.toString() : String(stakeAmount);
+
     // Use provided griefingRatio or default to 0 (contract will use default)
     const finalGriefingRatio: number = griefingRatio !== undefined ? parseInt(griefingRatio) : 0;
 
     loggers.registry.info({ endpoint }, "Registering relay on-chain");
-    const result = await client.registerRelay(endpoint, gunPubKey, stakeAmount, finalGriefingRatio);
+    const result = await client.registerRelay(endpoint, gunPubKey, stakeAmountStr, finalGriefingRatio);
 
     res.json({
       success: true,
@@ -297,8 +300,11 @@ router.post("/stake/increase", async (req: Request, res: Response) => {
       });
     }
 
+    // Convert amount to string if it's a number (for backward compatibility)
+    const amountStr = typeof amount === "number" ? amount.toString() : String(amount);
+
     const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
-    const result = await client.increaseStake(amount);
+    const result = await client.increaseStake(amountStr);
 
     res.json({
       success: true,
