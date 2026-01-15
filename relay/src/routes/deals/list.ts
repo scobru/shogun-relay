@@ -179,7 +179,7 @@ router.get("/by-client/:address", async (req: Request, res: Response) => {
             sizeMB: onChainDeal.sizeMB,
             durationDays: Math.ceil(
               (Number(onChainDeal.expiresAt) - Number(onChainDeal.createdAt)) /
-                (1000 * 60 * 60 * 24)
+              (1000 * 60 * 60 * 24)
             ),
             totalPriceUSDC: parseFloat(String(onChainDeal.priceUSDC)),
             features: { erasureCoding: false },
@@ -296,7 +296,7 @@ router.get("/relay/active", async (req: Request, res: Response) => {
     }
 
     // Also fetch deals from on-chain registry if configured
-    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+    const RELAY_PRIVATE_KEY = registryConfig.getRelayPrivateKey();
     const REGISTRY_CHAIN_ID = registryConfig.chainId;
 
     if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {

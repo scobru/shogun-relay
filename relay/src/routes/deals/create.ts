@@ -76,7 +76,7 @@ router.post("/create", express.json(), async (req: Request, res: Response) => {
     // Return payment instructions for USDC transfer
     // Client must transfer USDC to relay address, then relay will register deal on-chain
     const REGISTRY_CHAIN_ID = registryConfig.chainId;
-    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+    const RELAY_PRIVATE_KEY = registryConfig.getRelayPrivateKey();
 
     // If relayAddress is provided, verify it's registered and get its info
     if (relayAddress) {
@@ -181,22 +181,22 @@ router.post("/create", express.json(), async (req: Request, res: Response) => {
     // Prepare reputation info for response
     const reputationInfo = selectedRelayReputation
       ? {
-          score: selectedRelayReputation.calculatedScore.total,
-          tier: selectedRelayReputation.calculatedScore.tier,
-          breakdown: selectedRelayReputation.calculatedScore.breakdown,
-          hasEnoughData: selectedRelayReputation.calculatedScore.hasEnoughData,
-          metrics: {
-            uptimePercent: selectedRelayReputation.uptimePercent || 0,
-            proofSuccessRate:
-              selectedRelayReputation.proofsTotal &&
+        score: selectedRelayReputation.calculatedScore.total,
+        tier: selectedRelayReputation.calculatedScore.tier,
+        breakdown: selectedRelayReputation.calculatedScore.breakdown,
+        hasEnoughData: selectedRelayReputation.calculatedScore.hasEnoughData,
+        metrics: {
+          uptimePercent: selectedRelayReputation.uptimePercent || 0,
+          proofSuccessRate:
+            selectedRelayReputation.proofsTotal &&
               selectedRelayReputation.proofsTotal > 0 &&
               selectedRelayReputation.proofsSuccessful !== undefined
-                ? (selectedRelayReputation.proofsSuccessful / selectedRelayReputation.proofsTotal) *
-                  100
-                : null,
-            avgResponseTimeMs: selectedRelayReputation.avgResponseTimeMs || null,
-          },
-        }
+              ? (selectedRelayReputation.proofsSuccessful / selectedRelayReputation.proofsTotal) *
+              100
+              : null,
+          avgResponseTimeMs: selectedRelayReputation.avgResponseTimeMs || null,
+        },
+      }
       : null;
 
     // Return 200 OK - deal created successfully, payment needed to activate
@@ -290,7 +290,7 @@ router.post("/:dealId/activate", express.json(), async (req: Request, res: Respo
     }
 
     // Verify USDC payment was made to relay
-    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+    const RELAY_PRIVATE_KEY = registryConfig.getRelayPrivateKey();
     const REGISTRY_CHAIN_ID = registryConfig.chainId;
 
     if (!RELAY_PRIVATE_KEY || !REGISTRY_CHAIN_ID) {

@@ -14,7 +14,7 @@ const router: Router = Router();
  */
 router.post("/sync", async (req: Request, res: Response) => {
   try {
-    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+    const RELAY_PRIVATE_KEY = registryConfig.getRelayPrivateKey();
     const REGISTRY_CHAIN_ID = registryConfig.chainId;
 
     if (!RELAY_PRIVATE_KEY) {
@@ -73,7 +73,7 @@ router.post("/sync", async (req: Request, res: Response) => {
  */
 router.get("/sync/status", async (req: Request, res: Response) => {
   try {
-    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+    const RELAY_PRIVATE_KEY = registryConfig.getRelayPrivateKey();
     const REGISTRY_CHAIN_ID = registryConfig.chainId;
 
     if (!RELAY_PRIVATE_KEY) {

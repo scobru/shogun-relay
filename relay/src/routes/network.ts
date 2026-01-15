@@ -622,7 +622,7 @@ router.get("/stats", async (req, res) => {
 
       // Optional: Also check on-chain deals if relay is configured
       // This includes deals registered on-chain but not yet synced to GunDB
-      const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+      const RELAY_PRIVATE_KEY = registryConfig.getRelayPrivateKey();
       const REGISTRY_CHAIN_ID = registryConfig.chainId;
 
       if (RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID && allDeals.length === 0) {

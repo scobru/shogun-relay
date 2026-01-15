@@ -193,13 +193,16 @@ export const config = {
       (process.env.REGISTRY_DEFAULT_NETWORK || "base-sepolia") as NetworkId
     ),
 
-    // Relay private key for on-chain operations (PRIVATE_KEY is fallback)
-    // NOTE: Use getRelayPrivateKey() to get fresh value instead of this cached property
-    relayPrivateKey: process.env.RELAY_PRIVATE_KEY,
-
     // Dynamic getter for relay private key to avoid caching issues
+    // Priority: RELAY_PRIVATE_KEY > PRIVATE_KEY (fallback)
+    // IMPORTANT: Always use this getter instead of a cached property
     getRelayPrivateKey: (): string | undefined => {
-      return process.env.RELAY_PRIVATE_KEY;
+      return process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY;
+    },
+
+    // Deprecated: Use getRelayPrivateKey() instead - this getter ensures no caching
+    get relayPrivateKey(): string | undefined {
+      return process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY;
     },
   },
 

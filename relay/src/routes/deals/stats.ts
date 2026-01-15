@@ -64,7 +64,7 @@ router.get("/stats", async (req: Request, res: Response) => {
     });
 
     // Optional: Also check on-chain deals if relay is configured and no deals found in GunDB
-    const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+    const RELAY_PRIVATE_KEY = registryConfig.getRelayPrivateKey();
     const REGISTRY_CHAIN_ID = registryConfig.chainId;
     const dealMap = new Map<string, any>(); // Use map to deduplicate by deal ID
 
