@@ -181,6 +181,16 @@ async function initializeServer() {
   const publicPath = path.resolve(__dirname, path_public);
   const indexPath = path.resolve(publicPath, "index.html");
 
+  // Normalize double slashes in the path to avoid 404s (e.g. //api/v1/health)
+  app.use((req, res, next) => {
+    const [pathPart, queryPart] = req.url.split("?", 2);
+    if (pathPart.includes("//")) {
+      const normalizedPath = pathPart.replace(/\/{2,}/g, "/");
+      req.url = queryPart ? `${normalizedPath}?${queryPart}` : normalizedPath;
+    }
+    next();
+  });
+
   // ===== SECURITY: CORS Configuration =====
   const corsOptions = {
     origin: authConfig.corsOrigins.includes("*")
