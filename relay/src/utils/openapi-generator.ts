@@ -907,149 +907,57 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
           },
         },
       },
-      "/api/v1/bridge/balance-info/{user}": {
+      "/api/v1/user-uploads/system-hashes-map": {
         get: {
-          tags: ["Bridge"],
-          summary: "Get balance with verification data",
+          tags: ["User Uploads"],
+          summary: "Get system hashes map",
           description:
-            "Get user L2 balance with Merkle proof for independent verification against on-chain batch roots. Enables trustless balance verification without relying on the relay.",
-          operationId: "getBalanceInfo",
-          parameters: [
-            {
-              name: "user",
-              in: "path",
-              required: true,
-              schema: { type: "string" },
-              description: "User's Ethereum address",
-            },
-          ],
+            "Get the complete system hashes map with metadata for all files. Returns all file metadata stored in the GunDB systemhash node.",
+          operationId: "getSystemHashesMap",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
           responses: {
             "200": {
-              description: "Balance info with verification data",
+              description: "System hashes map with metadata",
               content: {
                 "application/json": {
                   schema: {
                     type: "object",
                     properties: {
                       success: { type: "boolean" },
-                      user: { type: "string" },
-                      balance: { type: "string" },
-                      balanceEth: { type: "string" },
-                      verification: {
+                      systemHashes: {
                         type: "object",
-                        nullable: true,
-                        properties: {
-                          lastBatchId: { type: "string" },
-                          lastBatchRoot: { type: "string" },
-                          lastBatchTxHash: { type: "string", nullable: true },
-                          lastBatchTimestamp: { type: "number" },
-                          lastWithdrawal: {
-                            type: "object",
-                            properties: {
-                              amount: { type: "string" },
-                              nonce: { type: "string" },
-                              timestamp: { type: "number" },
-                            },
-                          },
-                          merkleProof: {
-                            type: "array",
-                            items: { type: "string" },
-                          },
-                          verifiedOnChain: { type: "boolean" },
-                        },
-                      },
-                      stats: {
-                        type: "object",
-                        properties: {
-                          processedDepositsCount: { type: "number" },
-                          hasVerificationData: { type: "boolean" },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            "400": {
-              description: "Invalid address",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" },
-                },
-              },
-            },
-          },
-        },
-      },
-      "/api/v1/bridge/batch-history/{user}": {
-        get: {
-          tags: ["Bridge"],
-          summary: "Get batch history for user",
-          description:
-            "Get all batches containing user withdrawals plus processed deposits. Enables users to track their complete on-chain activity.",
-          operationId: "getBatchHistory",
-          parameters: [
-            {
-              name: "user",
-              in: "path",
-              required: true,
-              schema: { type: "string" },
-              description: "User's Ethereum address",
-            },
-          ],
-          responses: {
-            "200": {
-              description: "User batch history",
-              content: {
-                "application/json": {
-                  schema: {
-                    type: "object",
-                    properties: {
-                      success: { type: "boolean" },
-                      user: { type: "string" },
-                      batches: {
-                        type: "array",
-                        items: {
+                        description: "Map of CID to metadata objects",
+                        additionalProperties: {
                           type: "object",
                           properties: {
-                            batchId: { type: "string" },
-                            root: { type: "string" },
-                            txHash: { type: "string", nullable: true },
+                            hash: { type: "string" },
+                            userAddress: { type: "string" },
                             timestamp: { type: "number" },
-                            finalized: { type: "boolean" },
-                            withdrawals: {
+                            uploadedAt: { type: "number" },
+                            fileName: { type: "string" },
+                            displayName: { type: "string" },
+                            originalName: { type: "string" },
+                            fileSize: { type: "number" },
+                            contentType: { type: "string" },
+                            isEncrypted: { type: "boolean" },
+                            isDirectory: { type: "boolean" },
+                            fileCount: { type: "number" },
+                            files: {
                               type: "array",
                               items: {
                                 type: "object",
                                 properties: {
-                                  amount: { type: "string" },
-                                  nonce: { type: "string" },
-                                  timestamp: { type: "number" },
+                                  name: { type: "string" },
+                                  path: { type: "string" },
+                                  size: { type: "number" },
+                                  mimetype: { type: "string" },
+                                  originalName: { type: "string" },
+                                  isEncrypted: { type: "boolean" },
                                 },
                               },
                             },
+                            relayUrl: { type: "string" },
                           },
-                        },
-                      },
-                      deposits: {
-                        type: "array",
-                        items: {
-                          type: "object",
-                          properties: {
-                            txHash: { type: "string" },
-                            amount: { type: "string" },
-                            amountEth: { type: "string" },
-                            blockNumber: { type: "number" },
-                            timestamp: { type: "number" },
-                          },
-                        },
-                      },
-                      summary: {
-                        type: "object",
-                        properties: {
-                          totalBatches: { type: "number" },
-                          totalDeposits: { type: "number" },
-                          totalWithdrawals: { type: "number" },
                         },
                       },
                     },
@@ -3124,13 +3032,15 @@ The wallet signature must be a valid EIP-191 signature of the message "I Love Sh
           },
         },
       },
-      "/api/v1/bridge/deposit": {
-        post: {
-          tags: ["Bridge"],
-          summary: "Get deposit instructions",
-          description: "Get instructions for depositing ETH to the bridge contract",
-          operationId: "getDepositInstructions",
-          requestBody: {
+      "/api/v1/user-uploads/system-hashes-map": {
+        get: {
+          tags: ["User Uploads"],
+          summary: "Get system hashes map",
+          description:
+            "Get the complete system hashes map with metadata for all files. Returns all file metadata stored in the GunDB systemhash node.",
+          operationId: "getSystemHashesMap",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
+          responses: {
             content: {
               "application/json": {
                 schema: {
@@ -3144,24 +3054,64 @@ The wallet signature must be a valid EIP-191 signature of the message "I Love Sh
           },
           responses: {
             "200": {
-              description: "Deposit instructions",
+              description: "System hashes map with metadata",
               content: {
                 "application/json": {
                   schema: {
                     type: "object",
                     properties: {
                       success: { type: "boolean" },
-                      message: { type: "string" },
-                      contractAddress: { type: "string" },
-                      amount: { type: "string" },
-                      instructions: { type: "string" },
+                      systemHashes: {
+                        type: "object",
+                        description: "Map of CID to metadata objects",
+                        additionalProperties: {
+                          type: "object",
+                          properties: {
+                            hash: { type: "string" },
+                            userAddress: { type: "string" },
+                            timestamp: { type: "number" },
+                            uploadedAt: { type: "number" },
+                            fileName: { type: "string" },
+                            displayName: { type: "string" },
+                            originalName: { type: "string" },
+                            fileSize: { type: "number" },
+                            contentType: { type: "string" },
+                            isEncrypted: { type: "boolean" },
+                            isDirectory: { type: "boolean" },
+                            fileCount: { type: "number" },
+                            files: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  name: { type: "string" },
+                                  path: { type: "string" },
+                                  size: { type: "number" },
+                                  mimetype: { type: "string" },
+                                  originalName: { type: "string" },
+                                  isEncrypted: { type: "boolean" },
+                                },
+                              },
+                            },
+                            relayUrl: { type: "string" },
+                          },
+                        },
+                      },
                     },
                   },
                 },
               },
             },
-            "400": {
-              description: "Bad request",
+            "401": {
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error - GunDB not available",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/Error" },
@@ -3171,7 +3121,7 @@ The wallet signature must be a valid EIP-191 signature of the message "I Love Sh
           },
         },
       },
-      "/api/v1/bridge/transfer": {
+      "/api/v1/user-uploads/save-system-hash": {
         post: {
           tags: ["Bridge"],
           summary: "Transfer balance (L2 -> L2)",
@@ -3239,71 +3189,72 @@ The wallet signature must be a valid EIP-191 signature of the message "I Love Sh
           },
         },
       },
-      "/api/v1/bridge/withdraw": {
+      "/api/v1/user-uploads/save-system-hash": {
         post: {
-          tags: ["Bridge"],
-          summary: "Request withdrawal",
-          description: "Request withdrawal from L2 to L1",
-          operationId: "requestWithdrawal",
+          tags: ["User Uploads"],
+          summary: "Save file metadata to system hash map",
+          description:
+            "Save file or directory metadata to the GunDB systemhash node. Used by drive applications to track file metadata.",
+          operationId: "saveSystemHash",
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
           requestBody: {
             required: true,
             content: {
               "application/json": {
                 schema: {
                   type: "object",
+                  required: ["hash", "userAddress"],
                   properties: {
-                    user: { type: "string", description: "User Ethereum address" },
-                    amount: { type: "string", description: "Amount in wei" },
-                    nonce: {
-                      type: "string",
-                      description: "Withdrawal nonce (optional, auto-generated if omitted)",
+                    hash: { type: "string", description: "IPFS CID" },
+                    userAddress: { type: "string", description: "User identifier" },
+                    timestamp: { type: "number", description: "Upload timestamp" },
+                    fileName: { type: "string", description: "File name" },
+                    displayName: { type: "string", description: "Display name" },
+                    originalName: { type: "string", description: "Original file name" },
+                    fileSize: { type: "number", description: "File size in bytes" },
+                    contentType: { type: "string", description: "MIME type" },
+                    isEncrypted: { type: "boolean", description: "Whether file is encrypted" },
+                    isDirectory: { type: "boolean", description: "Whether this is a directory" },
+                    fileCount: { type: "number", description: "Number of files in directory" },
+                    files: {
+                      type: "array",
+                      description: "File list for directories",
+                      items: {
+                        type: "object",
+                        properties: {
+                          name: { type: "string" },
+                          path: { type: "string" },
+                          size: { type: "number" },
+                          mimetype: { type: "string" },
+                          originalName: { type: "string" },
+                          isEncrypted: { type: "boolean" },
+                        },
+                      },
                     },
-                    message: {
-                      type: "string",
-                      description: "Message that was signed (must include nonce if provided)",
-                    },
-                    seaSignature: { type: "string", description: "SEA signature" },
-                    ethSignature: { type: "string", description: "Ethereum signature" },
-                    gunPubKey: { type: "string", description: "GunDB public key" },
+                    relayUrl: { type: "string", description: "Relay URL where file is stored" },
                   },
-                  required: [
-                    "user",
-                    "amount",
-                    "message",
-                    "seaSignature",
-                    "ethSignature",
-                    "gunPubKey",
-                  ],
                 },
               },
             },
           },
           responses: {
             "200": {
-              description: "Withdrawal requested",
+              description: "System hash saved successfully",
               content: {
                 "application/json": {
                   schema: {
                     type: "object",
                     properties: {
                       success: { type: "boolean" },
-                      withdrawal: {
-                        type: "object",
-                        properties: {
-                          user: { type: "string" },
-                          amount: { type: "string" },
-                          nonce: { type: "string" },
-                          timestamp: { type: "number" },
-                        },
-                      },
                       message: { type: "string" },
+                      hash: { type: "string" },
                     },
                   },
                 },
               },
             },
             "400": {
-              description: "Bad request",
+              description: "Bad request - missing required fields",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/Error" },
@@ -3311,7 +3262,15 @@ The wallet signature must be a valid EIP-191 signature of the message "I Love Sh
               },
             },
             "401": {
-              description: "Unauthorized - invalid signatures",
+              description: "Unauthorized",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "500": {
+              description: "Server error - GunDB not available",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/Error" },
@@ -3321,7 +3280,7 @@ The wallet signature must be a valid EIP-191 signature of the message "I Love Sh
           },
         },
       },
-      "/api/v1/bridge/submit-batch": {
+      "/api/v1/user-uploads/save-system-hash": {
         post: {
           tags: ["Bridge"],
           summary: "Submit batch",
