@@ -1909,7 +1909,7 @@ See docs/RELAY_KEYS.md for more information.
   const DEAL_SYNC_INTERVAL_MS = dealSyncConfig.intervalMs;
   const DEAL_SYNC_FAST_INTERVAL_MS = dealSyncConfig.fastIntervalMs;
   const DEAL_SYNC_INITIAL_DELAY_MS = dealSyncConfig.initialDelayMs;
-  const RELAY_PRIVATE_KEY = registryConfig.relayPrivateKey;
+  const RELAY_PRIVATE_KEY = registryConfig.getRelayPrivateKey();
   const REGISTRY_CHAIN_ID = registryConfig.chainId?.toString();
 
   // Store interval/timeout references for cleanup
