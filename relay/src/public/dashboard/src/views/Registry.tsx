@@ -269,12 +269,24 @@ function Registry() {
       {/* Stats Bar */}
       <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
         <div className="stat">
-          <div className="stat-title">Status</div>
+          <div className="stat-title">On-Chain Status</div>
           <div
-            className={`stat-value text-lg ${status?.registered ? "text-success" : "text-warning"}`}
+            className={`stat-value text-lg ${
+              status?.relay?.status === "Active" ? "text-success" :
+              status?.relay?.status === "Unstaking" ? "text-warning" :
+              status?.relay?.status === "Slashed" ? "text-error" :
+              status?.registered ? "text-info" : "text-warning"
+            }`}
           >
-            {status?.registered ? "✅ Registered" : "⚠️ Not Registered"}
+            {status?.relay?.status === "Active" ? "✅ Active" :
+             status?.relay?.status === "Unstaking" ? "⏳ Unstaking" :
+             status?.relay?.status === "Slashed" ? "❌ Slashed" :
+             status?.relay?.status === "Inactive" ? "⚪ Inactive" :
+             status?.registered ? "✅ Registered" : "⚠️ Not Registered"}
           </div>
+          {status?.relay?.status === "Unstaking" && (
+            <div className="stat-desc text-warning">Pending unstake - not visible to clients</div>
+          )}
         </div>
         {balances && (
           <>
@@ -370,42 +382,54 @@ function Registry() {
                   <button
                     className={`tab ${stakingMode === "increase" ? "tab-active" : ""}`}
                     onClick={() => setStakingMode("increase")}
+                    disabled={status.relay?.status === "Unstaking"}
                   >
                     Increase Stake
                   </button>
                   <button
                     className={`tab ${stakingMode === "unstake" ? "tab-active" : ""}`}
                     onClick={() => setStakingMode("unstake")}
+                    disabled={status.relay?.status !== "Active"}
                   >
                     Unstake
                   </button>
                   <button
                     className={`tab ${stakingMode === "withdraw" ? "tab-active" : ""}`}
                     onClick={() => setStakingMode("withdraw")}
+                    disabled={status.relay?.status !== "Unstaking"}
                   >
                     Withdraw
                   </button>
                 </div>
                 <div className="flex items-center gap-4">
-                  <input
-                    type="number"
-                    className="input input-bordered w-32"
-                    value={stakeActionAmount}
-                    onChange={(e) => setStakeActionAmount(e.target.value)}
-                    placeholder="Amount USDC"
-                  />
+                  {stakingMode === "increase" && (
+                    <input
+                      type="number"
+                      className="input input-bordered w-32"
+                      value={stakeActionAmount}
+                      onChange={(e) => setStakeActionAmount(e.target.value)}
+                      placeholder="Amount USDC"
+                    />
+                  )}
                   <button className="btn btn-primary" onClick={handleStakingAction}>
                     {stakingMode === "increase"
                       ? "➕ Stake"
                       : stakingMode === "unstake"
-                        ? "⏳ Request Unstake"
-                        : "💸 Withdraw"}
+                        ? "⏳ Request Unstake (All)"
+                        : "💸 Withdraw All"}
                   </button>
                 </div>
                 <p className="text-sm text-base-content/60 mt-2">
-                  Current Stake: <strong>{status.relay?.stakedAmount} USDC</strong> • Pending
-                  Unstake: <strong>0 USDC</strong>
+                  Current Stake: <strong>{status.relay?.stakedAmount} USDC</strong>
+                  {status.relay?.status === "Unstaking" && (
+                    <span className="text-warning ml-2">• ⏳ Unstaking in progress (wait {params?.unstakingDelayDays || 7} days to withdraw)</span>
+                  )}
                 </p>
+                {stakingMode === "unstake" && status.relay?.status === "Active" && (
+                  <div className="alert alert-warning mt-2">
+                    <span>⚠️ Unstaking will remove your relay from the active list. Your full stake of <strong>{status.relay?.stakedAmount} USDC</strong> will be locked for {params?.unstakingDelayDays || 7} days before withdrawal.</span>
+                  </div>
+                )}
               </div>
             )}
 
