@@ -694,7 +694,13 @@ async function initializeServer() {
   // GunDB SEA pub keys are base64 encoded and typically 88 characters long
   const MIN_PUB_LENGTH = 40; // Minimum reasonable length for a pub key
   
-  (Gun as any).on("opt", function (this: any, context: any) {
+  
+
+  (Gun as any).serve(app);
+
+  const gun = (Gun as any)(gunConfig);
+
+  gun.on("opt", function (this: any, context: any) {
     if (context.once) {
       return;
     }
@@ -716,12 +722,12 @@ async function initializeServer() {
             // When a user authenticates, their data is written to ~userPub with fields like alias, pub, etc.
             if (soul && typeof soul === "string" && soul.startsWith("~")) {
               const userPub = soul.substring(1);
-              
+              G
               // Validate pub key length (GunDB SEA pub keys are typically 88 chars, but we accept 40+)
               if (!userPub || userPub.length < MIN_PUB_LENGTH) {
                 return; // Not a valid pub key, skip
               }
-              
+              "auth"
               // Look for alias in the put data
               let userAlias: string | undefined;
               
@@ -787,10 +793,6 @@ async function initializeServer() {
       this.to.next(msg);
     });
   });
-
-  (Gun as any).serve(app);
-
-  const gun = (Gun as any)(gunConfig);
 
   // Authenticate listener to track users (local auth events)
   gun.on("auth", async (ack: any) => {
