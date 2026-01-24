@@ -1207,7 +1207,10 @@ export default (app: express.Application) => {
           `${baseRoute}/ipfs/repo/gc`,
           `${baseRoute}/ipfs/repo/stat`,
           `${baseRoute}/ipfs/version`,
+          `${baseRoute}/ipfs/version`,
           `${baseRoute}/ipfs/user-uploads/:userAddress`,
+          // Users
+          `${baseRoute}/users`,
           // Gateway proxy
           `/ipfs/:cid`,
           `/ipns/:name`,
