@@ -658,7 +658,7 @@ async function initializeServer() {
     localStorage: false,
     wire: true,
     axe: false,
-    rfs: !storageConfig.disableRadisk,
+    rfs: true,
     wait: 500,
     webrtc: true,
     peers: peers,
