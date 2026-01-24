@@ -685,11 +685,86 @@ async function initializeServer() {
     }
   }
 
+  // Monitor incoming messages to track external client authentications
+  // When external clients connect and authenticate, they write to their user graph (~userPub)
+  // We use Gun's "opt" hook to intercept these writes, similar to bullet-catcher
+  // IMPORTANT: Register this hook BEFORE creating the gun instance
+  const trackedUsers = new Map<string, number>(); // Cache: pub -> lastSeen timestamp to avoid duplicate tracking
+  const TRACK_COOLDOWN = 60000; // 1 minute cooldown between tracking same user
+  
+  (Gun as any).on("opt", function (this: any, context: any) {
+    if (context.once) {
+      return;
+    }
+    // Pass to subsequent opt handlers
+    this.to.next(context);
+
+    // Add our custom "in" listener to intercept user authentication data
+    (context as any).on("in", async function (this: any, msg: any) {
+      try {
+        // Check if this is a put message
+        if (msg && msg.put) {
+          const putData = msg.put;
+          const soul = msg["#"];
+          
+          // In GunDB, user nodes have souls starting with ~ (format: ~userPub)
+          // When a user authenticates, their data is written to ~userPub with fields like alias, pub, etc.
+          if (soul && typeof soul === "string" && soul.startsWith("~")) {
+            const userPub = soul.substring(1);
+            
+            // Look for alias in the put data
+            let userAlias: string | undefined;
+            
+            // Check direct fields first
+            if (putData.alias && typeof putData.alias === "string") {
+              userAlias = putData.alias;
+            } else {
+              // Check nested data (GunDB sometimes nests data)
+              for (const key in putData) {
+                if (key !== "_" && key !== "#" && key !== ">" && key !== "<") {
+                  const value = putData[key];
+                  if (value && typeof value === "object" && value.alias && typeof value.alias === "string") {
+                    userAlias = value.alias;
+                    break;
+                  }
+                }
+              }
+            }
+
+            // Track the user if we found valid pub and alias, and cooldown has passed
+            if (userPub && userAlias && userPub.length > 20) { // Basic validation: pub should be reasonably long
+              const now = Date.now();
+              const lastTracked = trackedUsers.get(userPub);
+              
+              if (!lastTracked || (now - lastTracked) > TRACK_COOLDOWN) {
+                trackedUsers.set(userPub, now);
+                
+                // Dynamic import to avoid circular dependencies
+                const { trackUser } = await import("./utils/relay-user");
+                await trackUser(userPub, userAlias);
+                loggers.server.info(
+                  { pub: userPub, alias: userAlias },
+                  "External user authenticated and tracked via incoming message"
+                );
+              }
+            }
+          }
+        }
+      } catch (error) {
+        // Don't log every error to avoid spam
+        loggers.server.debug({ err: error }, "Error processing incoming message for user tracking");
+      }
+      
+      // Always pass the message through to the next handler
+      this.to.next(msg);
+    });
+  });
+
   (Gun as any).serve(app);
 
   const gun = (Gun as any)(gunConfig);
 
-  // Authenticate listener to track users
+  // Authenticate listener to track users (local auth events)
   gun.on("auth", async (ack: any) => {
     try {
       if (ack && ack.sea && ack.sea.pub && ack.sea.alias) {

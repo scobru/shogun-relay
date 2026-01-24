@@ -815,26 +815,35 @@ export async function trackUser(pub: string, alias: string): Promise<void> {
 
   // Use a dedicated node for observed users
   // Path: ~relayPub/users/observed/pubKey
-  return new Promise((resolve, reject) => {
-    const userData = {
-      pub,
-      alias,
-      lastSeen: Date.now(),
-      registeredAt: Date.now(), // First time we see them, we assume "registration" or at least first contact
-    };
+  return new Promise((resolve) => {
+    const usersNode = getGunNode(relayUser!, "users").get("observed").get(pub);
+    const now = Date.now();
+    
+    // First, check if user already exists to preserve registeredAt
+    usersNode.once((existingData: any) => {
+      const userData: any = {
+        pub,
+        alias,
+        lastSeen: now,
+      };
 
-    getGunNode(relayUser!, "users")
-      .get("observed")
-      .get(pub)
-      .put(userData, (ack: GunAck) => {
+      // Preserve registeredAt if user already exists, otherwise set it to now
+      if (existingData && existingData.registeredAt) {
+        userData.registeredAt = existingData.registeredAt;
+      } else {
+        userData.registeredAt = now; // First time we see them
+      }
+
+      usersNode.put(userData, (ack: GunAck) => {
         if ("err" in ack) {
           log.error({ pub, err: ack.err }, "Error tracking user");
         } else {
-          log.debug({ pub, alias }, "User tracked");
+          log.debug({ pub, alias, isNew: !existingData?.registeredAt }, "User tracked");
         }
         // Always resolve to prevent blocking
         resolve();
       });
+    });
   });
 }
 
