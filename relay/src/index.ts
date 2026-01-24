@@ -691,6 +691,8 @@ async function initializeServer() {
   // IMPORTANT: Register this hook BEFORE creating the gun instance
   const trackedUsers = new Map<string, number>(); // Cache: pub -> lastSeen timestamp to avoid duplicate tracking
   const TRACK_COOLDOWN = 60000; // 1 minute cooldown between tracking same user
+  // GunDB SEA pub keys are base64 encoded and typically 88 characters long
+  const MIN_PUB_LENGTH = 40; // Minimum reasonable length for a pub key
   
   (Gun as any).on("opt", function (this: any, context: any) {
     if (context.once) {
@@ -700,62 +702,88 @@ async function initializeServer() {
     this.to.next(context);
 
     // Add our custom "in" listener to intercept user authentication data
-    (context as any).on("in", async function (this: any, msg: any) {
-      try {
-        // Check if this is a put message
-        if (msg && msg.put) {
-          const putData = msg.put;
-          const soul = msg["#"];
-          
-          // In GunDB, user nodes have souls starting with ~ (format: ~userPub)
-          // When a user authenticates, their data is written to ~userPub with fields like alias, pub, etc.
-          if (soul && typeof soul === "string" && soul.startsWith("~")) {
-            const userPub = soul.substring(1);
+    // NOTE: This must be synchronous - we can't use async/await here
+    (context as any).on("in", function (this: any, msg: any) {
+      // Process asynchronously without blocking the message flow
+      setImmediate(() => {
+        try {
+          // Check if this is a put message
+          if (msg && msg.put) {
+            const putData = msg.put;
+            const soul = msg["#"];
             
-            // Look for alias in the put data
-            let userAlias: string | undefined;
-            
-            // Check direct fields first
-            if (putData.alias && typeof putData.alias === "string") {
-              userAlias = putData.alias;
-            } else {
-              // Check nested data (GunDB sometimes nests data)
-              for (const key in putData) {
-                if (key !== "_" && key !== "#" && key !== ">" && key !== "<") {
-                  const value = putData[key];
-                  if (value && typeof value === "object" && value.alias && typeof value.alias === "string") {
-                    userAlias = value.alias;
-                    break;
+            // In GunDB, user nodes have souls starting with ~ (format: ~userPub)
+            // When a user authenticates, their data is written to ~userPub with fields like alias, pub, etc.
+            if (soul && typeof soul === "string" && soul.startsWith("~")) {
+              const userPub = soul.substring(1);
+              
+              // Validate pub key length (GunDB SEA pub keys are typically 88 chars, but we accept 40+)
+              if (!userPub || userPub.length < MIN_PUB_LENGTH) {
+                return; // Not a valid pub key, skip
+              }
+              
+              // Look for alias in the put data
+              let userAlias: string | undefined;
+              
+              // Check direct fields first
+              if (putData.alias && typeof putData.alias === "string" && putData.alias.length > 0) {
+                userAlias = putData.alias;
+              } else if (putData["#"] && typeof putData["#"] === "string") {
+                // GunDB sometimes uses "#" to reference the alias node
+                // The alias might be in a separate node, we'll use pub as fallback
+                userAlias = undefined;
+              } else {
+                // Check nested data (GunDB sometimes nests data)
+                for (const key in putData) {
+                  if (key !== "_" && key !== "#" && key !== ">" && key !== "<") {
+                    const value = putData[key];
+                    if (value && typeof value === "object") {
+                      // Check if this nested object has an alias
+                      if (value.alias && typeof value.alias === "string" && value.alias.length > 0) {
+                        userAlias = value.alias;
+                        break;
+                      }
+                      // Check if this is a reference to another node that might contain alias
+                      if (value["#"] && typeof value["#"] === "string") {
+                        // This is a reference, alias might be in that node
+                        // We'll track with pub as alias for now, and update later if needed
+                      }
+                    }
                   }
                 }
               }
-            }
 
-            // Track the user if we found valid pub and alias, and cooldown has passed
-            if (userPub && userAlias && userPub.length > 20) { // Basic validation: pub should be reasonably long
+              // Track the user even without alias (use pub as fallback), and check cooldown
               const now = Date.now();
               const lastTracked = trackedUsers.get(userPub);
               
               if (!lastTracked || (now - lastTracked) > TRACK_COOLDOWN) {
                 trackedUsers.set(userPub, now);
                 
-                // Dynamic import to avoid circular dependencies
-                const { trackUser } = await import("./utils/relay-user");
-                await trackUser(userPub, userAlias);
+                // Use pub as alias if no alias found (we can update it later when alias is available)
+                const aliasToUse = userAlias || `user_${userPub.substring(0, 8)}`;
+                
+                // Dynamic import and track user (non-blocking)
+                import("./utils/relay-user").then(({ trackUser }) => {
+                  trackUser(userPub, aliasToUse).catch((err) => {
+                    loggers.server.debug({ pub: userPub, err }, "Error tracking user (non-fatal)");
+                  });
+                });
+                
                 loggers.server.info(
-                  { pub: userPub, alias: userAlias },
+                  { pub: userPub, alias: aliasToUse, hasAlias: !!userAlias },
                   "External user authenticated and tracked via incoming message"
                 );
               }
             }
           }
+        } catch (error) {
+          // Don't log every error to avoid spam
+          loggers.server.debug({ err: error }, "Error processing incoming message for user tracking");
         }
-      } catch (error) {
-        // Don't log every error to avoid spam
-        loggers.server.debug({ err: error }, "Error processing incoming message for user tracking");
-      }
+      });
       
-      // Always pass the message through to the next handler
+      // Always pass the message through to the next handler immediately (don't wait for async processing)
       this.to.next(msg);
     });
   });
