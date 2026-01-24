@@ -13,7 +13,6 @@ import "gun/lib/stats";
 import "gun/lib/webrtc";
 import "gun/axe";
 import "gun/lib/wire";
-import "gun/lib/rs3";
 import "./utils/bullet-catcher";
 import Holster from "@mblaney/holster/src/holster.js";
 import multer from "multer";
@@ -659,19 +658,13 @@ async function initializeServer() {
     localStorage: false,
     wire: true,
     axe: false,
-    rfs: true,
+    rfs: !storageConfig.disableRadisk,
     wait: 500,
     webrtc: true,
     peers: peers,
     chunk: 1000,
     pack: 1000,
-    jsonify: true,
-    s3: {
-      bucket: storageConfig.s3.bucket,             // S3 bucket name
-      region: storageConfig.s3.region,               // AWS region
-      accessKeyId: storageConfig.s3.accessKeyId,    // AWS access key
-      secretAccessKey: storageConfig.s3.secretAccessKey // AWS secret key
-    }
+    jsonify: true
   };
 
   if (storageConfig.disableRadisk) {
