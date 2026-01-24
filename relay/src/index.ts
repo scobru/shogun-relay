@@ -1184,6 +1184,7 @@ See docs/RELAY_KEYS.md for more information.
 
   // --- Modular Routes ---
   app.use("/api/v1/auth", authRoutes);
+  app.use("/api/v1/users", usersRoutes);
 
   // Initialize API Keys Manager before registering api-keys routes
   app.use("/api/v1/api-keys", async (req: any, res: any, next: any) => {
