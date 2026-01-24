@@ -654,7 +654,7 @@ async function initializeServer() {
     localStorage: false,
     wire: true,
     axe: false,
-    rfs: true,
+    rfs: false,
     wait: 500,
     webrtc: true,
     peers: peers,
