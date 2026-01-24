@@ -19,6 +19,7 @@ import GraphExplorer from './views/GraphExplorer'
 import Deals from './views/Deals'
 import X402 from './views/X402'
 import Chat from './views/Chat'
+import Users from './views/Users'
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
         <Route path="api-docs" element={<ApiDocs />} />
         <Route path="deals" element={<Deals />} />
         <Route path="x402" element={<X402 />} />
+        <Route path="users" element={<Users />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

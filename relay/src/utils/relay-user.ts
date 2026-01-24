@@ -623,7 +623,7 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
     const processedAddresses = new Set<string>();
     let parentListener: any = null;
     let resolved = false;
-    
+
     // Increased timeout to 15 seconds for better sync
     const timeout = setTimeout(() => {
       if (!resolved) {
@@ -639,12 +639,12 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
     // Use .on() for better sync, then switch to .once() for each subscription
     parentListener = subscriptionsNode.on((parentData: Record<string, any>) => {
       if (resolved) return;
-      
+
       if (!parentData || typeof parentData !== "object") {
         return; // Wait for more data
       }
 
-      const userKeys = Object.keys(parentData).filter((key) => 
+      const userKeys = Object.keys(parentData).filter((key) =>
         !["_", "#", ">", "<"].includes(key) && !processedAddresses.has(key)
       );
 
@@ -656,14 +656,14 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
       // Process new user keys
       userKeys.forEach((userAddress) => {
         processedAddresses.add(userAddress);
-        
+
         subscriptionsNode.get(userAddress).once((subData: SubscriptionData) => {
           if (resolved) return;
-          
+
           if (subData && typeof subData === "object") {
             const cleanData: SubscriptionData = {};
             let hasValidData = false;
-            
+
             Object.keys(subData).forEach((key) => {
               if (!["_", "#", ">", "<"].includes(key)) {
                 // @ts-ignore
@@ -674,7 +674,7 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
                 }
               }
             });
-            
+
             // Only add if we have valid subscription data
             if (hasValidData) {
               // Avoid duplicates
@@ -692,12 +692,12 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
     // Also try .once() for immediate local data
     subscriptionsNode.once((parentData: Record<string, any>) => {
       if (resolved) return;
-      
+
       if (!parentData || typeof parentData !== "object") {
         return;
       }
 
-      const userKeys = Object.keys(parentData).filter((key) => 
+      const userKeys = Object.keys(parentData).filter((key) =>
         !["_", "#", ">", "<"].includes(key)
       );
 
@@ -725,7 +725,7 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
           if (subData && typeof subData === "object") {
             const cleanData: SubscriptionData = {};
             let hasValidData = false;
-            
+
             Object.keys(subData).forEach((key) => {
               if (!["_", "#", ">", "<"].includes(key)) {
                 // @ts-ignore
@@ -735,7 +735,7 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
                 }
               }
             });
-            
+
             if (hasValidData) {
               const exists = subscriptions.some(s => s.userAddress === cleanData.userAddress);
               if (!exists) {
@@ -796,4 +796,114 @@ export default {
   getUserUploads,
   deleteUpload,
   getAllSubscriptions,
+  trackUser,
+  getObservedUsers
 };
+
+/**
+ * Track a user who has authenticated with this relay
+ * @param pub - The user's public key
+ * @param alias - The user's alias (username)
+ * @returns Promise
+ */
+export async function trackUser(pub: string, alias: string): Promise<void> {
+  if (!relayUser) {
+    // Only warn, don't throw, as this might be called during early init
+    log.warn("Relay user not initialized, cannot track user");
+    return;
+  }
+
+  // Use a dedicated node for observed users
+  // Path: ~relayPub/users/observed/pubKey
+  return new Promise((resolve, reject) => {
+    const userData = {
+      pub,
+      alias,
+      lastSeen: Date.now(),
+      registeredAt: Date.now(), // First time we see them, we assume "registration" or at least first contact
+    };
+
+    getGunNode(relayUser!, "users")
+      .get("observed")
+      .get(pub)
+      .put(userData, (ack: GunAck) => {
+        if ("err" in ack) {
+          log.error({ pub, err: ack.err }, "Error tracking user");
+        } else {
+          log.debug({ pub, alias }, "User tracked");
+        }
+        // Always resolve to prevent blocking
+        resolve();
+      });
+  });
+}
+
+/**
+ * Get all observed users
+ * @returns Promise with array of user objects
+ */
+export async function getObservedUsers(): Promise<Array<{ pub: string; alias: string; lastSeen: number }>> {
+  if (!relayUser) {
+    throw new Error("Relay user not initialized");
+  }
+
+  return new Promise((resolve) => {
+    const users: Array<any> = [];
+    let resolved = false;
+
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        resolve(users);
+      }
+    }, 5000); // 5 second timeout
+
+    getGunNode(relayUser!, "users")
+      .get("observed")
+      .once((data: Record<string, any>) => {
+        if (resolved) return;
+
+        if (!data || typeof data !== "object") {
+          resolved = true;
+          clearTimeout(timeout);
+          resolve([]);
+          return;
+        }
+
+        const keys = Object.keys(data).filter((k) => !["_", "#", ">", "<"].includes(k));
+        let processed = 0;
+
+        if (keys.length === 0) {
+          resolved = true;
+          clearTimeout(timeout);
+          resolve([]);
+          return;
+        }
+
+        keys.forEach((pub) => {
+          getGunNode(relayUser!, "users")
+            .get("observed")
+            .get(pub)
+            .once((userData: any) => {
+              processed++;
+              if (userData && userData.pub) {
+                users.push({
+                  pub: userData.pub,
+                  alias: userData.alias,
+                  lastSeen: userData.lastSeen,
+                  registeredAt: userData.registeredAt,
+                });
+              }
+
+              if (processed === keys.length) {
+                if (!resolved) {
+                  resolved = true;
+                  clearTimeout(timeout);
+                  resolve(users);
+                }
+              }
+            });
+        });
+      });
+  });
+}

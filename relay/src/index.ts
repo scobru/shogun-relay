@@ -68,6 +68,7 @@ import registryRoutes from "./routes/registry";
 import torrentRoutes from "./routes/torrent";
 import visualGraphRoutes from "./routes/visualGraph";
 import driveRoutes from "./routes/drive";
+import usersRoutes from "./routes/users";
 
 // Middleware
 
@@ -656,7 +657,7 @@ async function initializeServer() {
     uuid: relayConfig.name,
     localStorage: false,
     wire: true,
-    axe: false,
+    axe: true,
     rfs: true,
     wait: 500,
     webrtc: true,
@@ -679,6 +680,20 @@ async function initializeServer() {
   (Gun as any).serve(app);
 
   const gun = (Gun as any)(gunConfig);
+
+  // Authenticate listener to track users
+  gun.on("auth", async (ack: any) => {
+    try {
+      if (ack && ack.sea && ack.sea.pub && ack.sea.alias) {
+        // Dynamic import to avoid circular dependencies if any
+        const { trackUser } = await import("./utils/relay-user");
+        await trackUser(ack.sea.pub, ack.sea.alias);
+        loggers.server.info({ pub: ack.sea.pub, alias: ack.sea.alias }, "tl;dr: User authenticated and tracked");
+      }
+    } catch (error) {
+      loggers.server.error({ err: error }, "Error tracking user on auth");
+    }
+  });
 
   // Store gun instance in express app for access from routes
   app.set("gunInstance", gun);
