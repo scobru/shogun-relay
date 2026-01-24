@@ -693,8 +693,8 @@ async function initializeServer() {
   const TRACK_COOLDOWN = 60000; // 1 minute cooldown between tracking same user
   // GunDB SEA pub keys are base64 encoded and typically 88 characters long
   const MIN_PUB_LENGTH = 40; // Minimum reasonable length for a pub key
-  
-  
+
+
 
   (Gun as any).serve(app);
 
@@ -717,20 +717,21 @@ async function initializeServer() {
           if (msg && msg.put) {
             const putData = msg.put;
             const soul = msg["#"];
-            
+
             // In GunDB, user nodes have souls starting with ~ (format: ~userPub)
             // When a user authenticates, their data is written to ~userPub with fields like alias, pub, etc.
             if (soul && typeof soul === "string" && soul.startsWith("~")) {
               const userPub = soul.substring(1);
-              G
+
+
               // Validate pub key length (GunDB SEA pub keys are typically 88 chars, but we accept 40+)
               if (!userPub || userPub.length < MIN_PUB_LENGTH) {
                 return; // Not a valid pub key, skip
               }
-              "auth"
+
               // Look for alias in the put data
               let userAlias: string | undefined;
-              
+
               // Check direct fields first
               if (putData.alias && typeof putData.alias === "string" && putData.alias.length > 0) {
                 userAlias = putData.alias;
@@ -762,20 +763,20 @@ async function initializeServer() {
               // Track the user even without alias (use pub as fallback), and check cooldown
               const now = Date.now();
               const lastTracked = trackedUsers.get(userPub);
-              
+
               if (!lastTracked || (now - lastTracked) > TRACK_COOLDOWN) {
                 trackedUsers.set(userPub, now);
-                
+
                 // Use pub as alias if no alias found (we can update it later when alias is available)
                 const aliasToUse = userAlias || `user_${userPub.substring(0, 8)}`;
-                
+
                 // Dynamic import and track user (non-blocking)
                 import("./utils/relay-user").then(({ trackUser }) => {
                   trackUser(userPub, aliasToUse).catch((err) => {
                     loggers.server.debug({ pub: userPub, err }, "Error tracking user (non-fatal)");
                   });
                 });
-                
+
                 loggers.server.info(
                   { pub: userPub, alias: aliasToUse, hasAlias: !!userAlias },
                   "External user authenticated and tracked via incoming message"
@@ -788,7 +789,7 @@ async function initializeServer() {
           loggers.server.debug({ err: error }, "Error processing incoming message for user tracking");
         }
       });
-      
+
       // Always pass the message through to the next handler immediately (don't wait for async processing)
       this.to.next(msg);
     });
