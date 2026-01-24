@@ -818,7 +818,7 @@ export async function trackUser(pub: string, alias: string): Promise<void> {
   return new Promise((resolve) => {
     const usersNode = getGunNode(relayUser!, "users").get("observed").get(pub);
     const now = Date.now();
-    
+
     // First, check if user already exists to preserve registeredAt
     usersNode.once((existingData: any) => {
       const userData: any = {
@@ -856,63 +856,133 @@ export async function getObservedUsers(): Promise<Array<{ pub: string; alias: st
     throw new Error("Relay user not initialized");
   }
 
+  log.info("Fetching observed users from GunDB...");
+
   return new Promise((resolve) => {
     const users: Array<any> = [];
     let resolved = false;
 
+    // Increased timeout for debugging
     const timeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
+        log.warn({ count: users.length }, "getObservedUsers timed out, returning partial results");
         resolve(users);
       }
-    }, 5000); // 5 second timeout
+    }, 10000);
 
-    getGunNode(relayUser!, "users")
-      .get("observed")
-      .once((data: Record<string, any>) => {
-        if (resolved) return;
+    const observedNode = getGunNode(relayUser!, "users").get("observed");
 
-        if (!data || typeof data !== "object") {
-          resolved = true;
-          clearTimeout(timeout);
-          resolve([]);
-          return;
-        }
+    observedNode.once((data: Record<string, any>) => {
+      if (resolved) return;
 
-        const keys = Object.keys(data).filter((k) => !["_", "#", ">", "<"].includes(k));
-        let processed = 0;
+      if (!data || typeof data !== "object") {
+        log.warn("No 'observed' users node found or it is empty/null");
+        resolved = true;
+        clearTimeout(timeout);
+        resolve([]);
+        return;
+      }
 
-        if (keys.length === 0) {
-          resolved = true;
-          clearTimeout(timeout);
-          resolve([]);
-          return;
-        }
+      const keys = Object.keys(data).filter((k) => !["_", "#", ">", "<"].includes(k));
+      log.info({ count: keys.length, keys }, "Found user keys in observed node");
 
-        keys.forEach((pub) => {
-          getGunNode(relayUser!, "users")
-            .get("observed")
-            .get(pub)
-            .once((userData: any) => {
-              processed++;
-              if (userData && userData.pub) {
-                users.push({
-                  pub: userData.pub,
-                  alias: userData.alias,
-                  lastSeen: userData.lastSeen,
-                  registeredAt: userData.registeredAt,
-                });
+      let processed = 0;
+
+      if (keys.length === 0) {
+        resolved = true;
+        clearTimeout(timeout);
+        resolve([]);
+        return;
+      }
+
+      keys.forEach((pub) => {
+        observedNode
+          .get(pub)
+          .once((userData: any) => {
+            processed++;
+
+            if (userData && (userData.pub || userData.alias)) {
+              // Log found user for debugging
+              log.debug({ pub: userData.pub, alias: userData.alias }, "Found user data");
+
+              users.push({
+                pub: userData.pub || pub, // Fallback to key if pub missing in data
+                alias: userData.alias || "Unknown",
+                lastSeen: userData.lastSeen || 0,
+                registeredAt: userData.registeredAt,
+              });
+            } else {
+              log.debug({ pub }, "User data missing or invalid for key");
+            }
+
+            if (processed === keys.length) {
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timeout);
+                log.info({ count: users.length }, "Finished fetching observed users");
+                resolve(users);
               }
-
-              if (processed === keys.length) {
-                if (!resolved) {
-                  resolved = true;
-                  clearTimeout(timeout);
-                  resolve(users);
-                }
-              }
-            });
-        });
+            }
+          });
       });
+    });
+  });
+}
+
+/**
+ * Get all graph nodes related to a specific user public key
+ * Performs a shallow traversal of the user's root node
+ * @param pub - The user's public key
+ * @returns Promise with the user's root object
+ */
+export async function getUserGraphNodes(pub: string): Promise<Record<string, any>> {
+  if (!relayUser) {
+    throw new Error("Relay user not initialized");
+  }
+
+  // Capture relayUser locally to satisfy TS in callbacks
+  const userInstance = relayUser;
+
+  return new Promise((resolve) => {
+    // GunDB user roots are addressed by ~pub
+    // We need to go back to the root gun instance to access other users by public key
+    const rootGun = (userInstance as any).back(-1);
+    const userNode = rootGun.get(`~${pub}`);
+
+    const result: Record<string, any> = {};
+
+    // Get the root level data
+    userNode.once((data: any) => {
+      if (!data) {
+        resolve({
+          error: "User not found or no data",
+          pub
+        });
+        return;
+      }
+
+      // Clean metadata
+      Object.keys(data).forEach(key => {
+        if (key !== "_" && key !== "#" && key !== ">" && key !== "<") {
+          result[key] = data[key];
+        }
+      });
+
+      resolve(result);
+    });
+
+    // Timeout
+    setTimeout(() => {
+      // Resolve with whatever we have (even if just empty object)
+      // wrapping in an object to indicate timeout context if empty
+      if (Object.keys(result).length === 0) {
+        resolve({
+          message: "Timeout or empty data",
+          partial: result,
+          pub
+        });
+      }
+    }, 5000);
   });
 }

@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import { adminAuthMiddleware } from "../middleware/admin-auth";
-import { getObservedUsers } from "../utils/relay-user";
+import { getObservedUsers, getUserGraphNodes } from "../utils/relay-user";
 import { loggers } from "../utils/logger";
 
 const router = express.Router();
@@ -24,6 +24,38 @@ router.get("/", adminAuthMiddleware, async (req: Request, res: Response) => {
         res.status(500).json({
             success: false,
             error: error.message || "Failed to fetch users"
+        });
+    }
+});
+
+/**
+ * GET /api/v1/users/:pub/nodes
+ * Get all graph nodes for a specific user
+ * Protected by admin authentication
+ */
+router.get("/:pub/nodes", adminAuthMiddleware, async (req: Request, res: Response) => {
+    try {
+        const { pub } = req.params;
+
+        if (!pub) {
+            return res.status(400).json({
+                success: false,
+                error: "Public key is required"
+            });
+        }
+
+        const nodes = await getUserGraphNodes(pub);
+
+        res.json({
+            success: true,
+            pub,
+            nodes
+        });
+    } catch (error: any) {
+        loggers.server.error({ err: error, pub: req.params.pub }, "Error fetching user nodes");
+        res.status(500).json({
+            success: false,
+            error: error.message || "Failed to fetch user nodes"
         });
     }
 });
