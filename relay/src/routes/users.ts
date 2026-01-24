@@ -1,6 +1,6 @@
-
 import express, { Request, Response } from "express";
-import { adminAuthMiddleware, getObservedUsers } from "../utils/relay-user";
+import { adminAuthMiddleware } from "../middleware/admin-auth";
+import { getObservedUsers } from "../utils/relay-user";
 import { loggers } from "../utils/logger";
 
 const router = express.Router();

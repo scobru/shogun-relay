@@ -75,6 +75,7 @@ import chatRouter from "./chat";
 import torrentRouter from "./torrent";
 import driveRouter from "./drive";
 import apiKeysRouter from "./api-keys";
+import usersRouter from "./users";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
@@ -1176,6 +1177,9 @@ export default (app: express.Application) => {
   });
 
   loggers.server.info(`✅ Admin routes registered`);
+
+  // Users (observed users on relay) - must be before catch-all
+  app.use(`${baseRoute}/users`, usersRouter);
 
   // Route di default per API non trovate
   app.use(`${baseRoute}/*`, (req: Request, res: Response) => {
