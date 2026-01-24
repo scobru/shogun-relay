@@ -643,15 +643,11 @@ async function initializeServer() {
         bucket: s3Conf.bucket
       }, "🪣 Using S3/MinIO storage for Gun");
     }
-  } else {
-    loggers.server.info("📁 Using file-based radisk storage");
   }
 
+  // Configure Gun options based on storage selection
   const gunConfig: any = {
     super: true,
-    file: dataDir,
-    radisk: !storageConfig.disableRadisk, // Allow disabling radisk via env var
-    store: store, // Use SQLite or S3 store if available
     web: server,
     isValid: hasValidToken,
     uuid: relayConfig.name,
@@ -667,14 +663,26 @@ async function initializeServer() {
     jsonify: true
   };
 
-  if (storageConfig.disableRadisk) {
-    loggers.server.info("📁 Radisk disabled via environment variable");
-  } else if (storageType === "sqlite") {
-    loggers.server.info("📁 Using SQLite storage with radisk");
-  } else if (storageType === "s3") {
-    loggers.server.info("📁 Using S3/MinIO storage with radisk");
+  // Logic to ensure storage consistency
+  if (store) {
+    // When using a custom store (SQLite or S3), we bind it and enable radisk
+    gunConfig.store = store;
+    gunConfig.radisk = true; // Custom stores hook into radisk
+    // We do NOT set 'file' here to avoid Gun checking/creating default files unnecessarily
+
+    if (storageConfig.disableRadisk) {
+      loggers.server.warn("⚠️ DISABLE_RADISK setting ignored because a custom storage adapter (SQLite/S3) is active.");
+    }
   } else {
-    loggers.server.info("📁 Using local file storage with radisk");
+    // Fallback to default Gun file storage (Radisk default) or memory-only
+    gunConfig.radisk = !storageConfig.disableRadisk;
+
+    if (gunConfig.radisk) {
+      gunConfig.file = dataDir; // Only set 'file' when using default file storage
+      loggers.server.info("📁 Using file-based radisk storage (default)");
+    } else {
+      loggers.server.warn("⚠️ Persistent storage DISABLED (radisk=false). Data will be in-memory only.");
+    }
   }
 
   (Gun as any).serve(app);
