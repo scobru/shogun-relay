@@ -134,8 +134,9 @@ ARG CORS_ORIGINS
 ARG CORS_CREDENTIALS
 ARG STRICT_SESSION_IP
 
-
-
+ARG GUN_S3_BUCKET
+ARG GUN_S3_ACCESS_KEY
+ARG GUN_S3_SECRET_KEY
 
 # =============================================================================
 # ENVIRONMENT VARIABLES (Persist ARGs to Runtime)
@@ -322,11 +323,9 @@ COPY docker/ /app/docker/
 RUN dos2unix /app/docker/init-ipfs.sh \
     && dos2unix /app/docker/entrypoint.sh \
     && dos2unix /app/docker/verify-volumes.sh || true \
-    && dos2unix /app/docker/tunnel.sh \
     && chmod +x /app/docker/init-ipfs.sh \
     && chmod +x /app/docker/entrypoint.sh \
     && chmod +x /app/docker/verify-volumes.sh || true \
-    && chmod +x /app/docker/tunnel.sh \
     && cp /app/docker/entrypoint.sh /usr/local/bin/entrypoint.sh \
     && chmod +x /usr/local/bin/entrypoint.sh \
     && cp /app/docker/relay.env /app/relay/.env
