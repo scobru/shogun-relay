@@ -796,13 +796,17 @@ async function initializeServer() {
   });
 
   // Authenticate listener to track users (local auth events)
+  // Authenticate listener to track users (local auth events)
   gun.on("auth", async (ack: any) => {
     try {
-      if (ack && ack.sea && ack.sea.pub && ack.sea.alias) {
+      if (ack && ack.sea && ack.sea.pub) {
+        // Use provided alias or fallback to "user_<short_pub>"
+        const alias = ack.sea.alias || `user_${ack.sea.pub.substring(0, 8)}`;
+
         // Dynamic import to avoid circular dependencies if any
         const { trackUser } = await import("./utils/relay-user");
-        await trackUser(ack.sea.pub, ack.sea.alias);
-        loggers.server.info({ pub: ack.sea.pub, alias: ack.sea.alias }, "tl;dr: User authenticated and tracked");
+        await trackUser(ack.sea.pub, alias);
+        loggers.server.info({ pub: ack.sea.pub, alias, hasAlias: !!ack.sea.alias }, "tl;dr: User authenticated and tracked");
       }
     } catch (error) {
       loggers.server.error({ err: error }, "Error tracking user on auth");
