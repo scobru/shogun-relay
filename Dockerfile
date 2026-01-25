@@ -413,7 +413,7 @@ RUN echo "🔍 Final dashboard verification..." && \
 EXPOSE 8765 5001 8080 4001 6881
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=30s --start-period=180s --retries=5 \
     CMD curl -f http://localhost:8765/health || exit 1
 
 # Use supervisor to manage multiple services
