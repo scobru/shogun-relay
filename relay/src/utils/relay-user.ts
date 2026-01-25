@@ -857,7 +857,7 @@ export async function trackUser(pub: string, alias: string): Promise<void> {
  * Get all observed users
  * @returns Promise with array of user objects
  */
-export async function getObservedUsers(): Promise<Array<{ pub: string; alias: string; lastSeen: number }>> {
+export async function getObservedUsers(): Promise<Array<{ pub: string; alias: string; lastSeen: number; registeredAt?: number }>> {
   if (!relayUser) {
     throw new Error("Relay user not initialized");
   }
@@ -866,71 +866,113 @@ export async function getObservedUsers(): Promise<Array<{ pub: string; alias: st
 
   return new Promise((resolve) => {
     const users: Array<any> = [];
+    const processedKeys = new Set<string>();
     let resolved = false;
 
-    // Increased timeout for debugging
-    const timeout = setTimeout(() => {
+    // Overall timeout for the entire operation
+    const globalTimeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        log.warn({ count: users.length }, "getObservedUsers timed out, returning partial results");
+        log.warn({ count: users.length }, "getObservedUsers global timeout, returning accumulated results");
         resolve(users);
       }
-    }, 10000);
+    }, 15000); // 15 seconds global timeout
 
     const observedNode = getGunNode(relayUser!, "users").get("observed");
 
+    // "Race" to detect if the node is empty or non-existent quickly
+    // If .once() doesn't fire within 2 seconds, we assume it's empty or network is lagging
+    // But we still wait for the global timeout in case data comes in late
+    const initialCheckTimeout = setTimeout(() => {
+      // We don't resolve here, just log warning, because data might still flow in via .on() theoretically
+      // actually we are using .once()
+      log.debug("Initial check for observed users node timed out (2s), waiting for data...");
+    }, 2000);
+
     observedNode.once((data: Record<string, any>) => {
+      clearTimeout(initialCheckTimeout);
+
       if (resolved) return;
 
       if (!data || typeof data !== "object") {
         log.warn("No 'observed' users node found or it is empty/null");
         resolved = true;
-        clearTimeout(timeout);
+        clearTimeout(globalTimeout);
         resolve([]);
         return;
       }
 
+      // Filter valid keys (GunDB metadata starts with _)
       const keys = Object.keys(data).filter((k) => !["_", "#", ">", "<"].includes(k));
-      log.info({ count: keys.length, keys }, "Found user keys in observed node");
-
-      let processed = 0;
+      log.info({ count: keys.length }, "Found user keys in observed node");
 
       if (keys.length === 0) {
         resolved = true;
-        clearTimeout(timeout);
+        clearTimeout(globalTimeout);
         resolve([]);
         return;
       }
 
+      let completedLookups = 0;
+      const totalKeys = keys.length;
+
+      // Process each key
       keys.forEach((pub) => {
-        observedNode
-          .get(pub)
-          .once((userData: any) => {
-            processed++;
+        // Prevent duplicate processing
+        if (processedKeys.has(pub)) {
+          completedLookups++;
+          return;
+        }
+        processedKeys.add(pub);
+
+        // Fetch individual user data with a short timeout per user
+        // so one stuck user doesn't hold up the entire batch
+        const userPromise = new Promise<void>((resolveUser) => {
+          let userResolved = false;
+
+          const userTimeout = setTimeout(() => {
+            if (!userResolved) {
+              userResolved = true;
+              // Don't log error, just debug - it's common for some nodes to be slow
+              // We still want to count this as "completed" (failed) lookup
+              resolveUser();
+            }
+          }, 3000); // 3 seconds per user lookup
+
+          observedNode.get(pub).once((userData: any) => {
+            if (userResolved) return;
+            userResolved = true;
+            clearTimeout(userTimeout);
 
             if (userData && (userData.pub || userData.alias)) {
-              // Log found user for debugging
-              log.debug({ pub: userData.pub, alias: userData.alias }, "Found user data");
-
               users.push({
-                pub: userData.pub || pub, // Fallback to key if pub missing in data
+                pub: userData.pub || pub,
                 alias: userData.alias || "Unknown",
                 lastSeen: userData.lastSeen || 0,
                 registeredAt: userData.registeredAt,
               });
-            } else {
-              log.debug({ pub }, "User data missing or invalid for key");
             }
-
-            if (processed === keys.length) {
-              if (!resolved) {
-                resolved = true;
-                clearTimeout(timeout);
-                log.info({ count: users.length }, "Finished fetching observed users");
-                resolve(users);
-              }
-            }
+            resolveUser();
           });
+        });
+
+        // Handle the user promise completion
+        userPromise.then(() => {
+          completedLookups++;
+          // processing progress logging every 10 users
+          if (completedLookups % 10 === 0) {
+            log.debug({ current: completedLookups, total: totalKeys }, "Fetching users progress");
+          }
+
+          if (completedLookups === totalKeys) {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(globalTimeout);
+              log.info({ count: users.length, totalKeys }, "Finished fetching observed users");
+              resolve(users);
+            }
+          }
+        });
       });
     });
   });
