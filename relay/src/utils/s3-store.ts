@@ -80,13 +80,13 @@ class S3Store {
                 connectionTimeout: 5000,
                 socketTimeout: 30000,
                 socketAcquisitionWarningTimeout: 10000, // Warn only if acquisition takes longer than 10s
-                // Increase max sockets to handle GunDB radisk load
+                // limit max sockets to prevent 502 overload
                 httpsAgent: {
-                    maxSockets: 1000,
+                    maxSockets: 250,
                     keepAlive: true,
                 },
                 httpAgent: {
-                    maxSockets: 1000,
+                    maxSockets: 250,
                     keepAlive: true,
                 },
             }),

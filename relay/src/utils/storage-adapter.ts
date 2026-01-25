@@ -392,11 +392,11 @@ export class MinioStorageAdapter implements IStorageAdapter {
                 socketTimeout: 30000,
                 socketAcquisitionWarningTimeout: 10000, // Warn only after 10s
                 httpsAgent: {
-                    maxSockets: 1000,
+                    maxSockets: 250,
                     keepAlive: true,
                 },
                 httpAgent: {
-                    maxSockets: 1000,
+                    maxSockets: 250,
                     keepAlive: true,
                 },
             }),
