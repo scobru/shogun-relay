@@ -726,8 +726,13 @@ async function initializeServer() {
 
               // Validate pub key length (GunDB SEA pub keys are typically 88 chars, but we accept 40+)
               if (!userPub || userPub.length < MIN_PUB_LENGTH) {
-                return; // Not a valid pub key, skip
+                // Too noisy to log every invalid pub
+                // loggers.server.debug({ pub: userPub, len: userPub?.length }, "Skipping invalid pub key length");
+                return;
               }
+
+              // Log potential user activity for debugging
+              // loggers.server.debug({ pub: userPub, soul }, "Processing potential user activity");
 
               // Look for alias in the put data
               let userAlias: string | undefined;
@@ -786,7 +791,7 @@ async function initializeServer() {
           }
         } catch (error) {
           // Don't log every error to avoid spam
-          loggers.server.debug({ err: error }, "Error processing incoming message for user tracking");
+          // loggers.server.debug({ err: error }, "Error processing incoming message for user tracking");
         }
       });
 

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>GunDB Test</title>
+</head>
+
+<body>
+    <h1>GunDB Login/Register Test</h1>
+
+    <h3>Register</h3>
+    <input type="text" id="reg-user" placeholder="Username">
+    <input type="password" id="reg-pass" placeholder="Password">
+    <button onclick="register()">Register</button>
+
+    <h3>Login</h3>
+    <input type="text" id="login-user" placeholder="Username">
+    <input type="password" id="login-pass" placeholder="Password">
+    <button onclick="login()">Login</button>
+
+    <h3>Status</h3>
+    <div id="status">Waiting...</div>
+    <div id="current-user">Not logged in</div>
+
+    <!-- Load Gun and SEA from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+
+    <script>
+        // Initialize Gun
+        var gun = Gun({
+            peers: ['https://shogun-relay.scobrudot.dev/gun'],
+            localStorage: false,
+            radisk: false
+        });
+        var user = gun.user();
+
+        window.gun = gun;
+
+        function updateStatus(msg) {
+            document.getElementById('status').innerText = msg;
+            console.log(msg);
+        }
+
+        function register() {
+            var u = document.getElementById('reg-user').value;
+            var p = document.getElementById('reg-pass').value;
+
+            if (!u || !p) {
+                updateStatus('Username and password required');
+                return;
+            }
+
+            updateStatus('Registering...');
+            user.create(u, p, function (ack) {
+                if (ack.err) {
+                    updateStatus('Error: ' + ack.err);
+                } else {
+                    updateStatus('Registered successfully! Public Key: ' + ack.pub);
+                }
+            });
+        }
+
+        function login() {
+            var u = document.getElementById('login-user').value;
+            var p = document.getElementById('login-pass').value;
+
+            if (!u || !p) {
+                updateStatus('Username and password required');
+                return;
+            }
+
+            updateStatus('Logging in...');
+            user.auth(u, p, function (ack) {
+                if (ack.err) {
+                    updateStatus('Error: ' + ack.err);
+                } else {
+                    updateStatus('Logged in successfully!');
+                    showCurrentUser();
+                }
+            });
+        }
+
+        function showCurrentUser() {
+            if (user.is) {
+                document.getElementById('current-user').innerText = 'Current User Pub: ' + user.is.pub;
+            } else {
+                document.getElementById('current-user').innerText = 'Not logged in';
+            }
+        }
+
+        // Listen for auth events
+        gun.on('auth', function () {
+            // This event fires when authentication happens (login or session restore)
+            showCurrentUser();
+        });
+
+    </script>
+</body>
+
+</html>

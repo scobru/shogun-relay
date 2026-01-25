@@ -820,25 +820,31 @@ export async function trackUser(pub: string, alias: string): Promise<void> {
     const now = Date.now();
 
     // First, check if user already exists to preserve registeredAt
-    usersNode.once((existingData: any) => {
+    // Use a race with timeout to ensure we don't hang if Gun is slow
+    const timeoutPromise = new Promise<{ registeredAt?: number }>((resolve) => {
+      setTimeout(() => resolve({}), 2000); // 2s timeout
+    });
+
+    const readPromise = new Promise<{ registeredAt?: number }>((resolve) => {
+      usersNode.once((existingData: any) => {
+        resolve(existingData || {});
+      });
+    });
+
+    Promise.race([readPromise, timeoutPromise]).then((existingData: any) => {
       const userData: any = {
         pub,
         alias,
         lastSeen: now,
+        // Preserve registeredAt if user already exists, otherwise set it to now
+        registeredAt: existingData.registeredAt || now
       };
-
-      // Preserve registeredAt if user already exists, otherwise set it to now
-      if (existingData && existingData.registeredAt) {
-        userData.registeredAt = existingData.registeredAt;
-      } else {
-        userData.registeredAt = now; // First time we see them
-      }
 
       usersNode.put(userData, (ack: GunAck) => {
         if ("err" in ack) {
           log.error({ pub, err: ack.err }, "Error tracking user");
         } else {
-          log.debug({ pub, alias, isNew: !existingData?.registeredAt }, "User tracked");
+          log.debug({ pub, alias, isNew: !existingData.registeredAt }, "User tracked");
         }
         // Always resolve to prevent blocking
         resolve();
