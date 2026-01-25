@@ -944,64 +944,75 @@ export async function getObservedUsers(): Promise<Array<{ pub: string; alias: st
       let completedLookups = 0;
       const totalKeys = keys.length;
 
-      // Process each key
-      keys.forEach((pub) => {
-        // Prevent duplicate processing
-        if (processedKeys.has(pub)) {
-          completedLookups++;
-          return;
-        }
-        processedKeys.add(pub);
+      let completedLookups = 0;
+      const totalKeys = keys.length;
+      
+      // Helper to process a single user
+      const processUser = (pub: string): Promise<void> => {
+          if (processedKeys.has(pub)) return Promise.resolve();
+          processedKeys.add(pub);
 
-        // Fetch individual user data with a short timeout per user
-        // so one stuck user doesn't hold up the entire batch
-        const userPromise = new Promise<void>((resolveUser) => {
-          let userResolved = false;
+          return new Promise<void>((resolveUser) => {
+              let userResolved = false;
+              // Short timeout for individual user lookup
+              const userTimeout = setTimeout(() => {
+                  if (!userResolved) {
+                      userResolved = true;
+                      resolveUser();
+                  }
+              }, 3000); 
 
-          const userTimeout = setTimeout(() => {
-            if (!userResolved) {
-              userResolved = true;
-              // Don't log error, just debug - it's common for some nodes to be slow
-              // We still want to count this as "completed" (failed) lookup
-              resolveUser();
-            }
-          }, 3000); // 3 seconds per user lookup
+              observedNode.get(pub).once((userData: any) => {
+                  if (userResolved) return;
+                  userResolved = true;
+                  clearTimeout(userTimeout);
 
-          observedNode.get(pub).once((userData: any) => {
-            if (userResolved) return;
-            userResolved = true;
-            clearTimeout(userTimeout);
-
-            if (userData && (userData.pub || userData.alias)) {
-              users.push({
-                pub: userData.pub || pub,
-                alias: userData.alias || "Unknown",
-                lastSeen: userData.lastSeen || 0,
-                registeredAt: userData.registeredAt,
+                  if (userData && (userData.pub || userData.alias)) {
+                      users.push({
+                          pub: userData.pub || pub,
+                          alias: userData.alias || "Unknown",
+                          lastSeen: userData.lastSeen || 0,
+                          registeredAt: userData.registeredAt,
+                      });
+                  }
+                  resolveUser();
               });
-            }
-            resolveUser();
           });
-        });
+      };
 
-        // Handle the user promise completion
-        userPromise.then(() => {
-          completedLookups++;
-          // processing progress logging every 10 users
-          if (completedLookups % 10 === 0) {
-            log.debug({ current: completedLookups, total: totalKeys }, "Fetching users progress");
+      // Process in chunks to avoid blocking event loop
+      let currentIndex = 0;
+      const CHUNK_SIZE = 50;
+
+      const processChunk = async () => {
+          const end = Math.min(currentIndex + CHUNK_SIZE, totalKeys);
+          const chunk = keys.slice(currentIndex, end);
+          
+          // Process chunk in parallel
+          await Promise.all(chunk.map(pub => processUser(pub)));
+          
+          currentIndex += chunk.length;
+          
+          // Log progress
+          if (currentIndex % 500 === 0 || currentIndex === totalKeys) {
+             log.debug({ current: currentIndex, total: totalKeys }, "Fetching users progress");
           }
 
-          if (completedLookups === totalKeys) {
-            if (!resolved) {
-              resolved = true;
-              clearTimeout(globalTimeout);
-              log.info({ count: users.length, totalKeys }, "Finished fetching observed users");
-              resolve(users);
-            }
+          if (currentIndex < totalKeys) {
+              if (resolved) return; // Stop if global timeout triggered
+              setImmediate(processChunk);
+          } else {
+              if (!resolved) {
+                  resolved = true;
+                  clearTimeout(globalTimeout);
+                  log.info({ count: users.length, totalKeys }, "Finished fetching observed users");
+                  resolve(users);
+              }
           }
-        });
-      });
+      };
+
+      // Start processing
+      processChunk();
     });
   });
 }
