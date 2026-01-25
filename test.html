@@ -31,11 +31,14 @@
         var gun = Gun({
             peers: ['https://shogun-relay.scobrudot.dev/gun'],
             localStorage: false,
-            radisk: false
+            radisk: false,
+            wire: true
         });
         var user = gun.user();
 
         window.gun = gun;
+
+        console.log(gun)
 
         function updateStatus(msg) {
             document.getElementById('status').innerText = msg;

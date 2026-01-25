@@ -653,14 +653,14 @@ async function initializeServer() {
     uuid: relayConfig.name,
     localStorage: false,
     wire: true,
-    axe: false,
-    rfs: false,
-    wait: 500,
+    axe: true,
+    rfs: true,
+    //wait: 500,
     webrtc: true,
     peers: peers,
-    chunk: 1000,
-    pack: 1000,
-    jsonify: true
+    // chunk: 1000,
+    // pack: 1000,
+    // jsonify: true
   };
 
   // Logic to ensure storage consistency
