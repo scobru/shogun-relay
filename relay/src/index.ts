@@ -689,7 +689,7 @@ async function initializeServer() {
   // When external clients connect and authenticate, they write to their user graph (~userPub)
   // We use Gun's "opt" hook to intercept these writes, similar to bullet-catcher
   // IMPORTANT: Register this hook BEFORE creating the gun instance
-  const trackedUsers = new Map<string, number>(); // Cache: pub -> lastSeen timestamp to avoid duplicate tracking
+  const trackedUsers = new Map<string, { ts: number, hasAlias: boolean }>(); // Cache: pub -> { ts, hasAlias }
   const TRACK_COOLDOWN = 60000; // 1 minute cooldown between tracking same user
   // GunDB SEA pub keys are base64 encoded and typically 88 characters long
   const MIN_PUB_LENGTH = 40; // Minimum reasonable length for a pub key
@@ -767,10 +767,18 @@ async function initializeServer() {
 
               // Track the user even without alias (use pub as fallback), and check cooldown
               const now = Date.now();
-              const lastTracked = trackedUsers.get(userPub);
+              const lastTrackedInfo = trackedUsers.get(userPub);
+              const lastTrackedTime = lastTrackedInfo ? lastTrackedInfo.ts : 0;
+              const hasNewAlias = !!userAlias;
 
-              if (!lastTracked || (now - lastTracked) > TRACK_COOLDOWN) {
-                trackedUsers.set(userPub, now);
+              // We track if:
+              // 1. User hasn't been tracked recently (cooldown expired)
+              // 2. OR we have a real alias now, but didn't have one before (alias upgrade)
+              const isCooldownExpired = (now - lastTrackedTime) > TRACK_COOLDOWN;
+              const isAliasUpgrade = hasNewAlias && lastTrackedInfo && !lastTrackedInfo.hasAlias;
+
+              if (!lastTrackedInfo || isCooldownExpired || isAliasUpgrade) {
+                trackedUsers.set(userPub, { ts: now, hasAlias: hasNewAlias });
 
                 // Use pub as alias if no alias found (we can update it later when alias is available)
                 const aliasToUse = userAlias || `user_${userPub.substring(0, 8)}`;
@@ -783,7 +791,7 @@ async function initializeServer() {
                 });
 
                 loggers.server.info(
-                  { pub: userPub, alias: aliasToUse, hasAlias: !!userAlias },
+                  { pub: userPub, alias: aliasToUse, hasAlias: !!userAlias, upgrade: isAliasUpgrade },
                   "External user authenticated and tracked via incoming message"
                 );
               }
