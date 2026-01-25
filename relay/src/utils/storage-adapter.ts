@@ -390,12 +390,13 @@ export class MinioStorageAdapter implements IStorageAdapter {
             requestHandler: new NodeHttpHandler({
                 connectionTimeout: 5000,
                 socketTimeout: 30000,
+                socketAcquisitionWarningTimeout: 10000, // Warn only after 10s
                 httpsAgent: {
-                    maxSockets: 100,
+                    maxSockets: 1000,
                     keepAlive: true,
                 },
                 httpAgent: {
-                    maxSockets: 100,
+                    maxSockets: 1000,
                     keepAlive: true,
                 },
             }),
