@@ -438,4 +438,43 @@ router.get("/test-gun-save/:identifier/:hash", async (req: Request, res: Respons
   }
 });
 
+// Cleanup duplicate aliases endpoint
+router.post("/cleanup-aliases", async (req: Request, res: Response) => {
+  try {
+    const { authConfig } = await import("../config/env-config");
+    // require admin token
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
+
+    if (token !== authConfig.adminPassword) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    loggers.server.info("🧹 Starting manual alias cleanup via API");
+
+    // Dynamic import to avoid circular dependencies
+    const { cleanDuplicateAliases, rebuildAliasIndex } = await import("../utils/relay-user");
+
+    const cleaningResult = await cleanDuplicateAliases();
+    await rebuildAliasIndex();
+
+    loggers.server.info({ result: cleaningResult }, "✅ Alias cleanup completed");
+
+    res.json({
+      success: true,
+      data: cleaningResult,
+      message: "Alias cleanup completed successfully"
+    });
+
+  } catch (error: any) {
+    loggers.server.error({ err: error }, "❌ Alias cleanup error");
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 export default router;

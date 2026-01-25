@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import { adminAuthMiddleware } from "../middleware/admin-auth";
-import { getObservedUsers, getUserGraphNodes } from "../utils/relay-user";
+import { getObservedUsers, getUserGraphNodes, getGlobalUsers } from "../utils/relay-user";
 import { loggers } from "../utils/logger";
 
 const router = express.Router();
@@ -12,12 +12,13 @@ const router = express.Router();
  */
 router.get("/", adminAuthMiddleware, async (req: Request, res: Response) => {
     try {
-        const users = await getObservedUsers();
+        // Use getGlobalUsers to scan ~@ namespace as requested
+        const users = await getGlobalUsers();
 
         res.json({
             success: true,
             count: users.length,
-            users: users.sort((a, b) => b.lastSeen - a.lastSeen) // Sort by most recently seen
+            users: users // already has { alias, pub, ... }
         });
     } catch (error: any) {
         loggers.server.error({ err: error }, "Error fetching observed users");

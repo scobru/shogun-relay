@@ -1163,3 +1163,85 @@ export async function cleanDuplicateAliases(): Promise<{ removed: number, kept: 
 
   return { removed: removedCount, kept: keptCount };
 }
+
+/**
+ * Get ALL users from the global alias namespace (~@)
+ * This scans the public graph for any registered alias
+ */
+export async function getGlobalUsers(): Promise<Array<{ pub: string; alias: string; lastSeen: number; registeredAt: number }>> {
+  if (!relayUser) throw new Error("Relay user not initialized");
+
+  // Use the root gun instance to access ~@
+  // We need to back out from the user instance
+  const rootGun = (relayUser as any).back(-1);
+
+  return new Promise((resolve) => {
+    const users: Map<string, any> = new Map();
+    const aliasNode = rootGun.get('~@');
+
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        resolve(Array.from(users.values()));
+      }
+    }, 5000); // 5s timeout to gather aliases
+
+    aliasNode.map().once((data: any, alias: string) => {
+      if (resolved) return;
+      if (!alias || alias === '_' || alias === '#') return;
+
+      // Gun usually stores: ~@alias -> { #: ~pub } OR ~@alias -> ~pub
+      // We need to resolve the pub key
+
+      // If we already have this alias, skip
+      if (users.has(alias)) return;
+
+      // Try to resolve pub
+      // Option 1: The data IS the link
+      let pub = '';
+      if (data && typeof data === 'object' && data['#']) {
+        const soul = data['#'];
+        if (soul.startsWith('~')) {
+          pub = soul.substring(1);
+        }
+      }
+      // Option 2: Look deeper if needed (skipped for speed for now, assume standard auth)
+
+      if (pub) {
+        users.set(alias, {
+          alias,
+          pub,
+          lastSeen: 0, // Not available in raw alias scan
+          registeredAt: 0 // Not available in raw alias scan
+        });
+      } else {
+        // Try one level deeper lookup if link wasn't immediate
+        rootGun.get(`~@${alias}`).once((userData: any) => {
+          let foundPub = '';
+          if (userData) {
+            // Sometimes auth stores data directly
+            if (userData.pub) foundPub = userData.pub;
+            // Or finding the soul
+            else {
+              const soul = (userData as any)._?.['#'];
+              if (soul && soul.startsWith('~')) foundPub = soul.substring(1);
+            }
+          }
+
+          if (foundPub && !users.has(alias)) {
+            users.set(alias, {
+              alias,
+              pub: foundPub,
+              lastSeen: 0,
+              registeredAt: 0
+            });
+          }
+        });
+      }
+    });
+
+    // Also resolve after a short delay if map() finds nothing initially?
+    // The timeout handles the completion.
+  });
+}

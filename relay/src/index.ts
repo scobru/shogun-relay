@@ -2311,6 +2311,40 @@ See docs/RELAY_KEYS.md for more information.
     loggers.server.error({ err: error }, "❌ Failed to initialize Chat Service");
   }
 
+  // Initialize Alias Cleanup (Startup + Periodic)
+  try {
+    const { cleanDuplicateAliases, rebuildAliasIndex } = await import("./utils/relay-user");
+
+    // Run after a short delay to allow Gun to sync initial data
+    setTimeout(async () => {
+      try {
+        loggers.server.info("🧹 Running startup alias cleanup...");
+        const result = await cleanDuplicateAliases();
+        await rebuildAliasIndex();
+        loggers.server.info({ result }, "✅ Startup alias cleanup completed");
+      } catch (e) {
+        loggers.server.error({ err: e }, "❌ Startup alias cleanup failed");
+      }
+    }, 30000); // 30s delay
+
+    // Schedule periodic cleanup (every 1 hour)
+    setInterval(async () => {
+      try {
+        loggers.server.info("🧹 Running scheduled alias cleanup...");
+        const result = await cleanDuplicateAliases();
+        // rebuildAliasIndex is less critical to run every time if cleanup ensures consistency, 
+        // but good for safety.
+        await rebuildAliasIndex();
+        loggers.server.info({ result }, "✅ Scheduled alias cleanup completed");
+      } catch (e) {
+        loggers.server.error({ err: e }, "❌ Scheduled alias cleanup failed");
+      }
+    }, 60 * 60 * 1000); // 1 hour
+
+  } catch (error) {
+    loggers.server.error({ err: error }, "❌ Failed to initialize Alias Cleanup");
+  }
+
   return {
     server,
     gun,
