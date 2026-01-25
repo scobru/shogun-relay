@@ -797,7 +797,10 @@ export default {
   deleteUpload,
   getAllSubscriptions,
   trackUser,
-  getObservedUsers
+  getObservedUsers,
+  cleanDuplicateAliases,
+  deleteObservedUser,
+  rebuildAliasIndex
 };
 
 /**
@@ -808,47 +811,72 @@ export default {
  */
 export async function trackUser(pub: string, alias: string): Promise<void> {
   if (!relayUser) {
-    // Only warn, don't throw, as this might be called during early init
     log.warn("Relay user not initialized, cannot track user");
     return;
   }
 
-  // Use a dedicated node for observed users
-  // Path: ~relayPub/users/observed/pubKey
+  // Use a dedicated node for observed users: ~relayPub/users/observed/pubKey
+  // And an index for aliases: ~relayPub/users/aliases/alias
   return new Promise((resolve) => {
-    const usersNode = getGunNode(relayUser!, "users").get("observed").get(pub);
+    const usersRoot = getGunNode(relayUser!, "users");
+    const observedNode = usersRoot.get("observed");
+    const aliasesNode = usersRoot.get("aliases");
+
+    const usersNode = observedNode.get(pub);
     const now = Date.now();
 
-    // First, check if user already exists to preserve registeredAt
-    // Use a race with timeout to ensure we don't hang if Gun is slow
-    const timeoutPromise = new Promise<{ registeredAt?: number }>((resolve) => {
-      setTimeout(() => resolve({}), 2000); // 2s timeout
+    // Steps to ensure consistency and uniqueness:
+    // 1. Check if the requested alias is already taken by ANOTHER pub
+    // 2. Check the current alias of the user (to remove old alias from index if changed)
+    // 3. Update data
+
+    // Helper to read a node once
+    const readOnce = (node: any) => new Promise<any>((res) => {
+      node.once((data: any) => res(data));
+      setTimeout(() => res(undefined), 2000); // safety timeout
     });
 
-    const readPromise = new Promise<{ registeredAt?: number }>((resolve) => {
-      usersNode.once((existingData: any) => {
-        resolve(existingData || {});
-      });
-    });
+    Promise.all([
+      readOnce(aliasesNode.get(alias)), // Check who owns this new alias
+      readOnce(usersNode)               // Check current user data
+    ]).then(([existingAliasOwner, currentUserData]) => {
 
-    Promise.race([readPromise, timeoutPromise]).then((existingData: any) => {
+      // 1. Check Uniqueness
+      if (existingAliasOwner && typeof existingAliasOwner === 'string' && existingAliasOwner !== pub) {
+        // Alias is taken by someone else
+        log.warn({ pub, alias, takenBy: existingAliasOwner }, "❌ Registration rejected: Alias already taken");
+        resolve(); // Resolve without doing anything
+        return;
+      }
+
+      // 2. Handle Alias Change
+      const oldAlias = currentUserData?.alias;
+      if (oldAlias && oldAlias !== alias) {
+        log.info({ pub, oldAlias, newAlias: alias }, "User changed alias - freeing old alias");
+        aliasesNode.get(oldAlias).put(null); // Release old alias
+      }
+
+      // 3. Update User Data
       const userData: any = {
         pub,
         alias,
         lastSeen: now,
         // Preserve registeredAt if user already exists, otherwise set it to now
-        registeredAt: existingData.registeredAt || now
+        registeredAt: currentUserData?.registeredAt || now
       };
 
       usersNode.put(userData, (ack: GunAck) => {
         if ("err" in ack) {
           log.error({ pub, err: ack.err }, "Error tracking user");
         } else {
-          log.debug({ pub, alias, isNew: !existingData.registeredAt }, "User tracked");
+          // 4. Update Alias Index
+          aliasesNode.get(alias).put(pub);
+
+          log.debug({ pub, alias, isNew: !currentUserData?.registeredAt }, "User tracked and alias indexed");
         }
-        // Always resolve to prevent blocking
         resolve();
       });
+
     });
   });
 }
@@ -1033,4 +1061,105 @@ export async function getUserGraphNodes(pub: string): Promise<Record<string, any
       }
     }, 5000);
   });
+}
+
+/**
+ * Delete an observed user
+ * @param pub - The public key of the user to delete
+ */
+export async function deleteObservedUser(pub: string): Promise<void> {
+  if (!relayUser) {
+    throw new Error("Relay user not initialized");
+  }
+
+  return new Promise((resolve) => {
+    getGunNode(relayUser!, "users").get("observed").get(pub).put(null, (ack: GunAck) => {
+      log.info({ pub }, "Deleted observed user");
+      resolve();
+    });
+  });
+}
+
+/**
+ * Rebuild the alias index from observed users
+ * Can also be used to verify consistency
+ */
+export async function rebuildAliasIndex(): Promise<void> {
+  if (!relayUser) return;
+  const users = await getObservedUsers();
+  const aliasesNode = getGunNode(relayUser!, "users").get("aliases");
+
+  for (const user of users) {
+    if (user.alias) {
+      aliasesNode.get(user.alias).put(user.pub);
+    }
+  }
+  log.info({ count: users.length }, "Rebuilt alias index");
+}
+
+/**
+ * Clean duplicate aliases from the graph
+ * Rules:
+ * 1. Find all users with same alias
+ * 2. Keep the one with LATEST registeredAt (or lastSeen)
+ * 3. Delete others
+ * 4. Ensure alias index is correct for the survivors
+ */
+export async function cleanDuplicateAliases(): Promise<{ removed: number, kept: number }> {
+  if (!relayUser) throw new Error("Relay user not initialized");
+
+  const users = await getObservedUsers();
+
+  // Group by alias
+  const byAlias = new Map<string, Array<any>>();
+
+  for (const user of users) {
+    if (!user.alias) continue;
+    const list = byAlias.get(user.alias) || [];
+    list.push(user);
+    byAlias.set(user.alias, list);
+  }
+
+  let removedCount = 0;
+  let keptCount = 0;
+  const aliasesNode = getGunNode(relayUser!, "users").get("aliases");
+  const observedNode = getGunNode(relayUser!, "users").get("observed");
+
+  for (const [alias, list] of byAlias.entries()) {
+    if (list.length <= 1) {
+      keptCount++;
+      // Ensure index exists
+      aliasesNode.get(alias).put(list[0].pub);
+      continue;
+    }
+
+    // Sort by recency to find the "winner"
+    // Priority: RegisteredAt (latest) -> LastSeen (latest)
+    list.sort((a, b) => {
+      const regA = a.registeredAt || 0;
+      const regB = b.registeredAt || 0;
+      if (regA !== regB) return regB - regA; // descending
+      return (b.lastSeen || 0) - (a.lastSeen || 0);
+    });
+
+    const winner = list[0];
+    const losers = list.slice(1);
+
+    log.info({ alias, winner: winner.pub, losers: losers.length }, "Resolving duplicate alias");
+
+    // Keep winner
+    aliasesNode.get(alias).put(winner.pub);
+    keptCount++;
+
+    // Remove losers
+    for (const loser of losers) {
+      log.info({ pub: loser.pub, alias }, "Removing duplicate identity");
+      // Remove from observed
+      // We use observedNode directly to be sure
+      observedNode.get(loser.pub).put(null);
+      removedCount++;
+    }
+  }
+
+  return { removed: removedCount, kept: keptCount };
 }
