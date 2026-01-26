@@ -656,12 +656,12 @@ async function initializeServer() {
     wire: true,
     axe: true,
     rfs: true,
-    //wait: 500,
+    wait: 500,
     webrtc: true,
     peers: peers,
-    // chunk: 1000,
-    // pack: 1000,
-    // jsonify: true
+    chunk: 1000,
+    pack: 1000,
+    jsonify: true
   };
 
   // Logic to ensure storage consistency
