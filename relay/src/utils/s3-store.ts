@@ -82,11 +82,11 @@ class S3Store {
                 socketAcquisitionWarningTimeout: 10000, // Warn only if acquisition takes longer than 10s
                 // limit max sockets to prevent 502 overload
                 httpsAgent: {
-                    maxSockets: 250,
+                    maxSockets: 1000,
                     keepAlive: true,
                 },
                 httpAgent: {
-                    maxSockets: 250,
+                    maxSockets: 1000,
                     keepAlive: true,
                 },
             }),
