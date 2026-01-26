@@ -3,8 +3,7 @@ import multer from "multer";
 import path from "path";
 import { driveManager } from "../utils/drive";
 import { loggers } from "../utils/logger";
-import { adminAuthMiddleware } from "../middleware/admin-auth";
-import { driveAuthMiddleware } from "../middleware/drive-auth";
+import { adminOrApiKeyAuthMiddleware } from "../middleware/admin-or-api-key-auth";
 import { DrivePublicLinksManager } from "../utils/drive-public-links";
 import { getRelayUser, isRelayUserInitialized, initRelayUser } from "../utils/relay-user";
 
@@ -108,7 +107,7 @@ const upload = multer({
  * GET /list/:path?
  * List directory contents
  */
-router.get("/list/:path(*)?", driveAuthMiddleware, async (req: Request, res: Response) => {
+router.get("/list/:path(*)?", adminOrApiKeyAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const relativePath = req.params.path || "";
     const items = await driveManager.listDirectoryAsync(relativePath);
@@ -133,7 +132,7 @@ router.get("/list/:path(*)?", driveAuthMiddleware, async (req: Request, res: Res
  */
 router.post(
   "/upload/:path(*)?",
-  driveAuthMiddleware,
+  adminOrApiKeyAuthMiddleware,
   upload.fields([{ name: "file", maxCount: 1 }, { name: "files", maxCount: 100 }]),
   async (req: Request, res: Response) => {
     try {
@@ -183,7 +182,7 @@ router.post(
  * GET /download/:path(*)
  * Download a file
  */
-router.get("/download/:path(*)", driveAuthMiddleware, async (req: Request, res: Response) => {
+router.get("/download/:path(*)", adminOrApiKeyAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const relativePath = req.params.path;
 
@@ -244,7 +243,7 @@ router.get("/download/:path(*)", driveAuthMiddleware, async (req: Request, res: 
  * DELETE /delete/:path(*)
  * Delete a file or directory
  */
-router.delete("/delete/:path(*)", driveAuthMiddleware, async (req: Request, res: Response) => {
+router.delete("/delete/:path(*)", adminOrApiKeyAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const relativePath = req.params.path;
 
@@ -282,7 +281,7 @@ router.delete("/delete/:path(*)", driveAuthMiddleware, async (req: Request, res:
  * POST /mkdir/:path(*)?
  * Create a directory
  */
-router.post("/mkdir/:path(*)?", driveAuthMiddleware, express.json(), async (req: Request, res: Response) => {
+router.post("/mkdir/:path(*)?", adminOrApiKeyAuthMiddleware, express.json(), async (req: Request, res: Response) => {
   try {
     const parentPath = req.params.path || "";
     const { name } = req.body;
@@ -331,7 +330,7 @@ router.post("/mkdir/:path(*)?", driveAuthMiddleware, express.json(), async (req:
  * POST /rename
  * Rename a file or directory
  */
-router.post("/rename", driveAuthMiddleware, express.json(), async (req: Request, res: Response) => {
+router.post("/rename", adminOrApiKeyAuthMiddleware, express.json(), async (req: Request, res: Response) => {
   try {
     const { oldPath, newName } = req.body;
 
@@ -389,7 +388,7 @@ router.post("/rename", driveAuthMiddleware, express.json(), async (req: Request,
  * POST /move
  * Move a file or directory
  */
-router.post("/move", driveAuthMiddleware, express.json(), async (req: Request, res: Response) => {
+router.post("/move", adminOrApiKeyAuthMiddleware, express.json(), async (req: Request, res: Response) => {
   try {
     const { sourcePath, destPath } = req.body;
 
@@ -439,7 +438,7 @@ router.post("/move", driveAuthMiddleware, express.json(), async (req: Request, r
  * GET /stats
  * Get storage statistics
  */
-router.get("/stats", driveAuthMiddleware, async (req: Request, res: Response) => {
+router.get("/stats", adminOrApiKeyAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const stats = await driveManager.getStorageStatsAsync();
 
@@ -470,7 +469,7 @@ router.get("/stats", driveAuthMiddleware, async (req: Request, res: Response) =>
  * GET /links
  * List all public links
  */
-router.get("/links", driveAuthMiddleware, ensurePublicLinksInitialized, async (req: Request, res: Response) => {
+router.get("/links", adminOrApiKeyAuthMiddleware, ensurePublicLinksInitialized, async (req: Request, res: Response) => {
   try {
     const manager = getPublicLinksManager();
     if (!manager) {
@@ -498,7 +497,7 @@ router.get("/links", driveAuthMiddleware, ensurePublicLinksInitialized, async (r
  * POST /links
  * Create a new public link for a file
  */
-router.post("/links", driveAuthMiddleware, ensurePublicLinksInitialized, express.json(), async (req: Request, res: Response) => {
+router.post("/links", adminOrApiKeyAuthMiddleware, ensurePublicLinksInitialized, express.json(), async (req: Request, res: Response) => {
   try {
     const { filePath, expiresInDays } = req.body;
 
@@ -549,7 +548,7 @@ router.post("/links", driveAuthMiddleware, ensurePublicLinksInitialized, express
  * DELETE /links/:linkId
  * Revoke a public link
  */
-router.delete("/links/:linkId", driveAuthMiddleware, ensurePublicLinksInitialized, async (req: Request, res: Response) => {
+router.delete("/links/:linkId", adminOrApiKeyAuthMiddleware, ensurePublicLinksInitialized, async (req: Request, res: Response) => {
   try {
     const { linkId } = req.params;
 

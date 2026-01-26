@@ -58,6 +58,7 @@ import apiKeysRoutes from "./routes/api-keys";
 import networkRoutes from "./routes/network";
 import uploadsRoutes from "./routes/uploads";
 import dealsRoutes from "./routes/deals/index";
+import usersRoutes from "./routes/users";
 
 import x402Routes from "./routes/x402";
 import systemRoutes from "./routes/system";
@@ -68,7 +69,7 @@ import registryRoutes from "./routes/registry";
 import torrentRoutes from "./routes/torrent";
 import visualGraphRoutes from "./routes/visualGraph";
 import driveRoutes from "./routes/drive";
-import usersRoutes from "./routes/users";
+
 
 // Middleware
 
