@@ -691,7 +691,7 @@ async function initializeServer() {
   const gun = (Gun as any)(gunConfig);
 
 
-
+ 
   // Store gun instance in express app for access from routes
   app.set("gunInstance", gun);
   // Store the gun storage adapter for stats access
