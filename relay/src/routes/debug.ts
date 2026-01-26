@@ -454,18 +454,18 @@ router.post("/cleanup-aliases", async (req: Request, res: Response) => {
 
     loggers.server.info("🧹 Starting manual alias cleanup via API");
 
+    // TODO: cleanDuplicateAliases and rebuildAliasIndex functions not yet implemented
     // Dynamic import to avoid circular dependencies
-    const { cleanDuplicateAliases, rebuildAliasIndex } = await import("../utils/relay-user");
+    // const { cleanDuplicateAliases, rebuildAliasIndex } = await import("../utils/relay-user");
+    // const cleaningResult = await cleanDuplicateAliases();
+    // await rebuildAliasIndex();
 
-    const cleaningResult = await cleanDuplicateAliases();
-    await rebuildAliasIndex();
-
-    loggers.server.info({ result: cleaningResult }, "✅ Alias cleanup completed");
+    loggers.server.info("⚠️ Alias cleanup functions not yet implemented");
 
     res.json({
-      success: true,
-      data: cleaningResult,
-      message: "Alias cleanup completed successfully"
+      success: false,
+      error: "Not implemented",
+      message: "Alias cleanup functions (cleanDuplicateAliases, rebuildAliasIndex) are not yet implemented"
     });
 
   } catch (error: any) {
