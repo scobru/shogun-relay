@@ -685,146 +685,11 @@ async function initializeServer() {
     }
   }
 
-  // Monitor incoming messages to track external client authentications
-  // When external clients connect and authenticate, they write to their user graph (~userPub)
-  // We use Gun's "opt" hook to intercept these writes, similar to bullet-catcher
-  // IMPORTANT: Register this hook BEFORE creating the gun instance
-  const trackedUsers = new Map<string, { ts: number, hasAlias: boolean }>(); // Cache: pub -> { ts, hasAlias }
-  const TRACK_COOLDOWN = 60000; // 1 minute cooldown between tracking same user
-  // GunDB SEA pub keys are base64 encoded and typically 88 characters long
-  const MIN_PUB_LENGTH = 40; // Minimum reasonable length for a pub key
-
-
-
   (Gun as any).serve(app);
 
   const gun = (Gun as any)(gunConfig);
 
-  gun.on("opt", function (this: any, context: any) {
-    if (context.once) {
-      return;
-    }
-    // Pass to subsequent opt handlers
-    this.to.next(context);
 
-    // Add our custom "in" listener to intercept user authentication data
-    // NOTE: This must be synchronous - we can't use async/await here
-    (context as any).on("in", function (this: any, msg: any) {
-      // Process asynchronously without blocking the message flow
-      setImmediate(() => {
-        try {
-          // Check if this is a put message
-          if (msg && msg.put) {
-            const putData = msg.put;
-            const soul = msg["#"];
-
-            // In GunDB, user nodes have souls starting with ~ (format: ~userPub)
-            // When a user authenticates, their data is written to ~userPub with fields like alias, pub, etc.
-            if (soul && typeof soul === "string" && soul.startsWith("~")) {
-              const userPub = soul.substring(1);
-
-
-              // Validate pub key length (GunDB SEA pub keys are typically 88 chars, but we accept 40+)
-              if (!userPub || userPub.length < MIN_PUB_LENGTH) {
-                // Too noisy to log every invalid pub
-                // loggers.server.debug({ pub: userPub, len: userPub?.length }, "Skipping invalid pub key length");
-                return;
-              }
-
-              // Log potential user activity for debugging
-              // loggers.server.debug({ pub: userPub, soul }, "Processing potential user activity");
-
-              // Look for alias in the put data
-              let userAlias: string | undefined;
-
-              // Check direct fields first
-              if (putData.alias && typeof putData.alias === "string" && putData.alias.length > 0) {
-                userAlias = putData.alias;
-              } else if (putData["#"] && typeof putData["#"] === "string") {
-                // GunDB sometimes uses "#" to reference the alias node
-                // The alias might be in a separate node, we'll use pub as fallback
-                userAlias = undefined;
-              } else {
-                // Check nested data (GunDB sometimes nests data)
-                for (const key in putData) {
-                  if (key !== "_" && key !== "#" && key !== ">" && key !== "<") {
-                    const value = putData[key];
-                    if (value && typeof value === "object") {
-                      // Check if this nested object has an alias
-                      if (value.alias && typeof value.alias === "string" && value.alias.length > 0) {
-                        userAlias = value.alias;
-                        break;
-                      }
-                      // Check if this is a reference to another node that might contain alias
-                      if (value["#"] && typeof value["#"] === "string") {
-                        // This is a reference, alias might be in that node
-                        // We'll track with pub as alias for now, and update later if needed
-                      }
-                    }
-                  }
-                }
-              }
-
-              // Track the user even without alias (use pub as fallback), and check cooldown
-              const now = Date.now();
-              const lastTrackedInfo = trackedUsers.get(userPub);
-              const lastTrackedTime = lastTrackedInfo ? lastTrackedInfo.ts : 0;
-              const hasNewAlias = !!userAlias;
-
-              // We track if:
-              // 1. User hasn't been tracked recently (cooldown expired)
-              // 2. OR we have a real alias now, but didn't have one before (alias upgrade)
-              const isCooldownExpired = (now - lastTrackedTime) > TRACK_COOLDOWN;
-              const isAliasUpgrade = hasNewAlias && lastTrackedInfo && !lastTrackedInfo.hasAlias;
-
-              if (!lastTrackedInfo || isCooldownExpired || isAliasUpgrade) {
-                trackedUsers.set(userPub, { ts: now, hasAlias: hasNewAlias });
-
-                // Use pub as alias if no alias found (we can update it later when alias is available)
-                const aliasToUse = userAlias || `user_${userPub.substring(0, 8)}`;
-
-                // Dynamic import and track user (non-blocking)
-                import("./utils/relay-user").then(({ trackUser }) => {
-                  trackUser(userPub, aliasToUse).catch((err) => {
-                    loggers.server.debug({ pub: userPub, err }, "Error tracking user (non-fatal)");
-                  });
-                });
-
-                loggers.server.info(
-                  { pub: userPub, alias: aliasToUse, hasAlias: !!userAlias, upgrade: isAliasUpgrade },
-                  "External user authenticated and tracked via incoming message"
-                );
-              }
-            }
-          }
-        } catch (error) {
-          // Don't log every error to avoid spam
-          // loggers.server.debug({ err: error }, "Error processing incoming message for user tracking");
-        }
-      });
-
-      // Always pass the message through to the next handler immediately (don't wait for async processing)
-      this.to.next(msg);
-    });
-  });
-
-  // Authenticate listener to track users (local auth events)
-  // Authenticate listener to track users (local auth events)
-  gun.on("auth", async (ack: any) => {
-    try {
-      if (ack && ack.sea && ack.sea.pub) {
-        // Use provided alias or fallback to "user_<short_pub>"
-        const alias = ack.sea.alias || `user_${ack.sea.pub.substring(0, 8)}`;
-
-        // Dynamic import to avoid circular dependencies if any
-        const { trackUser } = await import("./utils/relay-user");
-        await trackUser(ack.sea.pub, alias);
-        loggers.server.info({ pub: ack.sea.pub, alias, hasAlias: !!ack.sea.alias }, "tl;dr: User authenticated and tracked");
-      }
-    } catch (error) {
-      loggers.server.error({ err: error }, "Error tracking user on auth");
-    }
-  });
 
   // Store gun instance in express app for access from routes
   app.set("gunInstance", gun);
@@ -2311,39 +2176,7 @@ See docs/RELAY_KEYS.md for more information.
     loggers.server.error({ err: error }, "❌ Failed to initialize Chat Service");
   }
 
-  // Initialize Alias Cleanup (Startup + Periodic)
-  try {
-    const { cleanDuplicateAliases, rebuildAliasIndex } = await import("./utils/relay-user");
 
-    // Run after a short delay to allow Gun to sync initial data
-    setTimeout(async () => {
-      try {
-        loggers.server.info("🧹 Running startup alias cleanup...");
-        const result = await cleanDuplicateAliases();
-        await rebuildAliasIndex();
-        loggers.server.info({ result }, "✅ Startup alias cleanup completed");
-      } catch (e) {
-        loggers.server.error({ err: e }, "❌ Startup alias cleanup failed");
-      }
-    }, 30000); // 30s delay
-
-    // Schedule periodic cleanup (every 1 hour)
-    setInterval(async () => {
-      try {
-        loggers.server.info("🧹 Running scheduled alias cleanup...");
-        const result = await cleanDuplicateAliases();
-        // rebuildAliasIndex is less critical to run every time if cleanup ensures consistency, 
-        // but good for safety.
-        await rebuildAliasIndex();
-        loggers.server.info({ result }, "✅ Scheduled alias cleanup completed");
-      } catch (e) {
-        loggers.server.error({ err: e }, "❌ Scheduled alias cleanup failed");
-      }
-    }, 60 * 60 * 1000); // 1 hour
-
-  } catch (error) {
-    loggers.server.error({ err: error }, "❌ Failed to initialize Alias Cleanup");
-  }
 
   return {
     server,
