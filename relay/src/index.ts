@@ -258,7 +258,7 @@ async function initializeServer() {
   // Use /healthz for minimal health checks during startup
 
   // Liveness probe (minimal check)
-  app.get("/healthz", (req, res) => {
+  app.get("/health", (req, res) => {
     res.status(200).send("OK");
   });
 
