@@ -647,7 +647,7 @@ async function initializeServer() {
   const gunConfig: any = {
     super: true,
     peers: peers,
-    file: dataDir,
+    file: store ? false : dataDir,
     radisk: !storageConfig.disableRadisk, // Allow disabling radisk via env var
     store: store, // Use SQLite or S3 store if available
     web: server,
