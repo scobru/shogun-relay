@@ -11,8 +11,6 @@ import Gun from "gun";
 import "gun/sea";
 import "gun/lib/stats";
 import "gun/lib/webrtc";
-import "gun/axe";
-import "gun/lib/wire";
 import "./utils/bullet-catcher";
 import Holster from "@mblaney/holster/src/holster.js";
 import multer from "multer";
@@ -258,7 +256,7 @@ async function initializeServer() {
   // Use /healthz for minimal health checks during startup
 
   // Liveness probe (minimal check)
-  app.get("/health", (req, res) => {
+  app.get("/healthz", (req, res) => {
     res.status(200).send("OK");
   });
 
@@ -648,6 +646,7 @@ async function initializeServer() {
 
   const gunConfig: any = {
     super: true,
+    peers: peers,
     file: dataDir,
     radisk: !storageConfig.disableRadisk, // Allow disabling radisk via env var
     store: store, // Use SQLite or S3 store if available
@@ -657,13 +656,12 @@ async function initializeServer() {
     localStorage: false,
     wire: true,
     axe: false,
-    rfs: true,
-    wait: 500,
+    // rfs: true,
+    // wait: 500,
     webrtc: true,
-    peers: peers,
-    chunk: 1000,
-    pack: 1000,
-    jsonify: true,
+    // chunk: 1000,
+    // pack: 1000,
+    // jsonify: true,
   };
 
   if (storageConfig.disableRadisk) {
