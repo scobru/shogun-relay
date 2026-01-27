@@ -332,7 +332,7 @@ RUN dos2unix /app/docker/init-ipfs.sh \
     && cp /app/docker/relay.env /app/relay/.env
 
 # Cache bust for relay copy - change this value to force rebuild
-ARG RELAY_CACHE_BUST=v5
+ARG RELAY_CACHE_BUST
 RUN echo "Relay cache bust: $RELAY_CACHE_BUST"
 
 # Copy ALL relay source files first (before npm install)
