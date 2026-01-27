@@ -81,11 +81,11 @@ class S3Store {
                 socketTimeout: 30000,
                 // Increase max sockets to handle GunDB radisk load
                 httpsAgent: {
-                    maxSockets: 100,
+                    maxSockets: 500,
                     keepAlive: true,
                 },
                 httpAgent: {
-                    maxSockets: 100,
+                    maxSockets: 500,
                     keepAlive: true,
                 },
             }),
