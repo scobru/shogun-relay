@@ -222,10 +222,16 @@ function X402() {
         </div>
       </div>
 
+       {/* Payment Generator - Admin Only */}
+       {isAuthenticated && status === 'active' && (
+        <PaymentGenerator password={password} />
+      )}
+
        {/* Custom Payments History - Admin Only */}
        {isAuthenticated && status === 'active' && (
         <PaymentHistory password={password} />
       )}
+
 
       
       {/* Info */}
@@ -326,6 +332,106 @@ function PaymentHistory({ password }: { password?: string }) {
             </div>
         </div>
       </div>
+    )
+}
+
+// Sub-component for Payment Generator
+function PaymentGenerator({ password }: { password?: string }) {
+    const [formData, setFormData] = useState({ price: 1, resourceId: '', description: '' })
+    const [result, setResult] = useState<any>(null)
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+
+    const handleGenerate = async () => {
+        if (!password) return
+        if (!formData.resourceId || !formData.description) {
+            setError("All fields are required")
+            return
+        }
+
+        setLoading(true)
+        setError(null)
+        setResult(null)
+
+        try {
+            const res = await fetch('/api/v1/x402/requirements/custom', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${password}`
+                },
+                body: JSON.stringify({
+                    priceUSDC: formData.price,
+                    resourceId: formData.resourceId,
+                    description: formData.description
+                })
+            })
+            const data = await res.json()
+            if (data.success) {
+                setResult(data.requirements)
+            } else {
+                setError(data.error || "Failed to generate")
+            }
+        } catch (e: any) {
+            setError(e.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(JSON.stringify(result, null, 2))
+    }
+
+    return (
+        <div className="card bg-base-100 shadow">
+            <div className="card-body">
+                <h3 className="card-title">🛠️ Payment Request Generator</h3>
+                <p className="text-sm text-base-content/60 mb-4">Generate x402 payment JSON for testing or manual distribution.</p>
+                
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="form-control w-full max-w-xs">
+                        <label className="label"><span className="label-text">Price (USDC)</span></label>
+                        <input type="number" step="0.01" min="0" className="input input-bordered" 
+                            value={formData.price} 
+                            onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})} />
+                    </div>
+                    <div className="form-control w-full">
+                        <label className="label"><span className="label-text">Resource ID</span></label>
+                        <input type="text" className="input input-bordered" placeholder="e.g. my-premium-api-v1"
+                            value={formData.resourceId} 
+                            onChange={e => setFormData({...formData, resourceId: e.target.value})} />
+                    </div>
+                </div>
+                <div className="form-control w-full mt-2">
+                    <label className="label"><span className="label-text">Description</span></label>
+                    <input type="text" className="input input-bordered" placeholder="e.g. Access to specialized dataset"
+                        value={formData.description} 
+                        onChange={e => setFormData({...formData, description: e.target.value})} />
+                </div>
+
+                <div className="card-actions justify-end mt-4">
+                    <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
+                        {loading && <span className="loading loading-spinner"></span>}
+                        Generate JSON
+                    </button>
+                </div>
+
+                {error && <div className="alert alert-error mt-4 text-sm">{error}</div>}
+
+                {result && (
+                    <div className="mt-4">
+                        <div className="flex justify-between items-center mb-2">
+                             <span className="font-bold text-sm">Generated Payment Requirements:</span>
+                             <button className="btn btn-xs btn-outline" onClick={copyToClipboard}>📋 Copy JSON</button>
+                        </div>
+                        <pre className="bg-base-300 p-4 rounded-lg overflow-x-auto text-xs font-mono">
+                            {JSON.stringify(result, null, 2)}
+                        </pre>
+                    </div>
+                )}
+            </div>
+        </div>
     )
 }
 

@@ -154,6 +154,55 @@ router.get("/payment-requirements/:tier", (req, res) => {
 });
 
 /**
+ * POST /requirements/custom
+ * Generate custom payment requirements (Admin only)
+ */
+router.post("/requirements/custom", async (req, res) => {
+  try {
+    // Authenticate admin
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const customToken = req.headers["token"];
+    const token = bearerToken || customToken;
+
+    if (token !== authConfig.adminPassword) {
+      return res.status(401).json({
+        success: false,
+        error: "Admin authentication required",
+      });
+    }
+
+    const { priceUSDC, resourceId, description } = req.body;
+
+    if (!priceUSDC || !resourceId || !description) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing parameters: priceUSDC, resourceId, description are required"
+      });
+    }
+
+    const merchant = getMerchant();
+    const requirements = merchant.createCustomPaymentRequiredResponse(
+      Number(priceUSDC),
+      resourceId,
+      description
+    );
+
+    res.json({
+      success: true,
+      requirements
+    });
+
+  } catch (error: any) {
+    console.error("Generate custom requirements error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
  * GET /subscription/:userAddress
  * Get subscription status for a user
  */
