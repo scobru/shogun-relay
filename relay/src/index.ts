@@ -656,12 +656,7 @@ async function initializeServer() {
     localStorage: false,
     wire: true,
     axe: false,
-    rfs: true,
-    wait: 500,
     webrtc: true,
-    chunk: 1000,
-    pack: 1000,
-    jsonify: true,
   };
 
   if (storageConfig.disableRadisk) {
