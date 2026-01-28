@@ -654,7 +654,6 @@ async function initializeServer() {
     isValid: hasValidToken,
     uuid: relayConfig.name,
     localStorage: false,
-    rfs:true,
     wire: true,
     axe: false,
     webrtc: true,
