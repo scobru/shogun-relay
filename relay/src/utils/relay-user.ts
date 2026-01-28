@@ -66,6 +66,17 @@ interface UploadInfo {
   uploadedAt?: number;
 }
 
+export interface PaymentRecord {
+  transaction: string;
+  payer: string;
+  amount: string;
+  network: string;
+  resourceId?: string;
+  description?: string;
+  timestamp: number;
+  [key: string]: unknown;
+}
+
 /**
  * Initialize relay user with direct SEA keypair (no login needed)
  * @param gun - GunDB instance
@@ -623,7 +634,7 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
     const processedAddresses = new Set<string>();
     let parentListener: any = null;
     let resolved = false;
-    
+
     // Increased timeout to 15 seconds for better sync
     const timeout = setTimeout(() => {
       if (!resolved) {
@@ -639,12 +650,12 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
     // Use .on() for better sync, then switch to .once() for each subscription
     parentListener = subscriptionsNode.on((parentData: Record<string, any>) => {
       if (resolved) return;
-      
+
       if (!parentData || typeof parentData !== "object") {
         return; // Wait for more data
       }
 
-      const userKeys = Object.keys(parentData).filter((key) => 
+      const userKeys = Object.keys(parentData).filter((key) =>
         !["_", "#", ">", "<"].includes(key) && !processedAddresses.has(key)
       );
 
@@ -656,14 +667,14 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
       // Process new user keys
       userKeys.forEach((userAddress) => {
         processedAddresses.add(userAddress);
-        
+
         subscriptionsNode.get(userAddress).once((subData: SubscriptionData) => {
           if (resolved) return;
-          
+
           if (subData && typeof subData === "object") {
             const cleanData: SubscriptionData = {};
             let hasValidData = false;
-            
+
             Object.keys(subData).forEach((key) => {
               if (!["_", "#", ">", "<"].includes(key)) {
                 // @ts-ignore
@@ -674,7 +685,7 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
                 }
               }
             });
-            
+
             // Only add if we have valid subscription data
             if (hasValidData) {
               // Avoid duplicates
@@ -692,12 +703,12 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
     // Also try .once() for immediate local data
     subscriptionsNode.once((parentData: Record<string, any>) => {
       if (resolved) return;
-      
+
       if (!parentData || typeof parentData !== "object") {
         return;
       }
 
-      const userKeys = Object.keys(parentData).filter((key) => 
+      const userKeys = Object.keys(parentData).filter((key) =>
         !["_", "#", ">", "<"].includes(key)
       );
 
@@ -725,7 +736,7 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
           if (subData && typeof subData === "object") {
             const cleanData: SubscriptionData = {};
             let hasValidData = false;
-            
+
             Object.keys(subData).forEach((key) => {
               if (!["_", "#", ">", "<"].includes(key)) {
                 // @ts-ignore
@@ -735,7 +746,7 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
                 }
               }
             });
-            
+
             if (hasValidData) {
               const exists = subscriptions.some(s => s.userAddress === cleanData.userAddress);
               if (!exists) {
@@ -796,4 +807,69 @@ export default {
   getUserUploads,
   deleteUpload,
   getAllSubscriptions,
+  savePayment,
+  getAllPayments
 };
+
+/**
+ * Save a payment record
+ * @param payment - The payment record to save
+ * @returns Promise
+ */
+export async function savePayment(payment: PaymentRecord): Promise<void> {
+  const user = getRelayUser();
+  if (!user) throw new Error("Relay user not initialized");
+
+  return new Promise((resolve, reject) => {
+    // Use transaction hash as key
+    getGunNode(user, GUN_PATHS.X402)
+      .get(GUN_PATHS.PAYMENTS)
+      .get(payment.transaction)
+      .put(payment as Record<string, any>, (ack: GunAck) => {
+        if ("err" in ack) {
+          const errorMsg = typeof ack.err === "string" ? ack.err : String(ack.err);
+          log.error({ tx: payment.transaction, err: ack.err }, "Error saving payment");
+          reject(new Error(errorMsg));
+        } else {
+          log.debug({ tx: payment.transaction }, "Payment saved");
+          resolve();
+        }
+      });
+  });
+}
+
+/**
+ * Get all payments (limit 100 recent)
+ * @returns Promise with array of payments
+ */
+export async function getAllPayments(limit: number = 100): Promise<Array<PaymentRecord>> {
+  const user = getRelayUser();
+  if (!user) throw new Error("Relay user not initialized");
+
+  return new Promise((resolve) => {
+    const payments: PaymentRecord[] = [];
+    const paymentNode = getGunNode(user, GUN_PATHS.X402).get(GUN_PATHS.PAYMENTS);
+
+    // Timeout
+    const timeout = setTimeout(() => {
+      resolve(payments.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit));
+    }, 5000);
+
+    paymentNode.map().once((data: any, key: string) => {
+      if (data && typeof data === 'object' && data.transaction) {
+        // Filter internal keys
+        const clean: any = {};
+        Object.keys(data).forEach(k => {
+          if (!["_", "#", ">", "<"].includes(k)) clean[k] = data[k];
+        });
+        payments.push(clean as PaymentRecord);
+      }
+    });
+
+    // Give it some time to collect map results
+    setTimeout(() => {
+      clearTimeout(timeout);
+      resolve(payments.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit));
+    }, 2000);
+  });
+}

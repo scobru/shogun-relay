@@ -221,6 +221,12 @@ function X402() {
             )}
         </div>
       </div>
+
+       {/* Custom Payments History - Admin Only */}
+       {isAuthenticated && status === 'active' && (
+        <PaymentHistory password={password} />
+      )}
+
       
       {/* Info */}
       <div className="card bg-base-100 shadow">
@@ -238,6 +244,89 @@ function X402() {
       </div>
     </div>
   )
+}
+
+// Sub-component for Payment History to keep main component clean
+function PaymentHistory({ password }: { password?: string }) {
+    const [payments, setPayments] = useState<any[]>([])
+    const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        fetchHistory()
+    }, [])
+
+    const fetchHistory = async () => {
+        if (!password) return
+        setLoading(true)
+        try {
+            const res = await fetch('/api/v1/x402/history', {
+                headers: { 'Authorization': `Bearer ${password}` }
+            })
+            const data = await res.json()
+            if (data.success) {
+                setPayments(data.payments)
+            }
+        } catch (e) {
+            console.error("Failed to fetch history", e)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const formatDate = (d: any) => new Date(d).toLocaleDateString() + ' ' + new Date(d).toLocaleTimeString()
+
+    return (
+        <div className="card bg-base-100 shadow">
+        <div className="card-body">
+            <div className="flex justify-between items-center">
+                <h3 className="card-title">💰 Custom Service Payments</h3>
+                <button className="btn btn-sm btn-ghost" onClick={fetchHistory}>🔄 Refresh</button>
+            </div>
+            
+            <div className="overflow-x-auto">
+                <table className="table">
+                    <thead>
+                        <tr>
+                            <th>Payer</th>
+                            <th>Resource</th>
+                            <th>Amount</th>
+                            <th>Transaction</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loading ? (
+                                <tr><td colSpan={5} className="text-center"><span className="loading loading-spinner"></span></td></tr>
+                        ) : payments.length === 0 ? (
+                            <tr><td colSpan={5} className="text-center text-base-content/50">No payments found</td></tr>
+                        ) : (
+                            payments.map((p, i) => (
+                                <tr key={i}>
+                                    <td className="font-mono text-xs">{p.payer?.substring(0,6)}...{p.payer?.substring(38)}</td>
+                                    <td>
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-xs">{p.resourceId}</span>
+                                            <span className="text-[10px] opacity-70">{p.description}</span>
+                                        </div>
+                                    </td>
+                                    <td className="font-bold text-success">{p.amount} USDC</td>
+                                    <td>
+                                        <a href={`${p.network === 'base' ? 'https://basescan.org' : 'https://sepolia.basescan.org'}/tx/${p.transaction}`} 
+                                           target="_blank" 
+                                           className="link link-primary text-xs font-mono">
+                                            {p.transaction?.substring(0,8)}...
+                                        </a>
+                                    </td>
+                                    <td className="text-xs">{formatDate(p.timestamp)}</td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+      </div>
+    )
 }
 
 export default X402

@@ -415,6 +415,60 @@ export class X402Merchant {
   }
 
   /**
+   * Create payment requirements for a custom service
+   */
+  createCustomPaymentRequirements(
+    amountUSDC: number,
+    resourceId: string,
+    description: string,
+    extraData: any = {}
+  ): PaymentRequirements {
+    const priceInAtomicUnits = parseUnits(amountUSDC.toString(), 6).toString();
+
+    return {
+      scheme: "exact",
+      network: this.network,
+      maxAmountRequired: priceInAtomicUnits,
+      resource: resourceId,
+      description: description,
+      mimeType: "application/json",
+      payTo: this.payToAddress,
+      maxTimeoutSeconds: 300,
+      asset: this.networkConfig.usdc,
+      extra: {
+        priceUSDC: amountUSDC,
+        // EIP-712 domain info for signing
+        name: this.networkConfig.usdcName,
+        version: this.networkConfig.usdcVersion,
+        ...extraData,
+      },
+    };
+  }
+
+  /**
+   * Create a payment-required response for a custom service
+   */
+  createCustomPaymentRequiredResponse(
+    amountUSDC: number,
+    resourceId: string,
+    description: string,
+    extraData: any = {}
+  ): X402Response {
+    const requirements = this.createCustomPaymentRequirements(
+      amountUSDC,
+      resourceId,
+      description,
+      extraData
+    );
+
+    return {
+      x402Version: 1,
+      accepts: [requirements],
+      error: "Payment required" as any,
+    };
+  }
+
+  /**
    * Create a payment-required response following x402 protocol
    */
   createPaymentRequiredResponse(tier: string = "basic"): X402Response {
