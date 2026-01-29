@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal GunDB Node Viewer</title>
+    <!-- Import GunDB & SEA -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            /* Monospace for minimal tech feel */
+            background-color: #ffffff;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            max-width: 600px;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #333;
+            font-family: inherit;
+            margin-bottom: 5px;
+        }
+
+        button {
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: #555;
+        }
+
+        #status {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+            height: 1.2em;
+        }
+
+        #monitor-box {
+            margin-top: 30px;
+            border: 1px solid #333;
+            padding: 10px;
+            background: #fafafa;
+        }
+
+        #monitor-title {
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px dotted #ccc;
+            padding-bottom: 5px;
+        }
+
+        #json-output {
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-size: 0.85rem;
+        }
+
+        .highlight {
+            background-color: #e0f7fa;
+            transition: background-color 0.5s ease;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>GUN NODE VISUALIZER</h1>
+
+    <div class="control-group">
+        <label for="nodeKey">NODE KEY (Address)</label>
+        <div style="display: flex; gap: 10px;">
+            <input type="text" id="nodeKey" value="test/data" placeholder="e.g. user/profile">
+            <button onclick="watchData()" style="background: #555; white-space: nowrap;">WATCH NODE</button>
+        </div>
+    </div>
+
+    <div class="control-group">
+        <label for="nodeValue">WRITE DATA (Optional)</label>
+        <textarea id="nodeValue" rows="4" placeholder='{"hello": "world"}'></textarea>
+        <button onclick="publishData()" style="margin-top: 5px;">WRITE DATA</button>
+    </div>
+
+    <div id="status"></div>
+
+    <div id="monitor-box">
+        <div id="monitor-title">LIVE MONITORING: <span id="target-node">...</span></div>
+        <div id="json-output">Waiting for updates...</div>
+    </div>
+
+    <script>
+        // Init Gun
+        const gun = Gun({
+            localStorage: true,
+            radisk: true
+        });
+
+        let currentSub = null;
+        let observingKey = null;
+
+        /**
+         * Parses input data. If it looks like JSON, parse it.
+         * Otherwise wrap it in a simple object.
+         */
+        function parseInput(input) {
+            try {
+                return JSON.parse(input);
+            } catch (e) {
+                return { message: input, timestamp: Date.now() };
+            }
+        }
+
+        /**
+         * Watch a node without writing.
+         */
+        function watchData() {
+            const key = document.getElementById('nodeKey').value.trim();
+            if (!key) {
+                document.getElementById('status').textContent = "Please enter a Node Key to watch.";
+                return;
+            }
+            document.getElementById('status').textContent = "Watching " + key + "...";
+            observeNode(key);
+        }
+
+        /**
+         * Main function to write data and start observing the node.
+         */
+        function publishData() {
+            const key = document.getElementById('nodeKey').value.trim();
+            const rawVal = document.getElementById('nodeValue').value;
+            const statusEl = document.getElementById('status');
+
+            if (!key) {
+                statusEl.textContent = "Please enter a Node Key.";
+                return;
+            }
+            if (!rawVal) {
+                statusEl.textContent = "Please enter some data.";
+                return;
+            }
+
+            const payload = parseInput(rawVal);
+
+            // 1. Write to Gun
+            gun.get(key).put(payload, (ack) => {
+                if (ack.err) {
+                    statusEl.textContent = "Error: " + ack.err;
+                } else {
+                    statusEl.textContent = "Data written successfully.";
+                    // Clear input optional? Let's keep it for quick edits.
+                }
+            });
+
+            // 2. Switch Monitor if changed
+            if (key !== observingKey) {
+                observeNode(key);
+            }
+        }
+
+        /**
+         * Sets up the listener for a specific node key.
+         */
+        function observeNode(key) {
+            observingKey = key;
+            document.getElementById('target-node').textContent = key;
+            const output = document.getElementById('json-output');
+            output.textContent = "Connecting...";
+
+            // Unsubscribe previous if possible (Gun .off() is not always straightforward without reference)
+            // For this simple viewer, simple stacking protection:
+            // In a real app we'd manage subscriptions better. 
+            // Here we just re-bind. Since 'key' changes, the old callback continues effectively but UI overrides.
+
+            gun.get(key).on(function (data, k) {
+                // Ensure this update corresponds to what we are currently looking at
+                // (Closure captures 'key', but we only want to update UI if it matches current observingKey)
+                if (key !== observingKey) return;
+
+                // copy data to clean properties
+                const clean = Object.assign({}, data);
+                delete clean._; // remove internal gun metadata
+
+                output.textContent = JSON.stringify(clean, null, 2);
+
+                // Flash effect
+                const box = document.getElementById('monitor-box');
+                box.style.backgroundColor = '#dcedc8'; // light green
+                setTimeout(() => {
+                    box.style.backgroundColor = '#fafafa';
+                }, 300);
+            });
+        }
+
+        // Auto-start observation on load if key exists
+        window.addEventListener('load', () => {
+            const key = document.getElementById('nodeKey').value.trim();
+            if (key) observeNode(key);
+        });
+
+    </script>
+</body>
+
+</html>

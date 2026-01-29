@@ -403,6 +403,7 @@ export const config = {
       bucket: process.env.MINIO_BUCKET || "shogun-drive",
       useSSL: process.env.MINIO_USE_SSL !== "false",
       region: process.env.MINIO_REGION || "us-east-1",
+      skipSslVerify: process.env.MINIO_SKIP_SSL_VERIFY === "true",
     },
   },
 

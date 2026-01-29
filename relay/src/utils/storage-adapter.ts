@@ -11,6 +11,8 @@
 
 import path from "path";
 import fs from "fs";
+import https from "https";
+import http from "http";
 import {
     S3Client,
     ListObjectsV2Command,
@@ -390,14 +392,15 @@ export class MinioStorageAdapter implements IStorageAdapter {
             requestHandler: new NodeHttpHandler({
                 connectionTimeout: 5000,
                 socketTimeout: 30000,
-                httpsAgent: {
+                httpsAgent: new https.Agent({
                     maxSockets: 100,
                     keepAlive: true,
-                },
-                httpAgent: {
+                    rejectUnauthorized: !minioConfig.skipSslVerify,
+                }),
+                httpAgent: new http.Agent({
                     maxSockets: 100,
                     keepAlive: true,
-                },
+                }),
             }),
         });
 
