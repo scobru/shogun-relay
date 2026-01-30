@@ -72,12 +72,12 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Description**: Enable wormhole P2P file transfer and cleanup scheduler.
 - **Example**: `WORMHOLE_ENABLED=true`
 
-### `ANNAS_ARCHIVE_ENABLED`
+### `TORRENT_ENABLED`
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
-- **Description**: Enable Anna's Archive integration (torrent/preservation). When disabled, all `/api/v1/annas-archive/*` routes return 503.
-- **Example**: `ANNAS_ARCHIVE_ENABLED=true`
+- **Description**: Enable torrent manager and Anna's Archive integration (download, seed, search). When disabled, all `/api/v1/torrents/*` routes return 503.
+- **Example**: `TORRENT_ENABLED=true`
 
 ### Module Dependencies
 
@@ -89,7 +89,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 | Registry | Gun |
 | Deals | Gun, IPFS |
 | Wormhole | Gun |
-| Anna's Archive | Gun, IPFS |
+| Torrent / Anna's Archive | Gun, IPFS |
 
 ---
 
@@ -584,6 +584,33 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Default**: `86400` (24 hours)
 - **Description**: Maximum age in seconds for wormhole transfers. Transfers older than this that haven't been completed are automatically unpinned from IPFS.
 - **Example**: `WORMHOLE_MAX_AGE_SECS=86400` (24 hours)
+
+---
+
+## Torrent / Anna's Archive
+
+When `TORRENT_ENABLED=true`, the following options apply:
+
+### `TORRENT_DATA_DIR`
+- **Type**: String (path)
+- **Required**: No
+- **Default**: `./data/torrents`
+- **Description**: Directory for torrent downloads and metadata.
+- **Example**: `TORRENT_DATA_DIR=/var/lib/shogun-relay/torrents`
+
+### `TORRENT_ANNAS_ARCHIVE_URL`
+- **Type**: String (URL)
+- **Required**: No
+- **Default**: `https://annas-archive.li/dyn/generate_torrents`
+- **Description**: URL for Anna's Archive torrent catalog (dynamic list). Used for mirroring and preservation.
+- **Example**: `TORRENT_ANNAS_ARCHIVE_URL=https://annas-archive.li/dyn/generate_torrents`
+
+### `TORRENT_MAX_TB`
+- **Type**: Float
+- **Required**: No
+- **Default**: `0` (unlimited)
+- **Description**: Maximum storage in TB for torrent data. When set, the relay will not fetch new torrents beyond this limit.
+- **Example**: `TORRENT_MAX_TB=1`
 
 ---
 

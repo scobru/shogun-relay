@@ -30,9 +30,9 @@
 ### Docker
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/scobru/shogun-relay.git
 cd shogun-relay
-./docker-start.sh
+docker-compose up -d
 
 curl http://localhost:8765/health
 ```
@@ -106,12 +106,11 @@ The relay includes a built-in SSH tunnel to **srv.us** for public access without
 | **[API Reference](./docs/API.md)** | Complete REST API documentation |
 | **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** | All configuration options |
 | **[Node Operator Guide](./docs/NODE_OPERATOR_GUIDE.md)** | Run your own relay |
-| **[L2 Bridge](./docs/BRIDGE.md)** | ETH bridge between L1 and L2 |
 | **[x402 Payments](./docs/X402_PAYMENTS.md)** | Subscription payment system |
 | **[Storage Deals](./docs/STORAGE_DEALS.md)** | Per-file contracts & erasure coding |
 | **[Network Federation](./docs/NETWORK_FEDERATION.md)** | Relay discovery & reputation |
 | **[Relay Keys](./docs/RELAY_KEYS.md)** | Keypair configuration |
-| **[Roadmap](./docs/ROADMAP.md)** | Evolution path |
+| **[Drive SDK Example](./docs/DRIVE_SDK_EXAMPLE.md)** | Admin Drive API usage |
 
 ---
 
@@ -145,21 +144,12 @@ The relay includes a built-in SSH tunnel to **srv.us** for public access without
 | `GET /api/v1/torrent/search/internet-archive` | Search Internet Archive |
 | `GET /api/v1/torrent/search` | Unified search |
 
-### User Uploads & Metadata
+### Drive & Graph
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/v1/user-uploads/system-hashes-map` | Get complete file metadata map |
-| `POST /api/v1/user-uploads/save-system-hash` | Save file metadata (admin) |
-| `DELETE /api/v1/user-uploads/remove-system-hash/:cid` | Remove file metadata |
-
-### Bridge
-
-| Endpoint | Description |
-|----------|-------------|
-| `POST /api/v1/bridge/deposit` | Record L1 deposit |
-| `POST /api/v1/bridge/withdraw` | Request withdrawal |
-| `GET /api/v1/bridge/balance/:user` | Get L2 balance |
+| `GET /api/v1/drive/*` | Admin file browser API |
+| `GET /api/v1/graph/*` | GunDB visual graph explorer |
 
 Full API documentation at `/endpoints` or see **[API Reference](./docs/API.md)**.
 
