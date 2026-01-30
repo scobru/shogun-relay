@@ -97,9 +97,12 @@ class S3Store {
         });
 
         log.info(
-            { endpoint: options.endpoint, bucket: this.bucket },
+            { endpoint: options.endpoint, bucket: this.bucket, skipSslVerify },
             "🪣 S3Store initialized"
         );
+        if (skipSslVerify) {
+            log.warn("⚠️ S3/MinIO TLS verification disabled (skipSslVerify=true). Use only in dev or trusted networks.");
+        }
 
         // Initialize bucket in background
         this.ensureBucket();

@@ -48,6 +48,9 @@ This project implements several security measures:
 - Time-window validation
 - Nonce tracking to prevent replay
 
+### TLS / Self-signed certificates
+- `MINIO_SKIP_SSL_VERIFY` and `GUN_S3_SKIP_SSL_VERIFY` allow accepting self-signed TLS certs for MinIO/S3 endpoints. Use only in development or on trusted networks; in production prefer proper certificates.
+
 ## Audit Status
 
 - [ ] Internal code review completed

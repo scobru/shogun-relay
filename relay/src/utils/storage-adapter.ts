@@ -405,9 +405,12 @@ export class MinioStorageAdapter implements IStorageAdapter {
         });
 
         loggers.server.info(
-            { endpoint: minioConfig.endpoint, bucket: this.bucket },
+            { endpoint: minioConfig.endpoint, bucket: this.bucket, skipSslVerify: minioConfig.skipSslVerify },
             "🪣 MinIO storage adapter initialized"
         );
+        if (minioConfig.skipSslVerify) {
+            loggers.server.warn("⚠️ MinIO TLS verification disabled (MINIO_SKIP_SSL_VERIFY=true). Use only in dev or trusted networks.");
+        }
 
         // Initialize bucket in background
         this.ensureBucket();
