@@ -145,6 +145,7 @@ export const config = {
       secretAccessKey: process.env.GUN_S3_SECRET_KEY || process.env.MINIO_SECRET_KEY,
       bucket: process.env.GUN_S3_BUCKET || "shogun-gun-data",
       region: process.env.GUN_S3_REGION || process.env.MINIO_REGION || "us-east-1",
+      skipSslVerify: process.env.GUN_S3_SKIP_SSL_VERIFY === "true" || process.env.MINIO_SKIP_SSL_VERIFY === "true",
     },
   },
 

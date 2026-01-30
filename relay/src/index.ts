@@ -634,6 +634,7 @@ async function initializeServer() {
         secretAccessKey: s3Conf.secretAccessKey,
         bucket: s3Conf.bucket,
         region: s3Conf.region,
+        skipSslVerify: s3Conf.skipSslVerify,
       });
       loggers.server.info({
         endpoint: s3Conf.endpoint,

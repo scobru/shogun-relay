@@ -9,6 +9,8 @@
  * Uses AWS SDK v3 (@aws-sdk/client-s3) for S3-compatible storage (AWS S3, MinIO, etc.)
  */
 
+import https from "https";
+import http from "http";
 import {
     S3Client,
     GetObjectCommand,
@@ -32,6 +34,8 @@ export interface S3StoreOptions {
     secretAccessKey: string;
     bucket?: string;
     region?: string;
+    /** When true, accept self-signed TLS certs (e.g. MinIO over HTTPS). Set GUN_S3_SKIP_SSL_VERIFY or MINIO_SKIP_SSL_VERIFY=true */
+    skipSslVerify?: boolean;
 }
 
 /**
@@ -66,6 +70,7 @@ class S3Store {
 
         // Parse endpoint URL for SSL detection
         const useSSL = options.endpoint.startsWith("https://");
+        const skipSslVerify = options.skipSslVerify === true;
 
         this.client = new S3Client({
             endpoint: options.endpoint,
@@ -75,19 +80,18 @@ class S3Store {
                 secretAccessKey: options.secretAccessKey,
             },
             forcePathStyle: true, // Required for MinIO and most S3-compatible services
-            // Limit concurrent connections to prevent socket exhaustion
             requestHandler: new NodeHttpHandler({
                 connectionTimeout: 5000,
                 socketTimeout: 30000,
-                // Increase max sockets to handle GunDB radisk load
-                httpsAgent: {
+                httpsAgent: new https.Agent({
                     maxSockets: 500,
                     keepAlive: true,
-                },
-                httpAgent: {
+                    rejectUnauthorized: !skipSslVerify,
+                }),
+                httpAgent: new http.Agent({
                     maxSockets: 500,
                     keepAlive: true,
-                },
+                }),
             }),
             ...(useSSL ? {} : { tls: false }),
         });
