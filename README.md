@@ -18,7 +18,6 @@
 - **Torrent Manager** — Download, seed, and stream torrents; built-in search (Internet Archive)
 - **Admin Dashboards** — Real-time monitoring, visual graph explorer, file manager, and config editor
 - **x402 Subscriptions** — Paid storage subscriptions via USDC (EIP-3009)
-- **L2 Bridge** — Trustless ETH bridge between L1 and GunDB L2
 - **Network Federation** — Relay discovery, storage proofs, and reputation system
 - **On-Chain Registry** — Staking and slashing on Base blockchain
 - **Anna's Archive** — Automated mirroring and indexing of scientific/cultural content

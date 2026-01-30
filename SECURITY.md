@@ -37,12 +37,6 @@ This project implements several security measures:
 - SHA-256 hashed admin tokens
 - Rate limiting on failed attempts
 
-### Bridge Security
-- Nonce-based replay attack prevention
-- Atomic balance operations with locking
-- Signature verification on all withdrawals
-- Frozen-data pattern for immutable balance records
-
 ### Payment Security (x402)
 - EIP-3009 signature verification
 - Time-window validation

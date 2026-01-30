@@ -398,7 +398,6 @@ See the main [API Documentation](../docs/API.md) for complete endpoint reference
 - **Registry**: On-chain relay registry operations
 - **Network**: Network federation, reputation, relay discovery
 - **X402**: Subscription management, storage limits
-- **Bridge**: L2 bridge operations, deposits, withdrawals
 - **Uploads**: User upload metadata management
 - **AnnasArchive**: Torrent and archive management
 

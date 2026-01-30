@@ -257,7 +257,6 @@ curl http://localhost:8765/api/v1/registry/balance
 ## Support
 
 - **Keypair Configuration**: See [RELAY_KEYS.md](./RELAY_KEYS.md) for detailed keypair setup
-- **Bridge Documentation**: See [BRIDGE.md](./BRIDGE.md) for L2 bridge API
 - **Issues**: https://github.com/scobru/shogun-relay/issues
 - **Main README**: [../README.md](../README.md)
 

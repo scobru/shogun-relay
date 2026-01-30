@@ -35,7 +35,7 @@ All PRs must include tests for:
 - Security-related changes
 
 Minimum coverage requirements:
-- **Critical modules** (bridge, payments): 90%+
+- **Critical modules** (payments, auth): 90%+
 - **Utility modules**: 80%+
 - **New code**: Must not decrease overall coverage
 
@@ -68,18 +68,17 @@ Follow conventional commits:
 
 Example:
 ```
-feat(bridge): add batch withdrawal support
+feat(x402): add subscription tier validation
 
-- Implement Merkle tree for batch proofs
-- Add nonce validation per user
-- Include debit hash in withdrawal records
+- Validate tier limits on upload
+- Add storage quota checks
 ```
 
 ## Security Considerations
 
 When contributing to security-sensitive areas:
 
-1. **Bridge operations**: Always include nonce validation
+1. **Payment operations**: Always include nonce/signature validation
 2. **Balance updates**: Use locking to prevent race conditions
 3. **Authentication**: Use timing-safe comparisons
 4. **User input**: Validate and sanitize all inputs
