@@ -1030,11 +1030,14 @@ export default (app: express.Application) => {
     }
   });
 
-  /**
+  /*
    * PUT /api/v1/admin/config
    * Update hot-reloadable configuration values (no restart required)
    * Admin only
+   * 
+   * DISABLED: Configuration editing is disabled via API.
    */
+  /*
   app.put(`${baseRoute}/admin/config`, tokenAuthMiddleware, async (req: Request, res: Response) => {
     try {
       const { setRuntimeValue, isHotReloadable, HOT_RELOADABLE_KEYS } = await import("../utils/runtime-config");
@@ -1084,6 +1087,7 @@ export default (app: express.Application) => {
       });
     }
   });
+  */
 
 
 

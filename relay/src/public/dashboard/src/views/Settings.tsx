@@ -50,9 +50,9 @@ function Settings() {
   const [config, setConfig] = useState<ConfigData | null>(null)
   const [loadingConfig, setLoadingConfig] = useState(false)
 
-  const [editedValues, setEditedValues] = useState<Record<string, string>>({})
-  const [savingConfig, setSavingConfig] = useState(false)
-  const [configMessage, setConfigMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null)
+  // const [editedValues, setEditedValues] = useState<Record<string, string>>({})
+  // const [savingConfig, setSavingConfig] = useState(false)
+  // const [configMessage, setConfigMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null)
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -110,43 +110,44 @@ function Settings() {
     }
   }
 
-  const handleConfigChange = (key: string, value: string) => {
-    setEditedValues(prev => ({ ...prev, [key]: value }))
-  }
+  // const handleConfigChange = (key: string, value: string) => {
+  //   setEditedValues(prev => ({ ...prev, [key]: value }))
+  // }
 
-  const saveHotReloadConfig = async () => {
-    if (Object.keys(editedValues).length === 0) return
+  // const saveHotReloadConfig = async () => {
+  //   if (Object.keys(editedValues).length === 0) return
     
-    setSavingConfig(true)
-    setConfigMessage(null)
-    try {
-      const res = await fetch('/api/v1/admin/config', {
-        method: 'PUT',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(editedValues)
-      })
-      const data = await res.json()
-      if (data.success) {
-        setConfigMessage({ type: 'success', text: `✅ ${data.message}` })
-        setEditedValues({})
-        fetchConfig()
-      } else {
-        setConfigMessage({ type: 'error', text: `❌ ${data.error || 'Failed to save'}` })
-      }
-    } catch (e) {
-      setConfigMessage({ type: 'error', text: '❌ Failed to save configuration' })
-    }
-    finally { setSavingConfig(false) }
-  }
+  //   setSavingConfig(true)
+  //   setConfigMessage(null)
+  //   try {
+  //     const res = await fetch('/api/v1/admin/config', {
+  //       method: 'PUT',
+  //       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+  //       body: JSON.stringify(editedValues)
+  //     })
+  //     const data = await res.json()
+  //     if (data.success) {
+  //       setConfigMessage({ type: 'success', text: `✅ ${data.message}` })
+  //       setEditedValues({})
+  //       fetchConfig()
+  //     } else {
+  //       setConfigMessage({ type: 'error', text: `❌ ${data.error || 'Failed to save'}` })
+  //     }
+  //   } catch (e) {
+  //     setConfigMessage({ type: 'error', text: '❌ Failed to save configuration' })
+  //   }
+  //   finally { setSavingConfig(false) }
+  // }
 
 
 
   const getHotReloadableCategories = () => {
     if (!config) return {}
+    // Return all categories, filtered or not, but now we show everything read-only
     const filtered: ConfigData = {}
     for (const [cat, items] of Object.entries(config)) {
-      const hotItems = items.filter(i => i.hotReloadable)
-      if (hotItems.length > 0) filtered[cat] = hotItems
+      // Allow all items to be shown in read-only mode
+      if (items.length > 0) filtered[cat] = items
     }
     return filtered
   }
@@ -168,15 +169,15 @@ function Settings() {
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono text-base-content/70">{item.key}</span>
                     {item.source === 'runtime' && <span className="badge badge-xs badge-info">runtime</span>}
-                    {isAdvanced && <span className="badge badge-xs badge-warning">restart required</span>}
+                    {item.hotReloadable && <span className="badge badge-xs badge-ghost">hot-reload</span>}
+                    {!item.hotReloadable && <span className="badge badge-xs badge-warning badge-outline">restart required</span>}
                   </div>
-                  <input
-                    type={item.key.includes('PASSWORD') || item.key.includes('KEY') || item.key.includes('TOKEN') ? 'password' : 'text'}
-                    className="input input-sm input-bordered w-full font-mono text-xs"
-                    value={editedValues[item.key] ?? (item.value || '')}
-                    onChange={(e) => handleConfigChange(item.key, e.target.value)}
-                    placeholder={item.value === undefined ? '(not set)' : undefined}
-                  />
+                  <div className="w-full bg-base-100 px-3 py-2 rounded text-xs font-mono break-all opacity-80">
+                     {item.key.includes('PASSWORD') || item.key.includes('KEY') || item.key.includes('TOKEN') 
+                       ? '••••••••••••••••' 
+                       : (item.value || <span className="italic text-base-content/40">(not set)</span>)
+                     }
+                  </div>
                 </div>
               ))}
             </div>
@@ -238,21 +239,22 @@ function Settings() {
             </div>
 
             {/* Message */}
-            {configMessage && (
+            {/* {configMessage && (
               <div className={`alert ${configMessage.type === 'success' ? 'alert-success' : configMessage.type === 'warning' ? 'alert-warning' : 'alert-error'}`}>
                 <span>{configMessage.text}</span>
               </div>
-            )}
+            )} */}
 
             {loadingConfig ? (
               <div className="flex justify-center p-4"><span className="loading loading-spinner"></span></div>
             ) : config ? (
               <div className="mt-2">
-                <p className="text-sm text-base-content/60 mb-3">
-                  These values can be changed without restarting the server.
-                </p>
+                <div className="alert alert-info py-2 mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  <span className="text-xs">Configuration is read-only. To modify settings, edit the <code>.env</code> file and restart the server.</span>
+                </div>
                 {renderConfigSection(getHotReloadableCategories(), false)}
-                {Object.keys(editedValues).length > 0 && (
+                {/* {Object.keys(editedValues).length > 0 && (
                   <button 
                     className="btn btn-primary btn-sm mt-4" 
                     onClick={saveHotReloadConfig}
@@ -260,7 +262,7 @@ function Settings() {
                   >
                     {savingConfig ? <span className="loading loading-spinner loading-xs"></span> : '💾 Apply Changes'}
                   </button>
-                )}
+                )} */}
               </div>
             ) : (
               <p className="text-base-content/50 text-sm">Failed to load configuration</p>
