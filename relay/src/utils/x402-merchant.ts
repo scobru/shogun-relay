@@ -302,11 +302,13 @@ const NETWORK_CONFIG: Record<NetworkKey, NetworkConfigType> = {
 };
 
 // Import pricing configuration
-import { PRICING_CONFIG } from "../config/pricing-config";
+import { getSubscriptionPricing, type SubscriptionTier } from "../config/pricing-config";
 import { relayConfig, storageConfig } from "../config";
 
-// Subscription tiers
-export const SUBSCRIPTION_TIERS: SubscriptionTiersMap = PRICING_CONFIG.subscriptions;
+// Subscription tiers - Dynamic getter
+export function getSubscriptionTiers(): Record<string, SubscriptionTier> {
+  return getSubscriptionPricing();
+}
 
 interface X402MerchantOptions {
   payToAddress: string;
@@ -317,6 +319,7 @@ interface X402MerchantOptions {
   privateKey?: string;
   rpcUrl?: string;
 }
+
 
 export class X402Merchant {
   payToAddress: string;
@@ -385,7 +388,7 @@ export class X402Merchant {
    * Create payment requirements for a subscription tier
    */
   createPaymentRequirements(tier: string = "basic"): PaymentRequirements {
-    const tierConfig = SUBSCRIPTION_TIERS[tier];
+    const tierConfig = getSubscriptionTiers()[tier];
     if (!tierConfig) {
       throw new Error(`Invalid subscription tier: ${tier}`);
     }
@@ -492,7 +495,7 @@ export class X402Merchant {
       return { isValid: false, invalidReason: "No payment payload provided" };
     }
 
-    const tierConfig = SUBSCRIPTION_TIERS[expectedTier];
+    const tierConfig = getSubscriptionTiers()[expectedTier];
     if (!tierConfig) {
       return { isValid: false, invalidReason: `Invalid tier: ${expectedTier}` };
     }
@@ -974,7 +977,8 @@ export class X402Merchant {
         };
       }
 
-      const tierConfig = SUBSCRIPTION_TIERS[subData.tier as string] || SUBSCRIPTION_TIERS.basic;
+      const tiers = getSubscriptionTiers();
+      const tierConfig = tiers[subData.tier as string] || tiers.basic;
 
       return {
         active: true,
@@ -1011,7 +1015,9 @@ export class X402Merchant {
       throw new Error("Relay user not initialized, cannot save subscription");
     }
 
-    const tierConfig = SUBSCRIPTION_TIERS[tier];
+    const tiers = getSubscriptionTiers();
+    const tierConfig = tiers[tier];
+
     if (!tierConfig) {
       throw new Error(`Invalid tier: ${tier}`);
     }
@@ -1027,7 +1033,7 @@ export class X402Merchant {
 
     // If renewing same or higher tier and subscription is still active, extend expiry
     if (currentSub.active && currentSub.tier) {
-      const currentTierConfig = SUBSCRIPTION_TIERS[currentSub.tier as string];
+      const currentTierConfig = tiers[currentSub.tier as string];
 
       // Prevent downgrade: new tier must have storageMB >= current tier
       if (currentTierConfig && tierConfig.storageMB < currentTierConfig.storageMB) {
@@ -1708,7 +1714,8 @@ export class X402Merchant {
     ipfsApiUrl?: string,
     ipfsApiToken?: string
   ): Promise<CanAcceptSubscriptionResult> {
-    const tierConfig = SUBSCRIPTION_TIERS[tier];
+    const tiers = getSubscriptionTiers();
+    const tierConfig = tiers[tier];
     if (!tierConfig) {
       return {
         allowed: false,

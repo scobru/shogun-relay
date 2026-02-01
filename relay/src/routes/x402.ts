@@ -11,7 +11,7 @@
 import express, { Request, Response, Router } from "express";
 import {
   X402Merchant,
-  SUBSCRIPTION_TIERS,
+  getSubscriptionTiers,
   NetworkKey,
   SubscriptionStatus,
   CanUploadResult,
@@ -65,7 +65,7 @@ router.get("/tiers", async (req, res) => {
     // Get relay storage status
     const relayStorage = await X402Merchant.getRelayStorageStatus(ipfsApiUrl, ipfsApiToken);
 
-    const tiers = Object.entries(SUBSCRIPTION_TIERS).map(([key, tier]) => {
+    const tiers = Object.entries(getSubscriptionTiers()).map(([key, tier]) => {
       const tierInfo: any = {
         id: key,
         ...tier,
@@ -127,11 +127,12 @@ router.get("/tiers", async (req, res) => {
 router.get("/payment-requirements/:tier", (req, res) => {
   try {
     const { tier } = req.params;
+    const tiers = getSubscriptionTiers();
 
-    if (!SUBSCRIPTION_TIERS[tier]) {
+    if (!tiers[tier]) {
       return res.status(400).json({
         success: false,
-        error: `Invalid tier: ${tier}. Available tiers: ${Object.keys(SUBSCRIPTION_TIERS).join(", ")}`,
+        error: `Invalid tier: ${tier}. Available tiers: ${Object.keys(tiers).join(", ")}`,
       });
     }
 
@@ -141,7 +142,7 @@ router.get("/payment-requirements/:tier", (req, res) => {
     res.json({
       success: true,
       tier,
-      tierInfo: SUBSCRIPTION_TIERS[tier],
+      tierInfo: tiers[tier],
       x402: requirements,
     });
   } catch (error: any) {
@@ -277,10 +278,11 @@ router.post("/subscribe", async (req, res) => {
       });
     }
 
-    if (!tier || !SUBSCRIPTION_TIERS[tier]) {
+    const tiers = getSubscriptionTiers();
+    if (!tier || !tiers[tier]) {
       return res.status(400).json({
         success: false,
-        error: `Invalid tier: ${tier}. Available tiers: ${Object.keys(SUBSCRIPTION_TIERS).join(", ")}`,
+        error: `Invalid tier: ${tier}. Available tiers: ${Object.keys(tiers).join(", ")}`,
       });
     }
 
@@ -329,8 +331,8 @@ router.post("/subscribe", async (req, res) => {
 
     if (currentSubscription.active && currentSubscription.tier) {
       const currentTier = currentSubscription.tier;
-      const currentTierConfig = SUBSCRIPTION_TIERS[currentTier];
-      const newTierConfig = SUBSCRIPTION_TIERS[tier];
+      const currentTierConfig = tiers[currentTier];
+      const newTierConfig = tiers[tier];
 
       if (!currentTierConfig || !newTierConfig) {
         return res.status(400).json({
@@ -347,7 +349,7 @@ router.post("/subscribe", async (req, res) => {
           : "unknown";
 
         // Get available upgrade tiers
-        const availableUpgrades = Object.entries(SUBSCRIPTION_TIERS)
+        const availableUpgrades = Object.entries(tiers)
           .filter(([tierName, tierCfg]) => tierCfg.storageMB >= currentTierConfig.storageMB)
           .map(([tierName, tierCfg]) => ({
             tier: tierName,
@@ -389,7 +391,7 @@ router.post("/subscribe", async (req, res) => {
         error: "Payment required",
         x402: requirements,
         tier,
-        tierInfo: SUBSCRIPTION_TIERS[tier],
+        tierInfo: tiers[tier],
       };
 
       if (relayCapacity.warning) {
@@ -449,7 +451,7 @@ router.post("/subscribe", async (req, res) => {
         purchasedAt: new Date(subscription.purchasedAt).toISOString(),
       },
       payment: {
-        amount: `${SUBSCRIPTION_TIERS[tier].priceUSDC} USDC`,
+        amount: `${tiers[tier].priceUSDC} USDC`,
         transaction: settlement.transaction,
         network: settlement.network,
         explorer: settlement.explorer,
@@ -606,7 +608,7 @@ router.get("/config", (req, res) => {
       configured,
       network,
       payToAddress: payToAddress || null,
-      tiers: Object.keys(SUBSCRIPTION_TIERS),
+      tiers: Object.keys(getSubscriptionTiers()),
     });
   } catch (error: any) {
     console.error("Config error:", error);
