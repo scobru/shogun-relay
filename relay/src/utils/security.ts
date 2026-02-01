@@ -7,7 +7,7 @@
 import crypto from "crypto";
 import { loggers } from "./logger";
 
-const log = loggers.server || console;
+const log = loggers.server;
 
 /**
  * Secure token comparison to prevent timing attacks

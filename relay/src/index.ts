@@ -109,7 +109,7 @@ let path_public = serverConfig.publicPath;
 async function initializeServer() {
   // Welcome message with ASCII art logo
   const welcomeMessage = serverConfig.welcomeMessage;
-  console.log(welcomeMessage);
+  loggers.server.info(welcomeMessage);
   loggers.server.info("🚀 Initializing Shogun Relay Server...");
   loggers.server.info("🚀 Shogun Relay v1.0.1 - FORCE UPDATE");
 

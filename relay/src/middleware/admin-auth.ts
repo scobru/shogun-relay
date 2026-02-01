@@ -9,7 +9,7 @@ import { secureCompare, hashToken } from "../utils/security";
 import { authConfig } from "../config";
 import { loggers } from "../utils/logger";
 
-const log = loggers.server || console;
+const log = loggers.server;
 
 // Cache admin password hash (computed once)
 let adminPasswordHash: string | null = null;

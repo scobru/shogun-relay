@@ -8,7 +8,7 @@ import { Request, Response, NextFunction } from "express";
 import { ApiKeysManager } from "../utils/api-keys";
 import { loggers } from "../utils/logger";
 
-const log = loggers.server || console;
+const log = loggers.server;
 
 // Global API keys manager instance (initialized in routes)
 let apiKeysManager: ApiKeysManager | null = null;

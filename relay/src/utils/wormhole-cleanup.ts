@@ -11,7 +11,7 @@ import { loggers } from "./logger";
 import { wormholeConfig, ipfsConfig, authConfig } from "../config/env-config";
 import { GUN_PATHS, getGunNode } from "./gun-paths";
 
-const log = loggers.server || console;
+const log = loggers.server;
 
 let cleanupInterval: NodeJS.Timeout | null = null;
 let isProcessing = false;

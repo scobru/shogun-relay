@@ -16,7 +16,7 @@ import { GUN_PATHS, getGunNode } from "./gun-paths";
 import { chatService } from "./chat-service";
 import type { IGunInstance } from "gun";
 
-const log = loggers.registry || console;
+const log = loggers.registry;
 
 interface PeerSyncResult {
   added: string[];
@@ -127,7 +127,7 @@ export async function syncOnchainRelaysAsPeers(
  */
 export function announceRelayPresence(
   gun: IGunInstance,
-  relayInfo: { endpoint: string; [key: string]: any },
+  relayInfo: { endpoint: string;[key: string]: any },
   pubKey: string
 ): void {
   if (!pubKey || !relayInfo.endpoint) {
@@ -142,10 +142,10 @@ export function announceRelayPresence(
 
   // Write to unified relays path
   getGunNode(gun, GUN_PATHS.RELAYS).get(pubKey).put(presenceData);
-  
+
   // Also announce to PEERS path so Mules can find us as a generic peer
   getGunNode(gun, GUN_PATHS.PEERS).get(pubKey).put(presenceData);
-  
+
   log.info({ pubKey, endpoint: relayInfo.endpoint }, "Announced relay presence on GunDB");
 }
 
@@ -156,7 +156,7 @@ export function announceRelayPresence(
  */
 export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): void {
   log.info("Starting GunDB peer discovery...");
-  
+
   getGunNode(gun, GUN_PATHS.RELAYS).map().on((data: any, pubKey: string) => {
     if (!data || !data.endpoint) return;
 
@@ -186,7 +186,7 @@ export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): voi
 
     // Add as peer
     gun.opt({ peers: [gunPeerUrl] });
-    
+
     // Auto-subscribe to chat with this relay
     chatService.syncMessagesFrom(pubKey);
 
@@ -200,13 +200,13 @@ export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): voi
  */
 export function syncMulePeers(gun: IGunInstance): void {
   log.info("Starting GunDB Mule peer discovery...");
-  
+
   getGunNode(gun, GUN_PATHS.PEERS).map().on((data: any, pubKey: string) => {
     if (!data) return;
-    
+
     // Auto-subscribe to chat with this peer (Mule)
     chatService.syncMessagesFrom(pubKey);
-    
+
     // We don't add Mules as gun.opt({peers}) because they are likely not running Gun servers (or are behind NAT)
     // But we do want to discover them for chat.
   });

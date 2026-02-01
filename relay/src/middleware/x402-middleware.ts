@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import { X402Merchant, NetworkKey } from "../utils/x402-merchant";
 import { x402Config } from "../config";
 import { parseUnits } from "viem";
+import { loggers } from "../utils/logger";
 
 export interface X402MiddlewareOptions {
     priceUSDC: number;
@@ -64,7 +65,7 @@ export const x402Protect = (options: X402MiddlewareOptions) => {
                         payment = JSON.parse(headerVal[0]);
                     }
                 } catch (e) {
-                    console.warn("Invalid x-payment header JSON");
+                    loggers.x402.warn("Invalid x-payment header JSON");
                 }
             }
 
@@ -72,7 +73,7 @@ export const x402Protect = (options: X402MiddlewareOptions) => {
                 try {
                     payment = JSON.parse(req.query.payment as string);
                 } catch (e) {
-                    console.warn("Invalid payment query param JSON");
+                    loggers.x402.warn("Invalid payment query param JSON");
                 }
             }
 
@@ -112,7 +113,7 @@ export const x402Protect = (options: X402MiddlewareOptions) => {
             const settlement = await merchant.settlePayment(payment);
 
             if (!settlement.success) {
-                console.error(`Payment settlement failed: ${settlement.errorReason}`);
+                loggers.x402.error(`Payment settlement failed: ${settlement.errorReason}`);
                 return res.status(500).json({
                     success: false,
                     error: "Payment settlement failed",
@@ -136,7 +137,7 @@ export const x402Protect = (options: X402MiddlewareOptions) => {
                     });
                 }
             } catch (err) {
-                console.warn("Failed to save payment history:", err);
+                loggers.x402.warn({ err }, "Failed to save payment history");
                 // Don't fail the request if saving history fails
             }
 
@@ -153,7 +154,7 @@ export const x402Protect = (options: X402MiddlewareOptions) => {
             next();
 
         } catch (error: any) {
-            console.error("x402 Middleware Error:", error);
+            loggers.x402.error({ err: error }, "x402 Middleware Error");
             res.status(500).json({
                 success: false,
                 error: "Internal payment processing error"

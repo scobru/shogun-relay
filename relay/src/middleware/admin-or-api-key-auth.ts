@@ -11,7 +11,7 @@ import { authConfig } from "../config";
 import { validateApiKeyToken } from "./api-keys-auth";
 import { loggers } from "../utils/logger";
 
-const log = loggers.server || console;
+const log = loggers.server;
 
 // Cache admin password hash (computed once)
 let adminPasswordHash: string | null = null;
