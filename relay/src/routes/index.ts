@@ -1085,62 +1085,7 @@ export default (app: express.Application) => {
     }
   });
 
-  /**
-   * PUT /api/v1/admin/config/env
-   * Update .env file directly (requires server restart)
-   * Admin only
-   */
-  app.put(`${baseRoute}/admin/config/env`, tokenAuthMiddleware, async (req: Request, res: Response) => {
-    try {
-      const { updateEnvFile, isHotReloadable, requiresRestart } = await import("../utils/runtime-config");
-      const updates = req.body as Record<string, string>;
 
-      if (!updates || typeof updates !== 'object') {
-        return res.status(400).json({
-          success: false,
-          error: "Request body must be an object with key-value pairs",
-        });
-      }
-
-      // Identify which keys require restart
-      const restartRequired: string[] = [];
-      const hotReloadable: string[] = [];
-
-      for (const key of Object.keys(updates)) {
-        if (requiresRestart(key)) {
-          restartRequired.push(key);
-        } else if (isHotReloadable(key)) {
-          hotReloadable.push(key);
-        }
-      }
-
-      const success = updateEnvFile(updates);
-
-      if (!success) {
-        return res.status(500).json({
-          success: false,
-          error: "Failed to write to .env file",
-        });
-      }
-
-      res.json({
-        success: true,
-        message: ".env file updated",
-        restartRequired: restartRequired.length > 0,
-        restartRequiredKeys: restartRequired,
-        hotReloadableKeys: hotReloadable,
-        warning: restartRequired.length > 0
-          ? `⚠️ Server restart required for: ${restartRequired.join(', ')}`
-          : undefined,
-      });
-    } catch (error: any) {
-      loggers.server.error({ err: error }, "Failed to update .env file");
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal server error",
-      });
-    }
-  });
 
   /**
    * GET /api/v1/admin/config/env

@@ -49,7 +49,7 @@ function Settings() {
   // Configuration State
   const [config, setConfig] = useState<ConfigData | null>(null)
   const [loadingConfig, setLoadingConfig] = useState(false)
-  const [configTab, setConfigTab] = useState<'hot' | 'advanced'>('hot')
+
   const [editedValues, setEditedValues] = useState<Record<string, string>>({})
   const [savingConfig, setSavingConfig] = useState(false)
   const [configMessage, setConfigMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null)
@@ -139,33 +139,7 @@ function Settings() {
     finally { setSavingConfig(false) }
   }
 
-  const saveEnvConfig = async () => {
-    if (Object.keys(editedValues).length === 0) return
-    
-    setSavingConfig(true)
-    setConfigMessage(null)
-    try {
-      const res = await fetch('/api/v1/admin/config/env', {
-        method: 'PUT',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(editedValues)
-      })
-      const data = await res.json()
-      if (data.success) {
-        const msg = data.restartRequired 
-          ? `⚠️ .env updated. Restart required for: ${data.restartRequiredKeys.join(', ')}`
-          : '✅ .env file updated'
-        setConfigMessage({ type: data.restartRequired ? 'warning' : 'success', text: msg })
-        setEditedValues({})
-        fetchConfig()
-      } else {
-        setConfigMessage({ type: 'error', text: `❌ ${data.error || 'Failed to save'}` })
-      }
-    } catch (e) {
-      setConfigMessage({ type: 'error', text: '❌ Failed to save .env file' })
-    }
-    finally { setSavingConfig(false) }
-  }
+
 
   const getHotReloadableCategories = () => {
     if (!config) return {}
@@ -177,15 +151,7 @@ function Settings() {
     return filtered
   }
 
-  const getAdvancedCategories = () => {
-    if (!config) return {}
-    const filtered: ConfigData = {}
-    for (const [cat, items] of Object.entries(config)) {
-      const advItems = items.filter(i => !i.hotReloadable)
-      if (advItems.length > 0) filtered[cat] = advItems
-    }
-    return filtered
-  }
+
 
   const renderConfigSection = (categories: ConfigData, isAdvanced: boolean) => (
     <div className="flex flex-col gap-4">
@@ -271,22 +237,6 @@ function Settings() {
               </button>
             </div>
 
-            {/* Tabs */}
-            <div role="tablist" className="tabs tabs-boxed">
-              <button 
-                className={`tab ${configTab === 'hot' ? 'tab-active' : ''}`} 
-                onClick={() => { setConfigTab('hot'); setEditedValues({}) }}
-              >
-                🟢 Hot-Reload
-              </button>
-              <button 
-                className={`tab ${configTab === 'advanced' ? 'tab-active' : ''}`}
-                onClick={() => { setConfigTab('advanced'); setEditedValues({}) }}
-              >
-                🔴 Advanced (.env)
-              </button>
-            </div>
-
             {/* Message */}
             {configMessage && (
               <div className={`alert ${configMessage.type === 'success' ? 'alert-success' : configMessage.type === 'warning' ? 'alert-warning' : 'alert-error'}`}>
@@ -298,38 +248,18 @@ function Settings() {
               <div className="flex justify-center p-4"><span className="loading loading-spinner"></span></div>
             ) : config ? (
               <div className="mt-2">
-                {configTab === 'hot' ? (
-                  <>
-                    <p className="text-sm text-base-content/60 mb-3">
-                      These values can be changed without restarting the server.
-                    </p>
-                    {renderConfigSection(getHotReloadableCategories(), false)}
-                    {Object.keys(editedValues).length > 0 && (
-                      <button 
-                        className="btn btn-primary btn-sm mt-4" 
-                        onClick={saveHotReloadConfig}
-                        disabled={savingConfig}
-                      >
-                        {savingConfig ? <span className="loading loading-spinner loading-xs"></span> : '💾 Apply Changes'}
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="alert alert-warning mb-3">
-                      <span>⚠️ Changes here require server restart to take effect.</span>
-                    </div>
-                    {renderConfigSection(getAdvancedCategories(), true)}
-                    {Object.keys(editedValues).length > 0 && (
-                      <button 
-                        className="btn btn-warning btn-sm mt-4" 
-                        onClick={saveEnvConfig}
-                        disabled={savingConfig}
-                      >
-                        {savingConfig ? <span className="loading loading-spinner loading-xs"></span> : '💾 Save to .env (Restart Required)'}
-                      </button>
-                    )}
-                  </>
+                <p className="text-sm text-base-content/60 mb-3">
+                  These values can be changed without restarting the server.
+                </p>
+                {renderConfigSection(getHotReloadableCategories(), false)}
+                {Object.keys(editedValues).length > 0 && (
+                  <button 
+                    className="btn btn-primary btn-sm mt-4" 
+                    onClick={saveHotReloadConfig}
+                    disabled={savingConfig}
+                  >
+                    {savingConfig ? <span className="loading loading-spinner loading-xs"></span> : '💾 Apply Changes'}
+                  </button>
                 )}
               </div>
             ) : (
