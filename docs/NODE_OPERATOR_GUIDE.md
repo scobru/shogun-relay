@@ -44,12 +44,15 @@ ipfs init
 ipfs daemon &
 
 # Install relay
-yarn install
+npm install
 cp env.example .env
 nano .env  # Edit configuration
 
+# (Optional) Build dashboard UI
+npm run build:dashboard
+
 # Start relay
-yarn start
+npm start
 ```
 
 ## Required Configuration
@@ -101,7 +104,7 @@ To be discoverable and earn revenue, register on-chain:
 
 ### Via Dashboard
 
-1. Open `http://your-relay:8765/registry-dashboard`
+1. Open `http://your-relay:8765/dashboard/` and go to **Registry** (`/dashboard/registry`)
 2. Enter:
    - **Endpoint**: `https://your-relay.com`
    - **Stake Amount**: Minimum 100 USDC
@@ -175,10 +178,11 @@ sudo ufw enable
 
 ### Dashboards
 
-- `/admin` - Main control panel
-- `/stats` - Live metrics
-- `/services-dashboard` - Service health
-- `/registry-dashboard` - On-chain status
+- `/dashboard/` - Status e panoramica
+- `/dashboard/stats` - Metriche in tempo reale
+- `/dashboard/services` - Stato servizi
+- `/dashboard/registry` - Registry on-chain
+- `/dashboard/settings` - Autenticazione admin e configurazione (sola lettura)
 
 ### Health Monitoring
 

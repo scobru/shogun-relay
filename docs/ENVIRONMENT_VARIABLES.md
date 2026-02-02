@@ -845,7 +845,8 @@ Always use `.env` files (and add `.env` to `.gitignore`) or secure environment v
 
 ## Related Documentation
 
-- [API.md](./API.md) - API endpoints reference
-- [README.md](../README.md) - Main project documentation
-- [env.example](../env.example) - Example environment file with all variables
+- [docs/README.md](./README.md) - Indice della documentazione
+- [API.md](./API.md) - Riferimento API
+- [README principale](../README.md) - Documentazione del progetto
+- [relay/env.example](../relay/env.example) - File d’esempio con tutte le variabili
 

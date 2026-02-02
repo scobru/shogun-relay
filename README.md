@@ -41,10 +41,13 @@ curl http://localhost:8765/health
 ```bash
 cd shogun-relay/relay
 npm install
-npm run dev
+npm run build:dashboard   # opzionale: per la UI del dashboard
+npm start
 ```
 
-Admin dashboards: `http://localhost:8765/`
+Per sviluppo con hot-reload: `npm run start:dev`
+
+Dashboard: `http://localhost:8765/dashboard/` (anche `http://localhost:8765/admin` reindirizza qui)
 
 ---
 
@@ -63,37 +66,48 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 
 ---
 
-## Admin Interfaces
+## Dashboard
 
-| Path | Description |
+L’interfaccia di amministrazione è una SPA React in **`/dashboard/`**. Anche **`/admin`** e **`/`** reindirizzano a `/dashboard/`.
+
+| Path | Descrizione |
 |------|-------------|
-| `/admin` | Main control panel |
-| `/stats` | Live metrics & charts |
-| `/torrents` | Torrent manager & search |
-| `/services-dashboard` | Service health overview |
-| `/config` | Runtime configuration editor |
-| `/pin-manager` | IPFS pin manager |
-| `/upload` | IPFS uploads |
-| `/drive` | Admin file browser |
-| `/visualGraph` | GunDB explorer |
-| `/graphExplorer` | Advanced graph navigator |
-| `/registry-dashboard` | On-chain registry |
-| `/endpoints` | API documentation |
+| `/dashboard/` | Status e panoramica |
+| `/dashboard/stats` | Metriche e grafici in tempo reale |
+| `/dashboard/services` | Stato dei servizi |
+| `/dashboard/files` | File manager |
+| `/dashboard/drive` | Drive / browser file |
+| `/dashboard/explore` | Esplora storage |
+| `/dashboard/network` | Rete e connessioni |
+| `/dashboard/chat` | Chat |
+| `/dashboard/torrents` | Torrent manager e ricerca (Anna's Archive) |
+| `/dashboard/deals` | Storage deals |
+| `/dashboard/x402` | Abbonamenti x402 |
+| `/dashboard/registry` | Registry on-chain |
+| `/dashboard/api-keys` | Gestione API keys |
+| `/dashboard/charts` | Grafici |
+| `/dashboard/visual-graph` | Esploratore grafo GunDB |
+| `/dashboard/graph-explorer` | Navigatore grafo avanzato |
+| `/dashboard/rpc-console` | Console RPC |
+| `/dashboard/api-docs` | Documentazione API |
+| `/dashboard/settings` | Impostazioni e autenticazione admin |
 
 ---
 
-## Development
+## Documentazione
 
-| Document | Description |
-|----------|-------------|
-| **[API Reference](./docs/API.md)** | Complete REST API documentation |
-| **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** | All configuration options |
-| **[Node Operator Guide](./docs/NODE_OPERATOR_GUIDE.md)** | Run your own relay |
-| **[x402 Payments](./docs/X402_PAYMENTS.md)** | Subscription payment system |
-| **[Storage Deals](./docs/STORAGE_DEALS.md)** | Per-file contracts & erasure coding |
-| **[Network Federation](./docs/NETWORK_FEDERATION.md)** | Relay discovery & reputation |
-| **[Relay Keys](./docs/RELAY_KEYS.md)** | Keypair configuration |
-| **[Drive SDK Example](./docs/DRIVE_SDK_EXAMPLE.md)** | Admin Drive API usage |
+Indice completo in **[docs/README.md](./docs/README.md)**.
+
+| Documento | Descrizione |
+|-----------|-------------|
+| **[API Reference](./docs/API.md)** | Documentazione REST API |
+| **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** | Variabili d’ambiente e configurazione |
+| **[Node Operator Guide](./docs/NODE_OPERATOR_GUIDE.md)** | Guida per operatori di nodi |
+| **[x402 Payments](./docs/X402_PAYMENTS.md)** | Pagamenti e abbonamenti x402 |
+| **[Storage Deals](./docs/STORAGE_DEALS.md)** | Contratti per file ed erasure coding |
+| **[Network Federation](./docs/NETWORK_FEDERATION.md)** | Federazione rete e reputazione |
+| **[Relay Keys](./docs/RELAY_KEYS.md)** | Configurazione keypair SEA |
+| **[Drive SDK Example](./docs/DRIVE_SDK_EXAMPLE.md)** | Esempio uso Drive API |
 
 ---
 
@@ -134,7 +148,7 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 | `GET /api/v1/drive/*` | Admin file browser API |
 | `GET /api/v1/graph/*` | GunDB visual graph explorer |
 
-Full API documentation at `/endpoints` or see **[API Reference](./docs/API.md)**.
+Documentazione API completa: **[API Reference](./docs/API.md)** o `/dashboard/api-docs` nel dashboard.
 
 ---
 
@@ -144,11 +158,12 @@ Full API documentation at `/endpoints` or see **[API Reference](./docs/API.md)**
 shogun-relay/
 ├── relay/
 │   ├── src/
-│   │   ├── index.ts       # Express + Gun bootstrap
-│   │   ├── routes/        # REST endpoints
-│   │   └── public/        # Admin frontends
-├── docs/                  # Documentation
-└── docker/                # Docker utilities
+│   │   ├── index.ts           # Express + Gun bootstrap
+│   │   ├── routes/            # REST endpoints
+│   │   └── public/dashboard/  # Dashboard React SPA (build → dist)
+├── docs/                      # Documentazione (vedi docs/README.md)
+├── sdk/                       # Shogun Relay SDK
+└── docker/                    # Docker e utilità
 ```
 
 ---

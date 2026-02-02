@@ -22,9 +22,11 @@ const iconMap: Record<string, string> = {
   rpcConsole: '▩',
   apiDocs: '▤',
   settings: '◎',
+  blobs: '📥',
 }
 
 interface NavItem {
+
   path: string
   icon: string
   label: string
@@ -43,7 +45,9 @@ const navItems: NavItem[] = [
   { path: '/torrents', icon: iconMap.torrents, label: 'Torrents', group: 'network' },
   { path: '/deals', icon: iconMap.deals, label: 'Deals', group: 'blockchain' },
   { path: '/x402', icon: iconMap.x402, label: 'x402', group: 'blockchain' },
+  { path: '/blobs', icon: iconMap.blobs, label: 'Blob Archiver', group: 'blockchain' },
   { path: '/registry', icon: iconMap.registry, label: 'Registry', group: 'registry' },
+
   { path: '/api-keys', icon: iconMap.apiKeys, label: 'API Keys', group: 'tools' },
   { path: '/charts', icon: iconMap.charts, label: 'Charts', group: 'tools' },
   { path: '/visual-graph', icon: iconMap.visualGraph, label: 'Visual Graph', group: 'tools' },

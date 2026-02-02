@@ -66,6 +66,8 @@ import registryRoutes from "./routes/registry";
 import torrentRoutes from "./routes/torrent";
 import visualGraphRoutes from "./routes/visualGraph";
 import driveRoutes from "./routes/drive";
+import blobArchiverRoutes from "./routes/blob-archiver";
+
 
 // Middleware
 
@@ -1300,6 +1302,8 @@ See docs/RELAY_KEYS.md for more information.
     return `${secs}s`;
   }
 
+  app.use("/api/drive", tokenAuthMiddleware, driveRoutes); // Drive
+  app.use("/api/blobs", tokenAuthMiddleware, blobArchiverRoutes); // Blob Archiver
   // Metrics endpoint for monitoring
   app.get("/metrics", tokenAuthMiddleware, (req, res) => {
     const memUsage = process.memoryUsage();
