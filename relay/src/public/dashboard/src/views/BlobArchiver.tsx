@@ -1,5 +1,6 @@
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '../context/AuthContext'
 
 interface BlobRecord {
   txHash: string
@@ -10,6 +11,7 @@ interface BlobRecord {
 }
 
 function BlobArchiver() {
+  const { getAuthHeaders } = useAuth()
   const [txHash, setTxHash] = useState('')
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
@@ -26,9 +28,15 @@ function BlobArchiver() {
   }
 
   // Fetch list of blobs
-  const fetchBlobs = async () => {
+  const fetchBlobs = useCallback(async () => {
     try {
-      const response = await fetch('/api/blobs/list')
+      const response = await fetch('/api/blobs/list', {
+        headers: getAuthHeaders()
+      })
+      if (response.status === 401) {
+          console.error('Unauthorized')
+          return
+      }
       const data = await response.json()
       if (data.success) {
         setBlobs(data.data)
@@ -36,13 +44,13 @@ function BlobArchiver() {
     } catch (error) {
       console.error('Failed to fetch blobs', error)
     }
-  }
+  }, [getAuthHeaders])
 
   useEffect(() => {
     fetchBlobs()
     const interval = setInterval(fetchBlobs, 10000) // Poll every 10s
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchBlobs])
 
   const handleArchive = async () => {
     if (!txHash) return
@@ -57,7 +65,10 @@ function BlobArchiver() {
     try {
       const response = await fetch('/api/blobs/archive', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            ...getAuthHeaders() 
+        },
         body: JSON.stringify({ txHash })
       })
       

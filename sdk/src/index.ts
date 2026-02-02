@@ -13,6 +13,8 @@ import { ApiKeysModule } from "./modules/api-keys";
 import { AuthModule } from "./modules/auth";
 import { ChatModule } from "./modules/chat";
 import { VisualGraphModule } from "./modules/visualGraph";
+import { BlobsModule } from "./modules/blobs";
+
 
 // Export types
 export * from "./types";
@@ -22,6 +24,8 @@ export * from "./modules/api-keys";
 export * from "./modules/auth";
 export * from "./modules/chat";
 export * from "./modules/visualGraph";
+export * from "./modules/blobs";
+
 
 // Export wallet utilities
 export * from "./utils/wallet";
@@ -43,6 +47,8 @@ export class ShogunRelaySDK {
   public auth: AuthModule;
   public chat: ChatModule;
   public visualGraph: VisualGraphModule;
+  public blobs: BlobsModule;
+
 
   constructor(config: ApiClientConfig) {
     this.client = new ApiClient(config);
@@ -61,7 +67,9 @@ export class ShogunRelaySDK {
     this.auth = new AuthModule(this.client);
     this.chat = new ChatModule(this.client);
     this.visualGraph = new VisualGraphModule(this.client);
+    this.blobs = new BlobsModule(this.client);
   }
+
 
   public setToken(token: string) {
     this.client.setToken(token);
