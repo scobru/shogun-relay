@@ -172,7 +172,7 @@ function Settings() {
                     {item.hotReloadable && <span className="badge badge-xs badge-ghost">hot-reload</span>}
                     {!item.hotReloadable && <span className="badge badge-xs badge-warning badge-outline">restart required</span>}
                   </div>
-                  <div className="w-full bg-base-100 px-3 py-2 rounded text-xs font-mono break-all opacity-80">
+                  <div className="w-full bg-base-200/80 px-3 py-2 rounded text-xs font-mono break-all opacity-90 select-none cursor-default border border-base-300/50" role="text">
                      {item.key.includes('PASSWORD') || item.key.includes('KEY') || item.key.includes('TOKEN') 
                        ? '••••••••••••••••' 
                        : (item.value || <span className="italic text-base-content/40">(not set)</span>)
@@ -233,6 +233,7 @@ function Settings() {
           <div className="card-body">
             <div className="flex items-center justify-between">
               <h3 className="card-title">⚙️ Configuration</h3>
+              <span className="badge badge-ghost badge-sm">Solo lettura</span>
               <button className="btn btn-ghost btn-sm" onClick={fetchConfig} disabled={loadingConfig}>
                 {loadingConfig ? <span className="loading loading-spinner loading-xs"></span> : '🔄'}
               </button>
