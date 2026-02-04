@@ -1,0 +1,146 @@
+:root {
+  --myspace-blue: #6699cc;
+  --myspace-light-blue: #d5e5f5;
+  --myspace-gray-bg: #f8f8f8;
+  --myspace-border: #6699cc;
+  --myspace-text: #000000;
+  --myspace-link: #003399;
+  --myspace-header-blue: #003399;
+  
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #ffffff;
+  color: var(--myspace-text);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  display: block; /* Overriding Vite default flex */
+  min-height: 100vh;
+}
+
+a {
+  color: var(--myspace-link);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  padding: 0;
+}
+
+.ms-container {
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: #ffffff;
+}
+
+/* Header */
+.ms-header {
+  background-color: var(--myspace-blue);
+  color: white;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--myspace-header-blue);
+}
+
+.ms-header h1 {
+  font-size: 24px;
+}
+
+.ms-nav {
+  background-color: var(--myspace-light-blue);
+  padding: 5px;
+  text-align: center;
+  border-bottom: 1px solid var(--myspace-blue);
+  font-size: 12px;
+}
+
+/* Profile Layout */
+.ms-profile-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  padding: 20px;
+}
+
+/* Boxes */
+.ms-box {
+  border: 1px solid var(--myspace-blue);
+  margin-bottom: 20px;
+}
+
+.ms-box-header {
+  background-color: var(--myspace-blue);
+  color: white;
+  padding: 5px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.ms-box-content {
+  padding: 10px;
+  background-color: var(--myspace-gray-bg);
+  font-size: 12px;
+}
+
+/* Specific Sections */
+.ms-profile-pic {
+  width: 100%;
+  border: 1px solid #ccc;
+  margin-bottom: 10px;
+}
+
+.ms-contact-box {
+  border: 2px solid var(--myspace-blue);
+}
+
+.ms-contact-box .ms-box-header {
+  background-color: #efefef;
+  color: #ff6600; /* Classic Orange accent? Or just keep it blue */
+  border-bottom: 1px solid #ccc;
+}
+
+/* Friends Grid */
+.ms-friends-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  text-align: center;
+}
+
+.ms-friend-item img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid #ccc;
+}
+
+.ms-friend-name {
+  font-size: 11px;
+  margin-top: 5px;
+}
+
+/* Form Styles */
+input, textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px;
+  margin-bottom: 5px;
+  border: 1px solid var(--myspace-blue);
+}
+
+button {
+  background-color: #efefef;
+  border: 1px solid #999;
+  padding: 5px 15px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+button:hover {
+  background-color: #ddd;
+}
