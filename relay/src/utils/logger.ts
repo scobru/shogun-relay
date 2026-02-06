@@ -6,6 +6,10 @@
  */
 
 import pino from "pino";
+import dotenv from "dotenv";
+
+// Load environment variables
+dotenv.config();
 
 // Determine environment
 const isDev = process.env.NODE_ENV !== "production";
@@ -25,14 +29,14 @@ const loggerOptions: pino.LoggerOptions = {
 // In development, use pino-pretty for human-readable output
 const transport = isDev
   ? {
-      target: "pino-pretty",
-      options: {
-        colorize: true,
-        translateTime: "HH:MM:ss",
-        ignore: "pid,hostname",
-        singleLine: false,
-      },
-    }
+    target: "pino-pretty",
+    options: {
+      colorize: true,
+      translateTime: "HH:MM:ss",
+      ignore: "pid,hostname",
+      singleLine: false,
+    },
+  }
   : undefined;
 
 // Create the base logger

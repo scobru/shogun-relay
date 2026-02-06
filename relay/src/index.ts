@@ -20,6 +20,10 @@ import * as FrozenData from "./utils/frozen-data";
 import SQLiteStore from "./utils/sqlite-store";
 import S3Store from "./utils/s3-store";
 import { loggers } from "./utils/logger";
+import dotenv from "dotenv";
+
+// Load environment variables as early as possible
+dotenv.config();
 import {
   config,
   ipfsConfig,
@@ -69,10 +73,8 @@ import driveRoutes from "./routes/drive";
 import blobArchiverRoutes from "./routes/blob-archiver";
 
 
-// Middleware
+// Middleware 
 
-
-dotenv.config();
 
 // --- IPFS Configuration ---
 const IPFS_API_URL = ipfsConfig.apiUrl;
