@@ -55,13 +55,32 @@ export function createIpfsRequestOptions(
 /**
  * Verify wallet signature for user authentication
  */
-export async function verifyWalletSignature(addr: string, sig: string): Promise<boolean> {
+export async function verifyWalletSignature(
+  addr: string,
+  sig: string,
+  timestamp?: number
+): Promise<boolean> {
   if (!sig || !sig.startsWith("0x") || sig.length < 100) {
     return false;
   }
   try {
     const { ethers } = await import("ethers");
-    const expectedMessage = "I Love Shogun";
+    let expectedMessage = "I Love Shogun";
+
+    // If timestamp is provided, validate it and include in message to prevent replay attacks
+    if (timestamp) {
+      const now = Date.now();
+      const diff = Math.abs(now - timestamp);
+      const MAX_DIFF = 5 * 60 * 1000; // 5 minutes
+
+      if (diff > MAX_DIFF) {
+        loggers.server.warn({ timestamp, now, diff }, "Wallet signature timestamp expired or invalid");
+        return false;
+      }
+
+      expectedMessage = `I Love Shogun - ${timestamp}`;
+    }
+
     const recoveredAddress = ethers.verifyMessage(expectedMessage, sig);
     return recoveredAddress.toLowerCase() === addr.toLowerCase();
   } catch (error) {

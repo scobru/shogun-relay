@@ -84,17 +84,25 @@ router.post(
         });
       }
 
-      const isValidSignature = await verifyWalletSignature(userAddress, signature);
+      // Check for timestamp to prevent replay attacks
+      const timestampHeader = req.headers["x-auth-timestamp"];
+      const timestamp = timestampHeader
+        ? parseInt(Array.isArray(timestampHeader) ? timestampHeader[0] : timestampHeader, 10)
+        : undefined;
+
+      const isValidSignature = await verifyWalletSignature(userAddress, signature, timestamp);
       if (!isValidSignature) {
-        loggers.server.warn({ userAddress }, "Invalid wallet signature for upload");
+        loggers.server.warn({ userAddress, timestamp: !!timestamp }, "Invalid wallet signature for upload");
         return res.status(401).json({
           success: false,
           error: "Invalid wallet signature",
-          hint: "Signature does not match the claimed wallet address",
+          hint: timestamp
+            ? "Signature expired or invalid for the provided timestamp"
+            : "Signature does not match the claimed wallet address",
         });
       }
 
-      loggers.server.info({ userAddress }, "Wallet signature verified for upload");
+      loggers.server.info({ userAddress, secure: !!timestamp }, "Wallet signature verified for upload");
       req.authType = "user";
       req.userAddress = userAddress;
 
