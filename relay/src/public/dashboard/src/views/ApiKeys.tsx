@@ -10,6 +10,7 @@ function ApiKeys() {
   const [keys, setKeys] = useState<ApiKey[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newExpires, setNewExpires] = useState('')
   const [createdToken, setCreatedToken] = useState('')
@@ -28,6 +29,7 @@ function ApiKeys() {
 
   const createKey = async () => {
     if (!newName.trim()) { setStatus('Name is required'); return }
+    setCreating(true)
     try {
       const body: { name: string; expiresInDays?: number } = { name: newName.trim() }
       if (newExpires) body.expiresInDays = parseInt(newExpires, 10)
@@ -38,6 +40,7 @@ function ApiKeys() {
       if (data.success && data.token) { setCreatedToken(data.token); setNewName(''); setNewExpires(''); setShowCreate(false); loadKeys() }
       else setStatus(data.error || 'Failed to create key')
     } catch { setStatus('Failed to create key') }
+    finally { setCreating(false) }
   }
 
   const revokeKey = async (keyId: string) => {
@@ -72,17 +75,19 @@ function ApiKeys() {
           <div className="modal-box">
             <h3 className="font-bold text-lg">Create API Key</h3>
             <div className="form-control mt-4">
-              <label className="label"><span className="label-text">Key Name</span></label>
-              <input type="text" className="input input-bordered" placeholder="e.g., My App Key" value={newName} onChange={e => setNewName(e.target.value)} />
+              <label className="label" htmlFor="keyName"><span className="label-text">Key Name</span></label>
+              <input id="keyName" type="text" className="input input-bordered" placeholder="e.g., My App Key" value={newName} onChange={e => setNewName(e.target.value)} disabled={creating} />
             </div>
             <div className="form-control mt-4">
-              <label className="label"><span className="label-text">Expires In Days (optional)</span></label>
-              <input type="number" className="input input-bordered" placeholder="e.g., 30" value={newExpires} onChange={e => setNewExpires(e.target.value)} min="1" />
+              <label className="label" htmlFor="keyExpires"><span className="label-text">Expires In Days (optional)</span></label>
+              <input id="keyExpires" type="number" className="input input-bordered" placeholder="e.g., 30" value={newExpires} onChange={e => setNewExpires(e.target.value)} min="1" disabled={creating} />
             </div>
             {status && <div className="alert alert-error mt-4"><span>{status}</span></div>}
             <div className="modal-action">
-              <button className="btn" onClick={() => setShowCreate(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={createKey}>Create</button>
+              <button className="btn" onClick={() => setShowCreate(false)} disabled={creating}>Cancel</button>
+              <button className="btn btn-primary" onClick={createKey} disabled={creating}>
+                {creating ? <span className="loading loading-spinner loading-xs"></span> : 'Create'}
+              </button>
             </div>
           </div>
           <form method="dialog" className="modal-backdrop"><button onClick={() => setShowCreate(false)}>close</button></form>
