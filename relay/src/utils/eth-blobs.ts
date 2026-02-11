@@ -1,5 +1,8 @@
 
-import { createPublicClient, http, hexToBytes, type Hex } from 'viem';
+import { createPublicClient, http, hexToBytes, type Hex, createWalletClient, toBlobs } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import * as cKzg from 'c-kzg';
+import { mainnetTrustedSetupPath } from 'viem/node';
 import { mainnet, sepolia, base, baseSepolia, arbitrum, optimism, polygon } from 'viem/chains';
 import { loggers } from './logger';
 import { registryConfig } from '../config/env-config';
@@ -138,6 +141,64 @@ export async function fetchBlobData(txHash: string): Promise<BlobData> {
             return mockFetchBlobData(txHash);
         }
 
+        throw error;
+    }
+}
+
+/**
+ * Send a Blob Transaction to the network
+ * @param data - The raw data buffer to be blobified
+ * @returns Transaction Hash
+ */
+export async function sendBlobTransaction(data: Buffer): Promise<string> {
+    try {
+        loggers.server.info(`🔮 Preparing blob transaction with ${data.length} bytes`);
+
+        // Get private key from config (ensures no caching)
+        const privateKey = registryConfig.getRelayPrivateKey();
+
+        if (!privateKey) {
+            throw new Error("RELAY_PRIVATE_KEY is not configured");
+        }
+
+        // Setup KZG
+        try {
+            // @ts-ignore
+            cKzg.loadTrustedSetup(mainnetTrustedSetupPath);
+        } catch (e: any) {
+            // Ignore if already loaded
+            if (!e.message.includes('already loaded')) {
+                loggers.server.warn("⚠️ Failed to load trusted setup, might be already loaded or missing: " + e.message);
+            }
+        }
+
+        const account = privateKeyToAccount(privateKey as `0x${string}`);
+
+        // Use the same chain and transport as publicClient
+        const walletClient = createWalletClient({
+            account,
+            chain,
+            transport: http(rpcUrl)
+        });
+
+        // Create blobs
+        const blobs = toBlobs({ data });
+
+        loggers.server.info(`🔮 Sending blob transaction...`);
+
+        const hash = await walletClient.sendTransaction({
+            blobs,
+            kzg: cKzg,
+            to: account.address, // Send to self
+            data: '0x',
+            type: 'eip4844',
+        });
+
+        loggers.server.info(`🔮 Blob transaction sent: ${hash}`);
+        return hash;
+
+    } catch (error: any) {
+        loggers.server.error({ err: error }, "Failed to send blob transaction");
         throw error;
     }
 }

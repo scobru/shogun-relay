@@ -2,7 +2,8 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { fetchBlobData } from "../utils/eth-blobs";
+import multer from "multer";
+import { fetchBlobData, sendBlobTransaction } from "../utils/eth-blobs";
 import { torrentManager } from "../utils/torrent";
 import { loggers } from "../utils/logger";
 import { getGunNode, GUN_PATHS } from "../utils/gun-paths";
@@ -141,4 +142,84 @@ router.get("/list", async (req, res) => {
     }
 });
 
+/**
+ * Configure multer for memory storage
+ */
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 128 * 1024, // Blobs are ~128KB, prevent massive uploads for now
+    }
+});
+
+/**
+ * POST /create
+ * Create a new blob from uploaded file
+ */
+router.post("/create", upload.single('file'), async (req: any, res: any) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: "No file uploaded" });
+        }
+
+        const buffer = req.file.buffer;
+
+        // Check size fit for one blob (approx 128KB)
+        // Viem might handle splitting, but for MVP let's keep it simple or allow viem to handle it.
+        // We'll just pass the buffer.
+
+        loggers.server.info(`📦 Creating Blob from file: ${req.file.originalname} (${buffer.length} bytes)`);
+
+        // 1. Send Blob Transaction
+        const txHash = await sendBlobTransaction(buffer);
+
+        // 2. Save to Disk (same as archive)
+        const filename = `${txHash}.blob`;
+        const filePath = path.join(BLOB_DATA_DIR, filename);
+
+        // We replicate the logic from /archive here to ensure it's available for seeding immediately
+        fs.writeFileSync(filePath, buffer);
+        loggers.server.info(`📦 Saved created blob data to ${filePath}`);
+
+        // 3. Create Torrent
+        const torrentResult = await torrentManager.createTorrent([filePath]);
+
+        // 4. Index in GunDB
+        const gun = req.app.get('gunInstance');
+        if (gun) {
+            const archiveRecord = {
+                txHash: txHash,
+                blobHash: 'pending', // We might get this from sidecars if we waited/decoded
+                magnetLink: torrentResult.magnetURI,
+                timestamp: Date.now(),
+                size: buffer.length,
+                archivedBy: torrentManager.getRelayKey(),
+                originalName: req.file.originalname,
+                type: 'created'
+            };
+
+            getGunNode(gun, 'blob-archive').get(txHash).put(archiveRecord);
+            loggers.server.info(`📦 Indexed created blob in GunDB: ${txHash}`);
+        }
+
+        res.json({
+            success: true,
+            message: "Blob created successfully",
+            data: {
+                txHash,
+                magnetURI: torrentResult.magnetURI,
+                size: buffer.length
+            }
+        });
+
+    } catch (error: any) {
+        loggers.server.error({ err: error }, "Failed to create blob");
+        res.status(500).json({
+            success: false,
+            error: error.message || "Internal Server Error"
+        });
+    }
+});
+
 export default router;
+

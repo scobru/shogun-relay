@@ -12,7 +12,9 @@ interface BlobRecord {
 
 function BlobArchiver() {
   const { getAuthHeaders } = useAuth()
+  const [activeTab, setActiveTab] = useState<'archive' | 'create'>('archive')
   const [txHash, setTxHash] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
   const [blobs, setBlobs] = useState<BlobRecord[]>([])
@@ -88,6 +90,42 @@ function BlobArchiver() {
     }
   }
 
+  const handleCreate = async () => {
+    if (!file) return
+
+    setLoading(true)
+    setStatus({ type: 'info', message: 'Uploading file and sending Blob Transaction...' })
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/blobs/create', {
+        method: 'POST',
+        headers: {
+            ...getAuthHeaders()
+            // Content-Type is set automatically for FormData
+        },
+        body: formData
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        setStatus({ type: 'success', message: `Blob created! TX: ${result.data.txHash}` })
+        setFile(null)
+        // Reset file input if possible or rely on state
+        fetchBlobs()
+      } else {
+        setStatus({ type: 'error', message: result.error || 'Failed to create blob' })
+      }
+    } catch (error: any) {
+      setStatus({ type: 'error', message: error.message || 'Network error' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -95,43 +133,87 @@ function BlobArchiver() {
                 <h1 className="text-2xl font-bold">Blob Archiver</h1>
                 <p className="text-base-content/60">Permanently archive Ethereum Blobs to Torrent/GunDB</p>
             </div>
-            
         </div>
 
-      {/* Archiver Card */}
+        {/* Tabs */}
+        <div className="tabs tabs-boxed">
+            <a 
+                className={`tab ${activeTab === 'archive' ? 'tab-active' : ''}`}
+                onClick={() => { setActiveTab('archive'); setStatus(null); }}
+            >
+                Archive by Hash
+            </a>
+            <a 
+                className={`tab ${activeTab === 'create' ? 'tab-active' : ''}`}
+                onClick={() => { setActiveTab('create'); setStatus(null); }}
+            >
+                Create New Blob
+            </a>
+        </div>
+
+      {/* Action Card */}
       <div className="card bg-base-100 shadow-xl">
         <div className="card-body">
           <h2 className="card-title text-lg flex items-center gap-2">
-            <span>📥</span> Archive New Blob
+            <span>{activeTab === 'archive' ? '📥' : '📤'}</span> 
+            {activeTab === 'archive' ? 'Archive Existing Blob' : 'Create & Upload Blob'}
           </h2>
           
-          <div className="form-control w-full">
-            <label className="label">
-              <span className="label-text">Ethereum Transaction Hash (Type 3)</span>
-            </label>
-            <div className="flex gap-2">
-              <input 
-                type="text" 
-                placeholder="0x..." 
-                className="input input-bordered w-full font-mono"
-                value={txHash}
-                onChange={(e) => setTxHash(e.target.value)}
-                disabled={loading}
-              />
-              <button 
-                className={`btn btn-primary ${loading ? 'loading' : ''}`}
-                onClick={handleArchive}
-                disabled={loading || !txHash}
-              >
-                {loading ? 'Archiving...' : 'Archive Blob'}
-              </button>
-            </div>
-            <label className="label">
-              <span className="label-text-alt text-base-content/60">
-                Provide a transaction hash containing blobs. The blob data will be fetched, saved, and seeded via Torrent.
-              </span>
-            </label>
-          </div>
+          {activeTab === 'archive' ? (
+              <div className="form-control w-full">
+                <label className="label">
+                  <span className="label-text">Ethereum Transaction Hash (Type 3)</span>
+                </label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="0x..." 
+                    className="input input-bordered w-full font-mono"
+                    value={txHash}
+                    onChange={(e) => setTxHash(e.target.value)}
+                    disabled={loading}
+                  />
+                  <button 
+                    className={`btn btn-primary ${loading ? 'loading' : ''}`}
+                    onClick={handleArchive}
+                    disabled={loading || !txHash}
+                  >
+                    {loading ? 'Archiving...' : 'Archive Blob'}
+                  </button>
+                </div>
+                <label className="label">
+                  <span className="label-text-alt text-base-content/60">
+                    Provide a transaction hash containing blobs. The blob data will be fetched, saved, and seeded via Torrent.
+                  </span>
+                </label>
+              </div>
+          ) : (
+              <div className="form-control w-full">
+                <label className="label">
+                  <span className="label-text">Select File (max 128KB)</span>
+                </label>
+                <div className="flex gap-2 items-center">
+                  <input 
+                    type="file" 
+                    className="file-input file-input-bordered w-full"
+                    onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+                    disabled={loading}
+                  />
+                  <button 
+                    className={`btn btn-secondary ${loading ? 'loading' : ''}`}
+                    onClick={handleCreate}
+                    disabled={loading || !file}
+                  >
+                    {loading ? 'Creating...' : 'Upload & Create'}
+                  </button>
+                </div>
+                <label className="label">
+                  <span className="label-text-alt text-base-content/60">
+                    Upload a file to create a blob transaction. Requires the relay to have a funded wallet.
+                  </span>
+                </label>
+              </div>
+          )}
 
           {status && (
             <div className={`alert ${
