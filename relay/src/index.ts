@@ -304,13 +304,22 @@ async function initializeServer() {
   // Serve React Dashboard SPA (built files from public/dashboard/dist)
   const dashboardPath = path.resolve(publicPath, "dashboard", "dist");
   app.use("/dashboard", express.static(dashboardPath, {
-    setHeaders: (res) => {
-      res.set({
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        Pragma: "no-cache",
-        Expires: "0",
-      });
-    }
+    setHeaders: (res, filePath) => {
+      // Performance: Intelligent Caching Strategy
+      if (filePath.endsWith(".html")) {
+        // HTML files (entry points) must not be cached to ensure updates are seen
+        res.set({
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        });
+      } else {
+        // Static assets (JS, CSS, Images) are hashed by Vite and safe to cache aggressively (1 year)
+        res.set({
+          "Cache-Control": "public, max-age=31536000, immutable",
+        });
+      }
+    },
   }));
 
   // SPA fallback for React Router - serve index.html for non-asset routes
