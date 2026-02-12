@@ -923,6 +923,7 @@ See docs/RELAY_KEYS.md for more information.
   // Initialize reputation tracking for this relay
   try {
     Reputation.initReputationTracking(gun, host);
+    Reputation.startReputationSync(gun);
     loggers.server.info({ host }, `📊 Reputation tracking initialized`);
   } catch (e: any) {
     loggers.server.warn({ err: e }, "⚠️ Failed to initialize reputation tracking");

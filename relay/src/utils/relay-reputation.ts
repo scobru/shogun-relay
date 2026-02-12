@@ -33,6 +33,10 @@ import { GUN_PATHS, getGunNode } from "./gun-paths";
 
 const log = loggers.reputation;
 
+// Local cache for reputation metrics (optimization)
+const reputationCache = new Map<string, ReputationMetrics>();
+let isSyncing = false;
+
 // Interfaces
 import type { IGunInstanceRoot, IGunChain, IGunInstance } from "gun/types/gun";
 
@@ -281,6 +285,37 @@ export function isSelfRating(relayHost: string, observerKeyPair: SEAKeyPair): bo
  */
 export function getObserverType(relayHost: string, observerKeyPair: SEAKeyPair): string {
   return isSelfRating(relayHost, observerKeyPair) ? OBSERVER_TYPE.SELF : OBSERVER_TYPE.EXTERNAL;
+}
+
+/**
+ * Start background sync of reputation data to local cache.
+ * Eliminates the need for slow fetching during requests.
+ * @param gun - GunDB instance
+ */
+export function startReputationSync(gun: GunInstance): void {
+  if (isSyncing) return;
+  isSyncing = true;
+
+  log.info("Starting background reputation sync...");
+
+  // Use map().on() to receive real-time updates for all relays
+  getGunNode(gun, GUN_PATHS.REPUTATION)
+    .map()
+    .on((data: Record<string, any> | undefined, host: string) => {
+      if (!data || typeof data !== "object") {
+        return;
+      }
+
+      // Filter GunDB metadata and store in cache
+      const metrics: ReputationMetrics = {};
+      Object.keys(data).forEach((key) => {
+        if (!["_", "#", ">", "<"].includes(key)) {
+          metrics[key] = data[key];
+        }
+      });
+
+      reputationCache.set(host, metrics);
+    });
 }
 
 /**
@@ -942,53 +977,31 @@ export async function getReputationLeaderboard(
 ): Promise<Array<LeaderboardEntry>> {
   const { minScore = 0, tier = undefined, limit = 50 } = options;
 
-  return new Promise((resolve) => {
-    const relays: Array<LeaderboardEntry> = [];
-    let resolved = false; // Flag to prevent double resolution
+  // Lazily start sync if not already running
+  if (!isSyncing) {
+    startReputationSync(gun);
+  }
 
-    const finalize = (): void => {
-      if (resolved) return;
-      resolved = true;
-      relays.sort((a, b) => b.calculatedScore.total - a.calculatedScore.total);
-      resolve(relays.slice(0, limit));
-    };
+  const relays: Array<LeaderboardEntry> = [];
 
-    // Timeout as safety net
-    const timeout = setTimeout(finalize, 3000);
+  for (const [host, metrics] of reputationCache.entries()) {
+    const score = calculateReputationScore(metrics);
 
-    gun
-      .get(GUN_PATHS.REPUTATION)
-      .map()
-      .once((data: Record<string, any> | undefined, host: string) => {
-        if (!data || typeof data !== "object") return;
+    // Apply filters
+    if (score.total < minScore) continue;
+    if (tier && score.tier !== tier) continue;
 
-        // Filter GunDB metadata
-        const metrics: ReputationMetrics = {};
-        Object.keys(data).forEach((key) => {
-          if (!["_", "#", ">", "<"].includes(key)) {
-            metrics[key] = data[key];
-          }
-        });
+    relays.push({
+      host,
+      ...metrics,
+      calculatedScore: score,
+    });
+  }
 
-        const score = calculateReputationScore(metrics);
+  // Sort by total score descending
+  relays.sort((a, b) => b.calculatedScore.total - a.calculatedScore.total);
 
-        // Apply filters
-        if (score.total < minScore) return;
-        if (tier && score.tier !== tier) return;
-
-        relays.push({
-          host,
-          ...metrics,
-          calculatedScore: score,
-        });
-      });
-
-    // Allow time for GunDB to collect, then finalize
-    setTimeout(() => {
-      clearTimeout(timeout);
-      finalize();
-    }, 2500);
-  });
+  return relays.slice(0, limit);
 }
 
 /**
@@ -1546,6 +1559,7 @@ export async function recordDataIntegrityCheck(
 export default {
   calculateReputationScore,
   initReputationTracking,
+  startReputationSync,
   recordProofSuccess,
   recordProofFailure,
   recordPinFulfillment,
