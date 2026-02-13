@@ -115,8 +115,8 @@ function Files() {
     return combined
   }
 
-  const handleUpload = async (event?: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event?.target.files || (fileInputRef.current?.files)
+  const handleUpload = async (filesToUpload: FileList | null) => {
+    const files = filesToUpload || fileInputRef.current?.files
     if (!files || files.length === 0) return
 
     setUploading(true)
@@ -335,9 +335,15 @@ function Files() {
           
           <div 
             className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${dragActive ? 'border-primary bg-primary/5' : 'border-base-300'}`}
-            onDragOver={e => { e.preventDefault(); setDragActive(true) }}
+            onDragOver={e => { e.preventDefault(); setDragActive(true); e.dataTransfer.dropEffect = 'copy' }}
             onDragLeave={() => setDragActive(false)}
-            onDrop={e => { e.preventDefault(); setDragActive(false) }}
+            onDrop={e => {
+              e.preventDefault();
+              setDragActive(false);
+              if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleUpload(e.dataTransfer.files);
+              }
+            }}
           >
             {/* Upload Mode Selection */}
             <div className="flex flex-wrap justify-center gap-4 mb-4">
@@ -346,7 +352,8 @@ function Files() {
                   type="radio" 
                   className="radio radio-primary" 
                   checked={uploadMode === 'single'} 
-                  onChange={() => setUploadMode('single')} 
+                  onChange={() => setUploadMode('single')}
+                  aria-label="Upload single file"
                 />
                 <span>Single File</span>
               </label>
@@ -355,7 +362,8 @@ function Files() {
                   type="radio" 
                   className="radio radio-primary" 
                   checked={uploadMode === 'directory'} 
-                  onChange={() => setUploadMode('directory')} 
+                  onChange={() => setUploadMode('directory')}
+                  aria-label="Upload directory"
                 />
                 <span>Directory</span>
               </label>
@@ -369,6 +377,7 @@ function Files() {
                   placeholder="Filename Override (optional)" 
                   value={fileNameOverride}
                   onChange={e => setFileNameOverride(e.target.value)}
+                  aria-label="Filename override"
                 />
                 <label className="label cursor-pointer gap-2">
                   <input 
@@ -387,7 +396,8 @@ function Files() {
                 ref={fileInputRef} 
                 type="file" 
                 className="file-input file-input-bordered file-input-primary w-full max-w-xs"
-                onChange={e => handleUpload(e)} 
+                onChange={e => handleUpload(e.target.files)}
+                aria-label="Select file to upload"
               />
             ) : (
               <input 
@@ -397,7 +407,8 @@ function Files() {
                 // @ts-ignore
                 webkitdirectory="" 
                 directory="" 
-                onChange={e => handleUpload(e)} 
+                onChange={e => handleUpload(e.target.files)}
+                aria-label="Select directory to upload"
               />
             )}
             
@@ -423,11 +434,13 @@ function Files() {
               placeholder="Search pins by name or CID..." 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
+              aria-label="Search pins"
             />
             <select 
               className="select select-bordered" 
               value={filterType} 
               onChange={e => setFilterType(e.target.value)}
+              aria-label="Filter pins by type"
             >
               <option value="all">All Types</option>
               <option value="recursive">Recursive</option>
@@ -460,13 +473,13 @@ function Files() {
                       </div>
                     </div>
                     <div className="card-actions justify-end mt-2">
-                      <button className="btn btn-ghost btn-xs" onClick={() => handlePreview(pin)} title="Preview">👁️</button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => handlePreview(pin)} title="Preview" aria-label={`Preview ${pin.name}`}>👁️</button>
                       <button className="btn btn-ghost btn-xs" onClick={() => {
                         navigator.clipboard.writeText(pin.cid)
                         setStatusMessage('CID Copied!')
                         setTimeout(() => setStatusMessage(''), 2000)
-                      }} title="Copy CID">📋</button>
-                      <button className="btn btn-ghost btn-xs text-error" onClick={() => handleRemove(pin.cid)} title="Delete">🗑️</button>
+                      }} title="Copy CID" aria-label={`Copy CID for ${pin.name}`}>📋</button>
+                      <button className="btn btn-ghost btn-xs text-error" onClick={() => handleRemove(pin.cid)} title="Delete" aria-label={`Delete ${pin.name}`}>🗑️</button>
                     </div>
                   </div>
                 </div>
