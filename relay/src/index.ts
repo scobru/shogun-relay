@@ -20,7 +20,6 @@ import * as FrozenData from "./utils/frozen-data";
 import SQLiteStore from "./utils/sqlite-store";
 import S3Store from "./utils/s3-store";
 import { loggers } from "./utils/logger";
-import dotenv from "dotenv";
 
 // Load environment variables as early as possible
 dotenv.config();
@@ -379,11 +378,11 @@ async function initializeServer() {
       const authHeader = req.headers["authorization"];
       const bearerToken = authHeader && authHeader.split(" ")[1];
       const customToken = req.headers["token"];
-      const formToken = req.query["_auth_token"]; // Token inviato tramite form
+      const formToken = req.query["_auth_token"] as string; // Token inviato tramite form
       const token = bearerToken || customToken || formToken;
 
       // Secure token comparison using hash and timing-safe comparison
-      const tokenHash = hashToken(token || "");
+      const tokenHash = hashToken((token as string) || "");
       const adminHash = getAdminPasswordHash();
 
       if (adminHash && secureCompare(tokenHash, adminHash)) {

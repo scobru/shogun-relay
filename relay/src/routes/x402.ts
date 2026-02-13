@@ -1111,16 +1111,17 @@ router.get("/recommend", async (req, res) => {
     // Calculate comparison costs
     try {
       // Subscription cost (monthly, but prorated for duration)
-      const subscriptionTiers = SUBSCRIPTION_TIERS;
+      const subscriptionTiers = getSubscriptionTiers();
       let subscriptionCost = null;
       let subscriptionTier = null;
 
       for (const [tierKey, tier] of Object.entries(subscriptionTiers)) {
-        if (tier.storageMB >= sizeMB) {
+        const tierConfig = tier as any;
+        if (tierConfig.storageMB >= sizeMB) {
           subscriptionTier = tierKey;
           // Calculate cost for duration (subscriptions are monthly)
           const monthsNeeded = Math.ceil(duration / 30);
-          subscriptionCost = tier.priceUSDC * monthsNeeded;
+          subscriptionCost = tierConfig.priceUSDC * monthsNeeded;
           break;
         }
       }
