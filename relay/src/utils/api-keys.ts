@@ -7,6 +7,7 @@
 
 import crypto from "crypto";
 import { loggers } from "./logger";
+import { secureCompare } from "./security";
 
 export interface ApiKey {
   keyId: string;
@@ -252,18 +253,19 @@ export class ApiKeysManager {
           keysChecked++;
 
           // Diagnostic: Log each key checked
+          const isMatch = !!(data.hash && secureCompare(data.hash, tokenHash));
           loggers.server.debug(
             {
               keyId,
               dataHash: data.hash?.substring(0, 16) + "...",
               searchHash: hashPreview,
-              matches: data.hash === tokenHash,
+              matches: isMatch,
               keyName: data.name
             },
             `🔑 Checking API key #${keysChecked}`
           );
 
-          if (data.hash === tokenHash) {
+          if (isMatch) {
             // Check expiration
             if (data.expiresAt && Date.now() > data.expiresAt) {
               loggers.server.debug({ keyId: data.keyId }, "API key expired");
