@@ -3,6 +3,7 @@ import { Router } from "express";
 import { loggers } from "../utils/logger";
 import { chatService } from "../utils/chat-service";
 import { authConfig } from "../config/env-config";
+import { validateAdminToken } from "../utils/auth-utils";
 import { torrentManager } from "../utils/torrent";
 import { GUN_PATHS, getGunNode } from "../utils/gun-paths";
 
@@ -18,7 +19,7 @@ const requireAuth = (req: any, res: any, next: any) => {
     const customToken = req.headers["token"];
     const token = bearerToken || customToken;
   
-    if (!token || token !== authConfig.adminPassword) {
+    if (!validateAdminToken(token)) {
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
     next();

@@ -3,6 +3,7 @@ import multer from "multer";
 import FormData from "form-data";
 import { loggers } from "../../utils/logger";
 import { authConfig, ipfsConfig, x402Config } from "../../config";
+import { validateAdminToken } from "../../utils/auth-utils";
 import { X402Merchant } from "../../utils/x402-merchant";
 import { ipfsUpload } from "../../utils/ipfs-client";
 import type { CustomRequest } from "./types";
@@ -25,7 +26,7 @@ router.post(
     const bearerToken = authHeader && authHeader.split(" ")[1];
     const customToken = req.headers["token"];
     const adminToken = bearerToken || customToken;
-    const isAdmin = adminToken === authConfig.adminPassword;
+    const isAdmin = validateAdminToken(adminToken);
 
     const userAddressRaw = req.headers["x-user-address"];
     const userAddress = Array.isArray(userAddressRaw) ? userAddressRaw[0] : userAddressRaw;

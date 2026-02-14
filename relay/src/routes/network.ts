@@ -18,6 +18,7 @@ import * as StorageDeals from "../utils/storage-deals";
 import { getRelayUser, getRelayKeyPair } from "../utils/relay-user";
 import { createRegistryClient, REGISTRY_ADDRESSES } from "../utils/registry-client";
 import { authConfig, registryConfig, relayConfig } from "../config";
+import { validateAdminToken } from "../utils/auth-utils";
 import { loggers } from "../utils/logger";
 import { GUN_PATHS } from "../utils/gun-paths";
 
@@ -1096,8 +1097,10 @@ router.post("/pin-request", express.json(), async (req, res) => {
   try {
     // Require admin auth
     const authHeader = req.headers["authorization"];
-    const token = authHeader?.split(" ")[1] || req.headers["token"];
-    if (token !== authConfig.adminPassword) {
+    const rawToken = authHeader?.split(" ")[1] || req.headers["token"];
+    const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
+
+    if (!validateAdminToken(token)) {
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
 

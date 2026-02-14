@@ -23,6 +23,7 @@ import { loggers } from "../utils/logger";
 const router: Router = express.Router();
 
 import { authConfig, ipfsConfig, relayConfig, x402Config } from "../config";
+import { validateAdminToken } from "../utils/auth-utils";
 
 // Initialize X402 Merchant
 let merchant: X402Merchant | undefined = undefined;
@@ -166,7 +167,7 @@ router.post("/requirements/custom", async (req, res) => {
     const customToken = req.headers["token"];
     const token = bearerToken || customToken;
 
-    if (token !== authConfig.adminPassword) {
+    if (!validateAdminToken(token)) {
       return res.status(401).json({
         success: false,
         error: "Admin authentication required",
@@ -536,7 +537,7 @@ router.post("/update-usage/:userAddress", async (req, res) => {
     const customToken = req.headers["token"];
     const token = bearerToken || customToken;
 
-    if (token !== authConfig.adminPassword) {
+    if (!validateAdminToken(token)) {
       return res.status(401).json({
         success: false,
         error: "Admin authentication required",
@@ -707,7 +708,7 @@ router.post("/storage/sync/:userAddress", async (req, res) => {
     const customToken = req.headers["token"];
     const token = bearerToken || customToken;
 
-    if (token !== authConfig.adminPassword) {
+    if (!validateAdminToken(token)) {
       return res.status(401).json({
         success: false,
         error: "Admin authentication required",
@@ -889,7 +890,7 @@ router.get("/relay-storage/detailed", async (req, res) => {
     const customToken = req.headers["token"];
     const token = bearerToken || customToken;
 
-    if (token !== authConfig.adminPassword) {
+    if (!validateAdminToken(token)) {
       return res.status(401).json({
         success: false,
         error: "Admin authentication required",
@@ -1251,7 +1252,7 @@ router.get("/subscriptions", async (req, res) => {
     const customToken = req.headers["token"];
     const token = bearerToken || customToken;
 
-    if (token !== authConfig.adminPassword) {
+    if (!validateAdminToken(token)) {
       return res.status(401).json({
         success: false,
         error: "Admin authentication required",
@@ -1310,7 +1311,7 @@ router.get("/history", async (req, res) => {
     const customToken = req.headers["token"];
     const token = bearerToken || customToken;
 
-    if (token !== authConfig.adminPassword) {
+    if (!validateAdminToken(token)) {
       return res.status(401).json({
         success: false,
         error: "Admin authentication required",
