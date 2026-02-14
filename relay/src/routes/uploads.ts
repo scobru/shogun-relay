@@ -2,7 +2,7 @@ import express, { Request, Response, Router, NextFunction } from "express";
 import http from "http";
 import { loggers } from "../utils/logger";
 import { authConfig } from "../config";
-import { secureCompare, hashToken } from "../utils/security";
+import { validateAdminToken } from "../utils/auth-utils";
 import { GUN_PATHS } from "../utils/gun-paths";
 
 // Extended Request interface with custom properties
@@ -298,10 +298,7 @@ router.post(
     const customToken = req.headers["token"];
 
     const adminToken = bearerToken || customToken;
-    // SECURITY: Use timing-safe comparison to prevent timing attacks
-    const tokenHash = adminToken ? hashToken(String(adminToken)) : "";
-    const adminHash = authConfig.adminPassword ? hashToken(authConfig.adminPassword) : "";
-    const isAdmin = tokenHash && adminHash && secureCompare(tokenHash, adminHash);
+    const isAdmin = validateAdminToken(adminToken);
 
     if (isAdmin) {
       (req as CustomRequest).authType = "admin";
@@ -461,9 +458,7 @@ router.delete(
     const token = bearerToken || customToken;
 
     // Verifica se è admin
-    const tokenHash = token ? hashToken(String(token)) : "";
-    const adminHash = authConfig.adminPassword ? hashToken(authConfig.adminPassword) : "";
-    const isAdmin = tokenHash && adminHash && secureCompare(tokenHash, adminHash);
+    const isAdmin = validateAdminToken(token);
 
     if (isAdmin) {
       (req as CustomRequest).authType = "admin";

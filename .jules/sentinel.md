@@ -1,3 +1,5 @@
+# Sentinel Journal
+
 ## 2025-02-12 - Timing Attack in Admin Auth
 **Vulnerability:** Direct string comparison (`===`) was used for checking admin tokens against the configuration.
 **Learning:** Even in high-level languages, timing attacks are possible when comparing secrets. This was missed because the "secure" logic was implemented in one place but not reused consistently.
@@ -7,3 +9,8 @@
 **Vulnerability:** API key hashes were compared using direct string equality (`===`) in `ApiKeysManager`, exposing a timing attack vulnerability.
 **Learning:** Security utilities like `secureCompare` must be used for ALL secret comparisons, not just passwords. The presence of a "hash" doesn't automatically make `===` safe if the hash is derived from user input and compared to a stored secret.
 **Prevention:** Audit all equality checks involving secrets or hashes of secrets. Enforce usage of `secureCompare`.
+
+## 2025-02-13 - Widespread Insecure Admin Token Comparison
+**Vulnerability:** Direct string comparison (`===`) was used for validating admin tokens in multiple route handlers (`uploads.ts`, `x402.ts`, `network.ts`, `chat.ts`), exposing the application to timing attacks.
+**Learning:** Security fixes must be applied systematically. A helper function `validateAdminToken` was created to centralize and enforce secure comparison, preventing future regressions and code duplication.
+**Prevention:** Use `validateAdminToken` from `relay/src/utils/auth-utils.ts` for all admin authentication checks. Avoid ad-hoc comparisons of sensitive tokens.

@@ -4,6 +4,7 @@ import multer from "multer";
 import FormData from "form-data";
 import { loggers } from "../../utils/logger";
 import { authConfig, ipfsConfig, x402Config } from "../../config";
+import { validateAdminToken } from "../../utils/auth-utils";
 import { X402Merchant } from "../../utils/x402-merchant";
 import { ipfsUpload } from "../../utils/ipfs-client";
 import type { CustomRequest, IpfsRequestOptions } from "./types";
@@ -40,7 +41,7 @@ router.post(
     
     if (adminTokenStr && typeof adminTokenStr === "string") {
       // Check admin password
-      if (adminTokenStr === authConfig.adminPassword) {
+      if (validateAdminToken(adminTokenStr)) {
         isAdmin = true;
       } else if (adminTokenStr.startsWith("shogun-api-")) {
         // Check API key
