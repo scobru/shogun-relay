@@ -5,7 +5,7 @@ import { adminAuthMiddleware } from "../middleware/admin-auth";
 
 const router: Router = express.Router();
 
-// Apply admin authentication to all debug routes
+// Apply admin authentication middleware to all debug routes
 router.use(adminAuthMiddleware);
 
 // Middleware per ottenere l'istanza Gun dal relay
