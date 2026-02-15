@@ -14,3 +14,8 @@
 **Vulnerability:** Direct string comparison (`===`) was used for validating admin tokens in multiple route handlers (`uploads.ts`, `x402.ts`, `network.ts`, `chat.ts`), exposing the application to timing attacks.
 **Learning:** Security fixes must be applied systematically. A helper function `validateAdminToken` was created to centralize and enforce secure comparison, preventing future regressions and code duplication.
 **Prevention:** Use `validateAdminToken` from `relay/src/utils/auth-utils.ts` for all admin authentication checks. Avoid ad-hoc comparisons of sensitive tokens.
+
+## 2025-05-15 - Unprotected Debug Endpoints
+**Vulnerability:** Critical debug endpoints (including data reset and sensitive data exposure) were mounted publicly without authentication.
+**Learning:** The `debug.ts` router was imported and used in `index.ts` without any middleware applied at the mount point or within the router file itself, despite having sensitive operations like `reset`.
+**Prevention:** Always apply authentication middleware at the router level (using `router.use()`) for any router file containing administrative or debug functions, or verify that the mounting point in `index.ts` applies the middleware.
