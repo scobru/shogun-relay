@@ -1,8 +1,12 @@
 import express, { Request, Response, Router } from "express";
 import { loggers } from "../utils/logger";
 import { GUN_PATHS } from "../utils/gun-paths";
+import { adminAuthMiddleware } from "../middleware/admin-auth";
 
 const router: Router = express.Router();
+
+// Apply admin authentication middleware to all debug routes
+router.use(adminAuthMiddleware);
 
 // Middleware per ottenere l'istanza Gun dal relay
 const getGunInstance = (req: Request): any => {
