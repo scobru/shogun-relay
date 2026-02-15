@@ -251,6 +251,66 @@ async function isPinned(cid: string): Promise<boolean> {
 }
 
 /**
+ * Get all pinned CIDs (recursive)
+ * Optimization to avoid N+1 requests
+ * @returns Promise with Set of CIDs
+ */
+export async function getAllPinnedCids(): Promise<Set<string>> {
+  try {
+    const gatewayUrl = new URL(IPFS_API_URL);
+    const protocolModule =
+      gatewayUrl.protocol === "https:" ? await import("https") : await import("http");
+
+    const requestOptions: RequestOptions = {
+      hostname: gatewayUrl.hostname,
+      port: gatewayUrl.port ? Number(gatewayUrl.port) : gatewayUrl.protocol === "https:" ? 443 : 80,
+      path: `/api/v0/pin/ls?type=recursive`,
+      method: "POST",
+      headers: {
+        "Content-Length": "0"
+      },
+    };
+
+    if (IPFS_API_TOKEN) {
+      requestOptions.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
+    }
+
+    return new Promise((resolve, reject) => {
+      const req = protocolModule.request(requestOptions, (res) => {
+        let data = "";
+        res.on("data", (chunk: string) => (data += chunk));
+        res.on("end", () => {
+          if (res.statusCode !== 200) {
+             reject(new Error(`Status ${res.statusCode}`));
+             return;
+          }
+          try {
+            const result = JSON.parse(data);
+            if (result && result.Keys) {
+              resolve(new Set(Object.keys(result.Keys)));
+            } else {
+              resolve(new Set());
+            }
+          } catch (e) {
+            reject(e);
+          }
+        });
+      });
+
+      req.on("error", (err) => reject(err));
+      req.setTimeout(30000, () => { // Longer timeout for large lists
+        req.destroy();
+        reject(new Error("Timeout fetching pin list"));
+      });
+      req.end();
+    });
+  } catch (error) {
+    log.warn({ err: error }, `Error fetching all pins`);
+    throw error;
+  }
+}
+
+/**
  * Pin a CID to IPFS with retry logic
  * @param cid - IPFS CID to pin
  * @param maxRetries - Maximum number of retry attempts (default: 2)
@@ -630,6 +690,20 @@ export async function syncDealsWithIPFS(
       relayPub = relayKeyPair.pub;
     }
 
+    // Fetch all local pins once to avoid N+1 requests
+    let localPins: Set<string> | null = null;
+    try {
+      localPins = await getAllPinnedCids();
+      if (!fastSync) {
+        log.debug(`Fetched ${localPins.size} local pins (recursive)`);
+      }
+    } catch (e) {
+      // Fallback to individual checks if batch fetch fails
+      if (!fastSync) {
+        log.warn({ err: e }, "Failed to fetch all pins, falling back to individual checks");
+      }
+    }
+
     // Process each deal
     for (const deal of dealsToSync) {
       // Check if shutdown started during processing
@@ -671,7 +745,12 @@ export async function syncDealsWithIPFS(
 
       try {
         // Check if already pinned
-        const pinned = await isPinned(cid);
+        let pinned = false;
+        if (localPins) {
+          pinned = localPins.has(cid);
+        } else {
+          pinned = await isPinned(cid);
+        }
 
         if (pinned) {
           if (!fastSync) {
@@ -895,9 +974,25 @@ export async function getDealSyncStatus(
       (deal) => deal.active && new Date(deal.expiresAt as unknown as string) > new Date()
     );
 
+    // Batch fetch pins
+    let localPins: Set<string> | null = null;
+    try {
+      localPins = await getAllPinnedCids();
+    } catch (e) {
+      log.warn({ err: e }, "Failed to fetch pins for status check");
+    }
+
     const status: Array<DealSyncStatus> = [];
     for (const deal of activeDeals) {
-      const pinned = deal.cid ? await isPinned(deal.cid) : false;
+      let pinned = false;
+      if (deal.cid) {
+        if (localPins) {
+          pinned = localPins.has(deal.cid);
+        } else {
+          pinned = await isPinned(deal.cid);
+        }
+      }
+
       status.push({
         dealId: deal.dealId,
         cid: deal.cid,
