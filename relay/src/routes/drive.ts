@@ -7,6 +7,7 @@ import { adminAuthMiddleware } from "../middleware/admin-auth";
 import { driveAuthMiddleware } from "../middleware/drive-auth";
 import { DrivePublicLinksManager } from "../utils/drive-public-links";
 import { getRelayUser, isRelayUserInitialized, initRelayUser } from "../utils/relay-user";
+import { handleDriveError } from "../utils/route-utils";
 
 const router = express.Router();
 
@@ -149,11 +150,7 @@ router.get("/list/:path(*)?", driveAuthMiddleware, async (req: Request, res: Res
       path: relativePath,
     });
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to list directory");
-    res.status(500).json({
-      success: false,
-      error: error.message || "Internal Server Error",
-    });
+    handleDriveError(res, error, "Failed to list directory");
   }
 });
 
@@ -200,11 +197,7 @@ export const uploadFilesHandler = async (req: Request, res: Response) => {
       files: uploadedFiles,
     });
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to upload file");
-    res.status(500).json({
-      success: false,
-      error: error.message || "Internal Server Error",
-    });
+    handleDriveError(res, error, "Failed to upload file");
   }
 };
 
@@ -247,19 +240,9 @@ router.get("/download/:path(*)", driveAuthMiddleware, async (req: Request, res: 
 
     res.send(buffer);
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to download file");
-
-    if (error.message.includes("does not exist")) {
-      res.status(404).json({
-        success: false,
-        error: error.message || "File not found",
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal Server Error",
-      });
-    }
+    handleDriveError(res, error, "Failed to download file", {
+      notFoundDefault: "File not found",
+    });
   }
 });
 
@@ -285,19 +268,7 @@ router.delete("/delete/:path(*)", driveAuthMiddleware, async (req: Request, res:
       message: "Item deleted successfully",
     });
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to delete item");
-
-    if (error.message.includes("does not exist")) {
-      res.status(404).json({
-        success: false,
-        error: error.message || "Item not found",
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal Server Error",
-      });
-    }
+    handleDriveError(res, error, "Failed to delete item");
   }
 });
 
@@ -338,19 +309,9 @@ router.post(
         path: relativePath,
       });
     } catch (error: any) {
-      loggers.server.error({ err: error }, "Failed to create directory");
-
-      if (error.message.includes("already exists")) {
-        res.status(409).json({
-          success: false,
-          error: error.message || "Directory already exists",
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: error.message || "Internal Server Error",
-        });
-      }
+      handleDriveError(res, error, "Failed to create directory", {
+        alreadyExistsDefault: "Directory already exists",
+      });
     }
   }
 );
@@ -392,24 +353,9 @@ router.post("/rename", driveAuthMiddleware, express.json(), async (req: Request,
       message: "Item renamed successfully",
     });
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to rename item");
-
-    if (error.message.includes("does not exist")) {
-      res.status(404).json({
-        success: false,
-        error: error.message || "Item not found",
-      });
-    } else if (error.message.includes("already exists")) {
-      res.status(409).json({
-        success: false,
-        error: error.message || "Target name already exists",
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal Server Error",
-      });
-    }
+    handleDriveError(res, error, "Failed to rename item", {
+      alreadyExistsDefault: "Target name already exists",
+    });
   }
 });
 
@@ -442,24 +388,10 @@ router.post("/move", driveAuthMiddleware, express.json(), async (req: Request, r
       message: "Item moved successfully",
     });
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to move item");
-
-    if (error.message.includes("does not exist")) {
-      res.status(404).json({
-        success: false,
-        error: error.message || "Source item not found",
-      });
-    } else if (error.message.includes("already exists")) {
-      res.status(409).json({
-        success: false,
-        error: error.message || "Destination already exists",
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal Server Error",
-      });
-    }
+    handleDriveError(res, error, "Failed to move item", {
+      notFoundDefault: "Source item not found",
+      alreadyExistsDefault: "Destination already exists",
+    });
   }
 });
 
@@ -482,11 +414,7 @@ router.get("/stats", driveAuthMiddleware, async (req: Request, res: Response) =>
       },
     });
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to get storage stats");
-    res.status(500).json({
-      success: false,
-      error: error.message || "Internal Server Error",
-    });
+    handleDriveError(res, error, "Failed to get storage stats");
   }
 });
 
@@ -518,11 +446,7 @@ router.get(
         links,
       });
     } catch (error: any) {
-      loggers.server.error({ err: error }, "Failed to list public links");
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal Server Error",
-      });
+      handleDriveError(res, error, "Failed to list public links");
     }
   }
 );
@@ -575,11 +499,7 @@ router.post(
         expiresAt: link.expiresAt,
       });
     } catch (error: any) {
-      loggers.server.error({ err: error }, "Failed to create public link");
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal Server Error",
-      });
+      handleDriveError(res, error, "Failed to create public link");
     }
   }
 );
@@ -624,11 +544,7 @@ router.delete(
         });
       }
     } catch (error: any) {
-      loggers.server.error({ err: error }, "Failed to revoke public link");
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal Server Error",
-      });
+      handleDriveError(res, error, "Failed to revoke public link");
     }
   }
 );
@@ -686,19 +602,10 @@ export async function handlePublicLinkAccess(req: Request, res: Response): Promi
 
     res.send(buffer);
   } catch (error: any) {
-    loggers.server.error({ err: error }, "Failed to access file via public link");
-
-    if (error.message && error.message.includes("does not exist")) {
-      res.status(404).json({
-        success: false,
-        error: "File not found",
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal Server Error",
-      });
-    }
+    handleDriveError(res, error, "Failed to access file via public link", {
+      notFoundDefault: "File not found",
+      useErrorMsg: false,
+    });
   }
 }
 
