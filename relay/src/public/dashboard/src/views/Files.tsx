@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { CopyButton } from '../components/CopyButton'
 
 
 interface Pin {
@@ -474,11 +475,7 @@ function Files() {
                     </div>
                     <div className="card-actions justify-end mt-2">
                       <button className="btn btn-ghost btn-xs" onClick={() => handlePreview(pin)} title="Preview" aria-label={`Preview ${pin.name}`}>👁️</button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => {
-                        navigator.clipboard.writeText(pin.cid)
-                        setStatusMessage('CID Copied!')
-                        setTimeout(() => setStatusMessage(''), 2000)
-                      }} title="Copy CID" aria-label={`Copy CID for ${pin.name}`}>📋</button>
+                      <CopyButton textToCopy={pin.cid} className="btn btn-ghost btn-xs" label={`Copy CID for ${pin.name}`} />
                       <button className="btn btn-ghost btn-xs text-error" onClick={() => handleRemove(pin.cid)} title="Delete" aria-label={`Delete ${pin.name}`}>🗑️</button>
                     </div>
                   </div>
@@ -514,7 +511,10 @@ function Files() {
               )}
             </div>
             
-            <div className="mt-4 text-xs text-base-content/60 font-mono">CID: {preview.cid}</div>
+            <div className="mt-4 text-xs text-base-content/60 font-mono flex items-center gap-2">
+              CID: {preview.cid}
+              <CopyButton textToCopy={preview.cid} className="btn btn-ghost btn-xs" label="Copy CID" />
+            </div>
           </div>
           <form method="dialog" className="modal-backdrop">
             <button onClick={closePreview}>close</button>

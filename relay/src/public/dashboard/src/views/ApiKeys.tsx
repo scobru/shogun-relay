@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { CopyButton } from '../components/CopyButton'
 
 interface ApiKey {
   keyId: string; name: string; createdAt: number; lastUsedAt?: number; expiresAt?: number
@@ -15,7 +16,6 @@ function ApiKeys() {
   const [newExpires, setNewExpires] = useState('')
   const [createdToken, setCreatedToken] = useState('')
   const [status, setStatus] = useState('')
-  const [copied, setCopied] = useState(false)
 
   const loadKeys = useCallback(async () => {
     try {
@@ -104,16 +104,13 @@ function ApiKeys() {
             <code className="bg-base-300 p-2 rounded block mt-2 text-xs break-all">{createdToken}</code>
           </div>
           <div className="flex gap-2">
-            <button
+            <CopyButton
+              textToCopy={createdToken}
               className="btn btn-sm"
-              onClick={() => {
-                navigator.clipboard.writeText(createdToken)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 2000)
-              }}
+              successContent="✅ Copied!"
             >
-              {copied ? '✅ Copied!' : '📋 Copy'}
-            </button>
+              📋 Copy
+            </CopyButton>
             <button className="btn btn-sm btn-primary" onClick={() => setCreatedToken('')}>Done</button>
           </div>
         </div>
