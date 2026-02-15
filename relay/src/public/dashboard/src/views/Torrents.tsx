@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { CopyButton } from '../components/CopyButton'
 
 
 interface Torrent {
@@ -544,7 +545,13 @@ function Torrents() {
 
                         {/* Actions */}
                         <div className="flex gap-2 justify-end mt-2">
-                            <button className="btn btn-xs btn-outline" onClick={() => {navigator.clipboard.writeText(t.magnetURI || ''); setStatusMsg('Magnet copied!')}}>🧲 Magnet</button>
+                            <CopyButton
+                                textToCopy={t.magnetURI || ''}
+                                className="btn btn-xs btn-outline"
+                                successContent="✅ Copied!"
+                            >
+                                🧲 Magnet
+                            </CopyButton>
                             {t.state === 'paused' ? (
                             <button className="btn btn-xs btn-success" onClick={() => handleAction(t.infoHash, 'resume')}>▶ Resume</button>
                             ) : (
@@ -715,11 +722,17 @@ function Torrents() {
                                 >
                                     ➕ Add
                                 </button>
-                                <button 
-                                    className="btn btn-xs btn-ghost" 
-                                    onClick={() => navigator.clipboard.writeText(res.magnet || res.torrentUrl || '')}
-                                    disabled={!res.magnet && !res.torrentUrl}
-                                >📋 Copy</button>
+                                { (res.magnet || res.torrentUrl) ? (
+                                    <CopyButton
+                                        textToCopy={res.magnet || res.torrentUrl || ''}
+                                        className="btn btn-xs btn-ghost"
+                                        successContent="✅ Copied"
+                                    >
+                                        📋 Copy
+                                    </CopyButton>
+                                ) : (
+                                    <button className="btn btn-xs btn-ghost" disabled>📋 Copy</button>
+                                )}
                             </div>
                         </div>
                     </div>
