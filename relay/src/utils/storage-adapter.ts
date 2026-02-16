@@ -11,6 +11,7 @@
 
 import path from "path";
 import fs from "fs";
+import fsPromises from "fs/promises";
 import https from "https";
 import http from "http";
 import {
@@ -136,38 +137,44 @@ export class FsStorageAdapter implements IStorageAdapter {
             throw new Error("Invalid path - path traversal attempt detected");
         }
 
-        if (!fs.existsSync(dirPath)) {
-            // Return empty for non-existent directories (root case)
-            if (relativePath === "") {
+        try {
+            await fsPromises.access(dirPath);
+        } catch {
+             // Return empty for non-existent directories (root case)
+             if (relativePath === "") {
                 return [];
             }
             throw new Error("Directory does not exist");
         }
 
-        const stats = fs.statSync(dirPath);
+        const stats = await fsPromises.stat(dirPath);
         if (!stats.isDirectory()) {
             throw new Error("Path is not a directory");
         }
 
         const items: DriveItem[] = [];
-        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        const entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
 
-        for (const entry of entries) {
-            const fullPath = path.join(dirPath, entry.name);
-            const itemStats = fs.statSync(fullPath);
+        // Process entries in parallel for stats
+        const itemPromises = entries.map(async (entry) => {
+             const fullPath = path.join(dirPath, entry.name);
+             const itemStats = await fsPromises.stat(fullPath);
 
-            const itemPath = relativePath
-                ? `${relativePath}/${entry.name}`
-                : entry.name;
+             const itemPath = relativePath
+                 ? `${relativePath}/${entry.name}`
+                 : entry.name;
 
-            items.push({
-                name: entry.name,
-                path: itemPath,
-                type: entry.isDirectory() ? "directory" : "file",
-                size: itemStats.size,
-                modified: itemStats.mtime.getTime(),
-            });
-        }
+             return {
+                 name: entry.name,
+                 path: itemPath,
+                 type: entry.isDirectory() ? "directory" : "file",
+                 size: itemStats.size,
+                 modified: itemStats.mtime.getTime(),
+             } as DriveItem;
+        });
+
+        const results = await Promise.all(itemPromises);
+        items.push(...results);
 
         items.sort((a, b) => {
             if (a.type !== b.type) {
@@ -184,15 +191,17 @@ export class FsStorageAdapter implements IStorageAdapter {
         const targetDir = path.join(this.dataDir, validatedPath);
         const targetFile = path.join(targetDir, filename);
 
-        if (!fs.existsSync(targetDir)) {
-            fs.mkdirSync(targetDir, { recursive: true });
+        try {
+             await fsPromises.access(targetDir);
+        } catch {
+            await fsPromises.mkdir(targetDir, { recursive: true });
         }
 
         if (!this.isPathSafe(targetFile)) {
             throw new Error("Invalid path - path traversal attempt detected");
         }
 
-        fs.writeFileSync(targetFile, buffer);
+        await fsPromises.writeFile(targetFile, buffer);
         loggers.server.info({ path: targetFile, size: buffer.length }, "📁 File uploaded (fs)");
     }
 
@@ -203,16 +212,18 @@ export class FsStorageAdapter implements IStorageAdapter {
             throw new Error("Invalid path - path traversal attempt detected");
         }
 
-        if (!fs.existsSync(filePath)) {
-            throw new Error("File does not exist");
+        try {
+            await fsPromises.access(filePath);
+        } catch {
+             throw new Error("File does not exist");
         }
 
-        const stats = fs.statSync(filePath);
+        const stats = await fsPromises.stat(filePath);
         if (!stats.isFile()) {
             throw new Error("Path is not a file");
         }
 
-        const buffer = fs.readFileSync(filePath);
+        const buffer = await fsPromises.readFile(filePath);
         const filename = path.basename(filePath);
 
         return { buffer, filename, size: buffer.length };
@@ -225,17 +236,19 @@ export class FsStorageAdapter implements IStorageAdapter {
             throw new Error("Invalid path - path traversal attempt detected");
         }
 
-        if (!fs.existsSync(itemPath)) {
-            throw new Error("Item does not exist");
+        try {
+            await fsPromises.access(itemPath);
+        } catch {
+             throw new Error("Item does not exist");
         }
 
-        const stats = fs.statSync(itemPath);
+        const stats = await fsPromises.stat(itemPath);
 
         if (stats.isDirectory()) {
-            fs.rmSync(itemPath, { recursive: true, force: true });
+            await fsPromises.rm(itemPath, { recursive: true, force: true });
             loggers.server.info({ path: itemPath }, "📁 Directory deleted (fs)");
         } else {
-            fs.unlinkSync(itemPath);
+            await fsPromises.unlink(itemPath);
             loggers.server.info({ path: itemPath }, "📁 File deleted (fs)");
         }
     }
@@ -247,11 +260,18 @@ export class FsStorageAdapter implements IStorageAdapter {
             throw new Error("Invalid path - path traversal attempt detected");
         }
 
-        if (fs.existsSync(dirPath)) {
+        try {
+            await fsPromises.access(dirPath);
             throw new Error("Directory already exists");
+        } catch (error: any) {
+            if (error.code !== 'ENOENT') {
+                 // Propagate if it's "Directory already exists" error or other unexpected errors
+                 if (error.message === "Directory already exists") throw error;
+                 // If access failed for other reasons, we might fail at mkdir too, proceed
+            }
         }
 
-        fs.mkdirSync(dirPath, { recursive: true });
+        await fsPromises.mkdir(dirPath, { recursive: true });
         loggers.server.info({ path: dirPath }, "📁 Directory created (fs)");
     }
 
@@ -264,19 +284,25 @@ export class FsStorageAdapter implements IStorageAdapter {
             throw new Error("Invalid path - path traversal attempt detected");
         }
 
-        if (!fs.existsSync(oldAbsolutePath)) {
-            throw new Error("Item does not exist");
+        try {
+             await fsPromises.access(oldAbsolutePath);
+        } catch {
+             throw new Error("Item does not exist");
         }
 
-        if (fs.existsSync(newAbsolutePath)) {
+        try {
+            await fsPromises.access(newAbsolutePath);
             throw new Error("Target name already exists");
+        } catch (error: any) {
+             if (error.message === "Target name already exists") throw error;
+             // ENOENT is expected here
         }
 
         if (newName.includes("/") || newName.includes("\\") || newName.includes("..")) {
             throw new Error("Invalid name - cannot contain path separators");
         }
 
-        fs.renameSync(oldAbsolutePath, newAbsolutePath);
+        await fsPromises.rename(oldAbsolutePath, newAbsolutePath);
         loggers.server.info({ oldPath, newName }, "📁 Item renamed (fs)");
     }
 
@@ -288,31 +314,41 @@ export class FsStorageAdapter implements IStorageAdapter {
             throw new Error("Invalid path - path traversal attempt detected");
         }
 
-        if (!fs.existsSync(sourceAbsolutePath)) {
-            throw new Error("Source item does not exist");
+        try {
+             await fsPromises.access(sourceAbsolutePath);
+        } catch {
+             throw new Error("Source item does not exist");
         }
 
         let finalDestPath = destAbsolutePath;
-        if (fs.existsSync(destAbsolutePath)) {
-            const destStats = fs.statSync(destAbsolutePath);
+        try {
+            const destStats = await fsPromises.stat(destAbsolutePath);
             if (destStats.isDirectory()) {
                 const sourceName = path.basename(sourceAbsolutePath);
                 finalDestPath = path.join(destAbsolutePath, sourceName);
             } else {
                 throw new Error("Destination already exists and is not a directory");
             }
-        } else {
-            const destParent = path.dirname(finalDestPath);
-            if (!fs.existsSync(destParent)) {
-                fs.mkdirSync(destParent, { recursive: true });
+        } catch (error: any) {
+            if (error.code === 'ENOENT') {
+                // Destination doesn't exist, check parent
+                const destParent = path.dirname(finalDestPath);
+                try {
+                     await fsPromises.mkdir(destParent, { recursive: true });
+                } catch { }
+            } else {
+                throw error;
             }
         }
 
-        if (fs.existsSync(finalDestPath)) {
-            throw new Error("Destination already exists");
+        try {
+            await fsPromises.access(finalDestPath);
+             throw new Error("Destination already exists");
+        } catch (error: any) {
+            if (error.message === "Destination already exists") throw error;
         }
 
-        fs.renameSync(sourceAbsolutePath, finalDestPath);
+        await fsPromises.rename(sourceAbsolutePath, finalDestPath);
         loggers.server.info({ sourcePath, destPath }, "📁 Item moved (fs)");
     }
 
@@ -321,31 +357,33 @@ export class FsStorageAdapter implements IStorageAdapter {
         let fileCount = 0;
         let dirCount = 0;
 
-        const calculateStats = (dirPath: string): void => {
+        const calculateStats = async (dirPath: string): Promise<void> => {
             try {
-                const items = fs.readdirSync(dirPath, { withFileTypes: true });
-                for (const item of items) {
-                    const fullPath = path.join(dirPath, item.name);
-                    try {
+                const items = await fsPromises.readdir(dirPath, { withFileTypes: true });
+
+                // Use Promise.all for parallel processing of subdirectories
+                await Promise.all(items.map(async (item) => {
+                     const fullPath = path.join(dirPath, item.name);
+                     try {
                         if (item.isDirectory()) {
                             dirCount++;
-                            calculateStats(fullPath);
+                            await calculateStats(fullPath);
                         } else if (item.isFile()) {
                             fileCount++;
-                            const stats = fs.statSync(fullPath);
+                            const stats = await fsPromises.stat(fullPath);
                             totalBytes += stats.size;
                         }
                     } catch {
                         // Ignore individual item errors
                     }
-                }
+                }));
             } catch {
                 // Ignore directory read errors
             }
         };
 
         if (fs.existsSync(this.dataDir)) {
-            calculateStats(this.dataDir);
+            await calculateStats(this.dataDir);
         }
 
         return {
