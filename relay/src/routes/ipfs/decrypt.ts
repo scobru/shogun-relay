@@ -322,13 +322,11 @@ router.get("/cat/:cid/decrypt", async (req: Request, res: Response) => {
               }
             } else {
               if (!res.headersSent) {
-                res
-                  .status(400)
-                  .json({
-                    success: false,
-                    error: "Decryption failed",
-                    message: "Incorrect token/password or crypto error.",
-                  });
+                res.status(400).json({
+                  success: false,
+                  error: "Decryption failed",
+                  message: "Incorrect token/password or crypto error.",
+                });
               }
               return;
             }

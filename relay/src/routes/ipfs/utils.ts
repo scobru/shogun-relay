@@ -74,7 +74,10 @@ export async function verifyWalletSignature(
       const MAX_DIFF = 5 * 60 * 1000; // 5 minutes
 
       if (diff > MAX_DIFF) {
-        loggers.server.warn({ timestamp, now, diff }, "Wallet signature timestamp expired or invalid");
+        loggers.server.warn(
+          { timestamp, now, diff },
+          "Wallet signature timestamp expired or invalid"
+        );
         return false;
       }
 

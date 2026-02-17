@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { ethers } from 'ethers';
-import { verifyWalletSignature } from './utils';
+import { describe, it, expect } from "vitest";
+import { ethers } from "ethers";
+import { verifyWalletSignature } from "./utils";
 
-describe('verifyWalletSignature', () => {
-  it('should verify a valid legacy signature', async () => {
+describe("verifyWalletSignature", () => {
+  it("should verify a valid legacy signature", async () => {
     const wallet = ethers.Wallet.createRandom();
     const address = wallet.address;
     const message = "I Love Shogun";
@@ -13,7 +13,7 @@ describe('verifyWalletSignature', () => {
     expect(isValid).toBe(true);
   });
 
-  it('should verify a valid signature with timestamp', async () => {
+  it("should verify a valid signature with timestamp", async () => {
     const wallet = ethers.Wallet.createRandom();
     const address = wallet.address;
     const timestamp = Date.now();
@@ -24,10 +24,10 @@ describe('verifyWalletSignature', () => {
     expect(isValid).toBe(true);
   });
 
-  it('should fail if timestamp is expired', async () => {
+  it("should fail if timestamp is expired", async () => {
     const wallet = ethers.Wallet.createRandom();
     const address = wallet.address;
-    const timestamp = Date.now() - (6 * 60 * 1000); // 6 minutes ago
+    const timestamp = Date.now() - 6 * 60 * 1000; // 6 minutes ago
     const message = `I Love Shogun - ${timestamp}`;
     const signature = await wallet.signMessage(message);
 
@@ -35,10 +35,10 @@ describe('verifyWalletSignature', () => {
     expect(isValid).toBe(false);
   });
 
-  it('should fail if timestamp is too far in future', async () => {
+  it("should fail if timestamp is too far in future", async () => {
     const wallet = ethers.Wallet.createRandom();
     const address = wallet.address;
-    const timestamp = Date.now() + (6 * 60 * 1000); // 6 minutes in future
+    const timestamp = Date.now() + 6 * 60 * 1000; // 6 minutes in future
     const message = `I Love Shogun - ${timestamp}`;
     const signature = await wallet.signMessage(message);
 
@@ -46,7 +46,7 @@ describe('verifyWalletSignature', () => {
     expect(isValid).toBe(false);
   });
 
-  it('should fail if signature does not match message with timestamp', async () => {
+  it("should fail if signature does not match message with timestamp", async () => {
     const wallet = ethers.Wallet.createRandom();
     const address = wallet.address;
     const timestamp = Date.now();
@@ -58,16 +58,17 @@ describe('verifyWalletSignature', () => {
     expect(isValid).toBe(false);
   });
 
-  it('should fail if signature is invalid', async () => {
+  it("should fail if signature is invalid", async () => {
     const wallet = ethers.Wallet.createRandom();
     const address = wallet.address;
-    const signature = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b"; // Random valid hex string but wrong signature
+    const signature =
+      "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b"; // Random valid hex string but wrong signature
 
     const isValid = await verifyWalletSignature(address, signature);
     expect(isValid).toBe(false);
   });
 
-  it('should fail if address does not match', async () => {
+  it("should fail if address does not match", async () => {
     const wallet = ethers.Wallet.createRandom();
     const otherWallet = ethers.Wallet.createRandom();
     const message = "I Love Shogun";

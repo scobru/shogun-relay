@@ -11,7 +11,8 @@ const router: Router = Router();
  * Admin or API Key authentication middleware helper
  */
 async function adminOrApiKeyAuthMiddleware(req: Request, res: Response, next: NextFunction) {
-  const { adminOrApiKeyAuthMiddleware: authMiddleware } = await import("../../middleware/admin-or-api-key-auth");
+  const { adminOrApiKeyAuthMiddleware: authMiddleware } =
+    await import("../../middleware/admin-or-api-key-auth");
   authMiddleware(req, res, next);
 }
 
@@ -466,7 +467,8 @@ router.get("/repo/stat", adminOrApiKeyAuthMiddleware, async (req, res) => {
         totalSizeGB: parseFloat((totalSize / (1024 * 1024 * 1024)).toFixed(4)),
         storageMaxBytes: storageMax,
         storageMaxMB: storageMax > 0 ? parseFloat((storageMax / (1024 * 1024)).toFixed(2)) : 0,
-        storageMaxGB: storageMax > 0 ? parseFloat((storageMax / (1024 * 1024 * 1024)).toFixed(4)) : 0,
+        storageMaxGB:
+          storageMax > 0 ? parseFloat((storageMax / (1024 * 1024 * 1024)).toFixed(4)) : 0,
         repoSizeMB: parseFloat((totalSize / (1024 * 1024)).toFixed(2)), // Alias for backward compatibility
         numObjects: storageDataObj.NumObjects || 0,
         repoPath: storageDataObj.RepoPath || "unknown",

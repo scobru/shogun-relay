@@ -1,19 +1,19 @@
 /**
  * Archive Search Service
- * 
+ *
  * Provides unified search across:
  * - Internet Archive (archive.org) - Official Advanced Search API
  * - PirateBay (apibay.org) - Public JSON API
  */
 
-import { loggers } from './logger';
+import { loggers } from "./logger";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 export interface ArchiveSearchResult {
-  source: 'internet-archive';
+  source: "internet-archive";
   identifier: string;
   title: string;
   description?: string;
@@ -72,31 +72,31 @@ export async function searchInternetArchive(
   query: string,
   options: InternetArchiveSearchOptions = {}
 ): Promise<ArchiveSearchResult[]> {
-  const { mediaType, rows = 50, page = 1, sort = 'downloads desc' } = options;
+  const { mediaType, rows = 50, page = 1, sort = "downloads desc" } = options;
 
   try {
     // Build query - search all formats (torrent is available for most items anyway)
     let q = `(${encodeURIComponent(query)})`;
-    
+
     if (mediaType) {
       q += ` AND mediatype:${encodeURIComponent(mediaType)}`;
     }
 
     const url = `https://archive.org/advancedsearch.php?q=${q}&output=json&rows=${rows}&page=${page}&sort[]=${encodeURIComponent(sort)}`;
-    
-    loggers.server.debug({ url, query, mediaType }, '🔍 Searching Internet Archive');
+
+    loggers.server.debug({ url, query, mediaType }, "🔍 Searching Internet Archive");
 
     const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(15000)
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const data = await response.json() as IASearchResponse;
-    
+    const data = (await response.json()) as IASearchResponse;
+
     if (!data.response?.docs) {
       return [];
     }
@@ -104,35 +104,32 @@ export async function searchInternetArchive(
     return data.response.docs.map((doc): ArchiveSearchResult => {
       const identifier = doc.identifier;
       return {
-        source: 'internet-archive',
+        source: "internet-archive",
         identifier,
         title: doc.title || identifier,
         description: Array.isArray(doc.description) ? doc.description[0] : doc.description,
-        creator: Array.isArray(doc.creator) ? doc.creator.join(', ') : doc.creator,
+        creator: Array.isArray(doc.creator) ? doc.creator.join(", ") : doc.creator,
         date: doc.date,
         mediaType: doc.mediatype,
         size: doc.item_size,
         // Torrent URL is always at this path for archive.org items
         torrentUrl: `https://archive.org/download/${identifier}/${identifier}_archive.torrent`,
         itemUrl: `https://archive.org/details/${identifier}`,
-        category: doc.mediatype
+        category: doc.mediatype,
       };
     });
-
   } catch (error: any) {
-    loggers.server.error({ err: error, query }, '🔍 Internet Archive search failed');
+    loggers.server.error({ err: error, query }, "🔍 Internet Archive search failed");
     return [];
   }
 }
-
-
 
 // ============================================================================
 // UNIFIED SEARCH
 // ============================================================================
 
 export interface UnifiedSearchOptions {
-  sources?: ('internet-archive')[];
+  sources?: "internet-archive"[];
   rows?: number;
   // Internet Archive specific
   mediaType?: string;
@@ -145,27 +142,19 @@ export async function searchArchives(
   query: string,
   options: UnifiedSearchOptions = {}
 ): Promise<ArchiveSearchResult[]> {
-  const { 
-    sources = ['internet-archive'],
-    rows = 25,
-    mediaType,
-  } = options;
+  const { sources = ["internet-archive"], rows = 25, mediaType } = options;
 
   const results: ArchiveSearchResult[] = [];
   const searchPromises: Promise<ArchiveSearchResult[]>[] = [];
 
-  if (sources.includes('internet-archive')) {
-    searchPromises.push(
-      searchInternetArchive(query, { rows, mediaType })
-    );
+  if (sources.includes("internet-archive")) {
+    searchPromises.push(searchInternetArchive(query, { rows, mediaType }));
   }
 
-
-
   const searchResults = await Promise.allSettled(searchPromises);
-  
+
   for (const result of searchResults) {
-    if (result.status === 'fulfilled') {
+    if (result.status === "fulfilled") {
       results.push(...result.value);
     }
   }
@@ -183,27 +172,28 @@ export async function searchArchives(
  * Get torrent/magnet for a specific item
  */
 export async function getTorrentForItem(
-  source: 'internet-archive',
+  source: "internet-archive",
   identifier: string
 ): Promise<{ torrentUrl?: string; magnetUri?: string } | null> {
   try {
-    if (source === 'internet-archive') {
+    if (source === "internet-archive") {
       // For Internet Archive, torrent URL follows a predictable pattern
       const torrentUrl = `https://archive.org/download/${identifier}/${identifier}_archive.torrent`;
-      
+
       // Verify it exists
-      const response = await fetch(torrentUrl, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+      const response = await fetch(torrentUrl, {
+        method: "HEAD",
+        signal: AbortSignal.timeout(5000),
+      });
       if (response.ok) {
         return { torrentUrl };
       }
       return null;
     }
 
-
-
     return null;
   } catch (error: any) {
-    loggers.server.error({ err: error, source, identifier }, '🔍 Failed to get torrent for item');
+    loggers.server.error({ err: error, source, identifier }, "🔍 Failed to get torrent for item");
     return null;
   }
 }
@@ -214,13 +204,11 @@ export class ArchiveSearchService {
     return searchInternetArchive(query, options);
   }
 
-
-
   async search(query: string, options?: UnifiedSearchOptions) {
     return searchArchives(query, options);
   }
 
-  async getTorrent(source: 'internet-archive', identifier: string) {
+  async getTorrent(source: "internet-archive", identifier: string) {
     return getTorrentForItem(source, identifier);
   }
 }

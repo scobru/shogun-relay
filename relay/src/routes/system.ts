@@ -5,6 +5,7 @@ import { loggers } from "../utils/logger";
 import { packageConfig } from "../config";
 import { config } from "../config/env-config";
 import { GUN_PATHS, getGunNode } from "../utils/gun-paths";
+import { adminAuthMiddleware } from "../middleware/admin-auth";
 
 const router: Router = express.Router();
 
@@ -17,7 +18,7 @@ const getGunInstance = (req: Request): any => {
 router.get("/health", (req, res) => {
   // Get relay public key from app context if available
   const relayPub = req.app.get("relayUserPub") || null;
-  
+
   res.json({
     success: true,
     message: "Shogun Relay is running",
@@ -46,7 +47,7 @@ router.get("/relay-info", (req, res) => {
 });
 
 // All data endpoint (requires authentication)
-router.get("/alldata", (req, res) => {
+router.get("/alldata", adminAuthMiddleware, (req, res) => {
   try {
     const gun = getGunInstance(req);
 
@@ -139,7 +140,7 @@ router.get("/stats", (req, res) => {
 });
 
 // Stats update endpoint
-router.post("/stats/update", (req, res) => {
+router.post("/stats/update", adminAuthMiddleware, (req, res) => {
   try {
     const { key, value } = req.body;
     const addTimeSeriesPoint = req.app.get("addTimeSeriesPoint");
@@ -239,14 +240,14 @@ router.get("/stats.json", (req, res) => {
 });
 
 // Gun node operations
-router.get("/node/*", async (req, res) => {
+router.get("/node/*", adminAuthMiddleware, async (req, res) => {
   try {
     // @ts-ignore - req.params is an array for wildcard routes
     const path: string = req.params[0] as string;
     const gun = getGunInstance(req);
 
     const node = getGunNode(gun, path);
-    
+
     // Promisify with timeout
     const data = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -286,7 +287,7 @@ router.get("/node/*", async (req, res) => {
   }
 });
 
-router.post("/node/*", async (req, res) => {
+router.post("/node/*", adminAuthMiddleware, async (req, res) => {
   try {
     // @ts-ignore - req.params is an array for wildcard routes
     const path: string = req.params[0] as string;
@@ -351,7 +352,7 @@ router.post("/node/*", async (req, res) => {
   }
 });
 
-router.delete("/node/*", async (req, res) => {
+router.delete("/node/*", adminAuthMiddleware, async (req, res) => {
   try {
     // @ts-ignore - req.params is an array for wildcard routes
     const path: string = req.params[0] as string;
@@ -411,7 +412,7 @@ router.delete("/node/*", async (req, res) => {
 });
 
 // Logs endpoint for real-time relay logs from file
-router.get("/logs", (req, res) => {
+router.get("/logs", adminAuthMiddleware, (req, res) => {
   try {
     const limit: number = parseInt(req.query.limit as string) || 100;
     const tail: number = parseInt(req.query.tail as string) || 100; // Number of lines to read from end
@@ -541,7 +542,7 @@ router.get("/logs", (req, res) => {
 });
 
 // Clear logs endpoint (clears GunDB logs only)
-router.delete("/logs", (req, res) => {
+router.delete("/logs", adminAuthMiddleware, (req, res) => {
   try {
     const gun = getGunInstance(req);
     const logsNode = getGunNode(gun, GUN_PATHS.LOGS);
@@ -599,7 +600,7 @@ router.get("/peers", (req, res) => {
   }
 });
 
-router.post("/peers/add", (req, res) => {
+router.post("/peers/add", adminAuthMiddleware, (req, res) => {
   try {
     const { peer } = req.body;
     const gun = getGunInstance(req);
@@ -630,7 +631,7 @@ router.post("/peers/add", (req, res) => {
 });
 
 // Services Logs endpoint
-router.get("/services/:name/logs", (req, res) => {
+router.get("/services/:name/logs", adminAuthMiddleware, (req, res) => {
   try {
     const serviceName = req.params.name;
     const limit = parseInt(req.query.limit as string) || 100;
@@ -639,73 +640,82 @@ router.get("/services/:name/logs", (req, res) => {
     // Map service names to log files
     // This assumes standard log locations or PM2 log naming convention
     let logFile = "";
-    
+
     // Normalize service name
-    const normalizedName = serviceName.toLowerCase().replace(/%20/g, ' ').trim();
-    
+    const normalizedName = serviceName.toLowerCase().replace(/%20/g, " ").trim();
+
     if (normalizedName.includes("ipfs")) {
-       // Check common IPFS log locations or PM2
-       logFile = "/var/log/supervisor/ipfs.log"; // Supervisor default
-       if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "ipfs.log"); 
+      // Check common IPFS log locations or PM2
+      logFile = "/var/log/supervisor/ipfs.log"; // Supervisor default
+      if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "ipfs.log");
     } else if (normalizedName.includes("gun") || normalizedName.includes("relay")) {
-       logFile = "/var/log/supervisor/relay.log";
-       if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "relay.log");
+      logFile = "/var/log/supervisor/relay.log";
+      if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "relay.log");
     } else {
-       // Generic fallback
-       logFile = `/var/log/supervisor/${normalizedName.replace(/\s+/g, '-')}.log`;
+      // Generic fallback
+      logFile = `/var/log/supervisor/${normalizedName.replace(/\s+/g, "-")}.log`;
     }
 
     if (!fs.existsSync(logFile)) {
-        // Try PM2 convention if Supervisor not found
-        const pm2Log = path.join(process.env.HOME || '/root', '.pm2', 'logs', `${normalizedName.replace(/\s+/g, '-')}-out.log`);
-        if (fs.existsSync(pm2Log)) {
-            logFile = pm2Log;
-        } else {
-            // Try Docker stdout logs - these are captured by Docker, not files
-            // Return helpful message instead of 404
-            return res.json({
-                success: true,
-                logs: [{
-                  id: 'info_0',
-                  timestamp: new Date().toISOString(),
-                  message: `Logs for ${serviceName} are managed by Docker/container orchestrator.`,
-                  level: 'info'
-                }, {
-                  id: 'info_1', 
-                  timestamp: new Date().toISOString(),
-                  message: `Use 'docker logs <container>' to view container logs.`,
-                  level: 'info'
-                }, {
-                  id: 'info_2',
-                  timestamp: new Date().toISOString(),
-                  message: `Checked paths: ${logFile}, ${pm2Log}`,
-                  level: 'debug'
-                }],
-                count: 3,
-                service: serviceName,
-                note: 'Log files not found at expected paths. Logs may be managed by Docker.'
-            });
-        }
+      // Try PM2 convention if Supervisor not found
+      const pm2Log = path.join(
+        process.env.HOME || "/root",
+        ".pm2",
+        "logs",
+        `${normalizedName.replace(/\s+/g, "-")}-out.log`
+      );
+      if (fs.existsSync(pm2Log)) {
+        logFile = pm2Log;
+      } else {
+        // Try Docker stdout logs - these are captured by Docker, not files
+        // Return helpful message instead of 404
+        return res.json({
+          success: true,
+          logs: [
+            {
+              id: "info_0",
+              timestamp: new Date().toISOString(),
+              message: `Logs for ${serviceName} are managed by Docker/container orchestrator.`,
+              level: "info",
+            },
+            {
+              id: "info_1",
+              timestamp: new Date().toISOString(),
+              message: `Use 'docker logs <container>' to view container logs.`,
+              level: "info",
+            },
+            {
+              id: "info_2",
+              timestamp: new Date().toISOString(),
+              message: `Checked paths: ${logFile}, ${pm2Log}`,
+              level: "debug",
+            },
+          ],
+          count: 3,
+          service: serviceName,
+          note: "Log files not found at expected paths. Logs may be managed by Docker.",
+        });
+      }
     }
 
     // Reuse log reading logic (simplified here)
     const logContent = fs.readFileSync(logFile, "utf8");
     const lines = logContent.split("\n").filter((line) => line.trim() !== "");
     const lastLines = lines.slice(-tail);
-    
+
     // Simple parsing - just return lines for now to fix 404
     const formattedLogs = lastLines.map((line, i) => ({
-        id: `l_${Date.now()}_${i}`,
-        timestamp: new Date().toISOString(), // Placeholder, real parsing is complex
-        message: line,
-        level: 'info'
+      id: `l_${Date.now()}_${i}`,
+      timestamp: new Date().toISOString(), // Placeholder, real parsing is complex
+      message: line,
+      level: "info",
     }));
 
     res.json({
       success: true,
       logs: formattedLogs,
       count: formattedLogs.length,
-      service: serviceName
+      service: serviceName,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "❌ Service Logs error");
@@ -717,7 +727,7 @@ router.get("/services/:name/logs", (req, res) => {
 });
 
 // RPC Execute endpoint
-router.post("/rpc/execute", async (req, res) => {
+router.post("/rpc/execute", adminAuthMiddleware, async (req, res) => {
   try {
     const { endpoint, request } = req.body;
 

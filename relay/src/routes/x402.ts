@@ -179,7 +179,7 @@ router.post("/requirements/custom", async (req, res) => {
     if (!priceUSDC || !resourceId || !description) {
       return res.status(400).json({
         success: false,
-        error: "Missing parameters: priceUSDC, resourceId, description are required"
+        error: "Missing parameters: priceUSDC, resourceId, description are required",
       });
     }
 
@@ -192,14 +192,13 @@ router.post("/requirements/custom", async (req, res) => {
 
     res.json({
       success: true,
-      requirements
+      requirements,
     });
-
   } catch (error: any) {
     console.error("Generate custom requirements error:", error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -312,11 +311,11 @@ router.post("/subscribe", async (req, res) => {
         relayFull: relayCapacity.relayFull || false,
         relayStorage: relayCapacity.relayStorage
           ? {
-            usedGB: relayCapacity.relayStorage.usedGB,
-            maxStorageGB: relayCapacity.relayStorage.maxStorageGB,
-            remainingGB: relayCapacity.relayStorage.remainingGB,
-            percentUsed: relayCapacity.relayStorage.percentUsed,
-          }
+              usedGB: relayCapacity.relayStorage.usedGB,
+              maxStorageGB: relayCapacity.relayStorage.maxStorageGB,
+              remainingGB: relayCapacity.relayStorage.remainingGB,
+              percentUsed: relayCapacity.relayStorage.percentUsed,
+            }
           : null,
       });
     }
@@ -667,17 +666,17 @@ router.get("/storage/:userAddress", async (req, res) => {
       },
       subscription: subscription.active
         ? {
-          tier: subscription.tier,
-          totalMB: subscription.storageMB,
-          remainingMB: parseFloat(
-            Math.max(0, (subscription.storageMB || 0) - realUsage.totalMB).toFixed(2)
-          ),
-          recordedUsedMB: subscription.storageUsedMB || 0,
-          discrepancy: parseFloat(
-            Math.abs((subscription.storageUsedMB || 0) - realUsage.totalMB).toFixed(2)
-          ),
-          expiresAt: subscription.expiresAt,
-        }
+            tier: subscription.tier,
+            totalMB: subscription.storageMB,
+            remainingMB: parseFloat(
+              Math.max(0, (subscription.storageMB || 0) - realUsage.totalMB).toFixed(2)
+            ),
+            recordedUsedMB: subscription.storageUsedMB || 0,
+            discrepancy: parseFloat(
+              Math.abs((subscription.storageUsedMB || 0) - realUsage.totalMB).toFixed(2)
+            ),
+            expiresAt: subscription.expiresAt,
+          }
         : null,
       files: realUsage.files.map((f) => ({
         hash: f.hash,
@@ -1136,17 +1135,17 @@ router.get("/recommend", async (req, res) => {
         subscription:
           subscriptionCost !== null
             ? {
-              tier: subscriptionTier,
-              totalCostUSDC: subscriptionCost,
-              note: subscriptionTier
-                ? `${subscriptionTiers[subscriptionTier].storageMB}MB for ${Math.ceil(duration / 30)} month(s)`
-                : "No suitable tier",
-            }
+                tier: subscriptionTier,
+                totalCostUSDC: subscriptionCost,
+                note: subscriptionTier
+                  ? `${subscriptionTiers[subscriptionTier].storageMB}MB for ${Math.ceil(duration / 30)} month(s)`
+                  : "No suitable tier",
+              }
             : {
-              tier: null,
-              totalCostUSDC: null,
-              note: "File too large for subscription tiers",
-            },
+                tier: null,
+                totalCostUSDC: null,
+                note: "File too large for subscription tiers",
+              },
         deal: {
           tier: dealTier,
           totalCostUSDC: dealCost,
@@ -1161,12 +1160,12 @@ router.get("/recommend", async (req, res) => {
       ) {
         const cheaper =
           recommendation.comparison.subscription.totalCostUSDC <
-            recommendation.comparison.deal.totalCostUSDC
+          recommendation.comparison.deal.totalCostUSDC
             ? "subscription"
             : "deal";
         const savings = Math.abs(
           recommendation.comparison.subscription.totalCostUSDC -
-          recommendation.comparison.deal.totalCostUSDC
+            recommendation.comparison.deal.totalCostUSDC
         );
 
         if (cheaper === recommendation.recommended) {
@@ -1266,30 +1265,29 @@ router.get("/subscriptions", async (req, res) => {
     if (!RelayUser.isRelayUserInitialized()) {
       return res.status(503).json({
         success: false,
-        error: "Relay user not initialized"
+        error: "Relay user not initialized",
       });
     }
 
     const subscriptions = await RelayUser.getAllSubscriptions();
 
     // Enrich with status checks (expired?)
-    const enriched = subscriptions.map(sub => {
+    const enriched = subscriptions.map((sub) => {
       const now = Date.now();
       const expires = new Date(sub.expiresAt as string | number | Date).getTime();
       const active = expires > now;
       return {
         ...sub,
         isActive: active,
-        status: active ? 'active' : 'expired'
+        status: active ? "active" : "expired",
       };
     });
 
     res.json({
       success: true,
       count: enriched.length,
-      subscriptions: enriched
+      subscriptions: enriched,
     });
-
   } catch (error: any) {
     console.error("List subscriptions error:", error);
     res.status(500).json({
@@ -1323,7 +1321,7 @@ router.get("/history", async (req, res) => {
     if (!RelayUser.isRelayUserInitialized()) {
       return res.status(503).json({
         success: false,
-        error: "Relay user not initialized"
+        error: "Relay user not initialized",
       });
     }
 
@@ -1332,9 +1330,8 @@ router.get("/history", async (req, res) => {
     res.json({
       success: true,
       count: payments.length,
-      payments
+      payments,
     });
-
   } catch (error: any) {
     console.error("List payments error:", error);
     res.status(500).json({
