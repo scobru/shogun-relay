@@ -1,4 +1,3 @@
-
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -71,9 +70,7 @@ import visualGraphRoutes from "./routes/visualGraph";
 import driveRoutes from "./routes/drive";
 import blobArchiverRoutes from "./routes/blob-archiver";
 
-
-// Middleware 
-
+// Middleware
 
 // --- IPFS Configuration ---
 const IPFS_API_URL = ipfsConfig.apiUrl;
@@ -116,9 +113,7 @@ async function initializeServer() {
   loggers.server.info("🚀 Initializing Shogun Relay Server...");
   loggers.server.info("🚀 Shogun Relay v1.0.1 - FORCE UPDATE");
 
-
   // Moved drive public links init to after app declaration
-
 
   /**
    * System logging function (console only, no GunDB storage)
@@ -200,20 +195,20 @@ async function initializeServer() {
     origin: authConfig.corsOrigins.includes("*")
       ? true // Allow all origins if '*' is configured
       : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
+          // Allow requests with no origin (like mobile apps or curl requests)
+          if (!origin) return callback(null, true);
 
-        if (
-          authConfig.corsOrigins.some(
-            (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
-          )
-        ) {
-          callback(null, true);
-        } else {
-          loggers.server.warn({ origin }, "CORS blocked request from origin");
-          callback(new Error("Not allowed by CORS"));
-        }
-      },
+          if (
+            authConfig.corsOrigins.some(
+              (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
+            )
+          ) {
+            callback(null, true);
+          } else {
+            loggers.server.warn({ origin }, "CORS blocked request from origin");
+            callback(new Error("Not allowed by CORS"));
+          }
+        },
     credentials: authConfig.corsCredentials,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: [
@@ -305,24 +300,27 @@ async function initializeServer() {
 
   // Serve React Dashboard SPA (built files from public/dashboard/dist)
   const dashboardPath = path.resolve(publicPath, "dashboard", "dist");
-  app.use("/dashboard", express.static(dashboardPath, {
-    setHeaders: (res, filePath) => {
-      // Performance: Intelligent Caching Strategy
-      if (filePath.endsWith(".html")) {
-        // HTML files (entry points) must not be cached to ensure updates are seen
-        res.set({
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        });
-      } else {
-        // Static assets (JS, CSS, Images) are hashed by Vite and safe to cache aggressively (1 year)
-        res.set({
-          "Cache-Control": "public, max-age=31536000, immutable",
-        });
-      }
-    },
-  }));
+  app.use(
+    "/dashboard",
+    express.static(dashboardPath, {
+      setHeaders: (res, filePath) => {
+        // Performance: Intelligent Caching Strategy
+        if (filePath.endsWith(".html")) {
+          // HTML files (entry points) must not be cached to ensure updates are seen
+          res.set({
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          });
+        } else {
+          // Static assets (JS, CSS, Images) are hashed by Vite and safe to cache aggressively (1 year)
+          res.set({
+            "Cache-Control": "public, max-age=31536000, immutable",
+          });
+        }
+      },
+    })
+  );
 
   // SPA fallback for React Router - serve index.html for non-asset routes
   app.get("/dashboard/*", (req, res) => {
@@ -333,7 +331,8 @@ async function initializeServer() {
       res.status(404).json({
         success: false,
         error: "Dashboard not found",
-        message: "Dashboard has not been built yet. Run 'npm run build' in the dashboard directory.",
+        message:
+          "Dashboard has not been built yet. Run 'npm run build' in the dashboard directory.",
       });
     }
   });
@@ -645,7 +644,9 @@ async function initializeServer() {
   } else if (storageType === "s3") {
     const s3Conf = storageConfig.s3;
     if (!s3Conf?.endpoint || !s3Conf?.accessKeyId || !s3Conf?.secretAccessKey) {
-      loggers.server.warn("⚠️ S3 storage configured but credentials missing. Falling back to radisk.");
+      loggers.server.warn(
+        "⚠️ S3 storage configured but credentials missing. Falling back to radisk."
+      );
     } else {
       store = new S3Store({
         endpoint: s3Conf.endpoint,
@@ -655,10 +656,13 @@ async function initializeServer() {
         region: s3Conf.region,
         skipSslVerify: s3Conf.skipSslVerify,
       });
-      loggers.server.info({
-        endpoint: s3Conf.endpoint,
-        bucket: s3Conf.bucket
-      }, "🪣 Using S3/MinIO storage for Gun");
+      loggers.server.info(
+        {
+          endpoint: s3Conf.endpoint,
+          bucket: s3Conf.bucket,
+        },
+        "🪣 Using S3/MinIO storage for Gun"
+      );
     }
   } else {
     loggers.server.info("📁 Using file-based radisk storage");
@@ -718,7 +722,8 @@ async function initializeServer() {
       // If already initialized, skip
       if (isPublicLinksInitialized()) return;
 
-      const { getRelayUser, isRelayUserInitialized, getRelayPub } = await import("./utils/relay-user");
+      const { getRelayUser, isRelayUserInitialized, getRelayPub } =
+        await import("./utils/relay-user");
 
       if (isRelayUserInitialized()) {
         const relayUser = getRelayUser();
@@ -729,7 +734,9 @@ async function initializeServer() {
           initDrivePublicLinks(gun, relayPub, relayUser);
           loggers.server.info("✅ DrivePublicLinksManager initialized via delayed startup check");
         } else {
-          loggers.server.info("✅ Relay User ready. Drive Manager will initialize on first request.");
+          loggers.server.info(
+            "✅ Relay User ready. Drive Manager will initialize on first request."
+          );
         }
       }
     } catch (err) {
@@ -792,17 +799,14 @@ async function initializeServer() {
         }
 
         // Save to file
-        fs.writeFileSync(
-          keypairFilePath,
-          JSON.stringify(newKeyPair, null, 2),
-          "utf8"
-        );
+        fs.writeFileSync(keypairFilePath, JSON.stringify(newKeyPair, null, 2), "utf8");
         relayKeyPair = newKeyPair;
 
+        loggers.server.info(`✅ Generated and saved new keypair to ${keypairFilePath}`);
         loggers.server.info(
-          `✅ Generated and saved new keypair to ${keypairFilePath}`
+          { pub: newKeyPair.pub, pubLength: newKeyPair.pub.length },
+          `🔑 Public key (generated)`
         );
-        loggers.server.info({ pub: newKeyPair.pub, pubLength: newKeyPair.pub.length }, `🔑 Public key (generated)`);
         loggers.server.warn(`⚠️ IMPORTANT: Save this keypair file securely!`);
       } else {
         // File exists, load it
@@ -865,7 +869,10 @@ async function initializeServer() {
         relayKeyPair = newKeyPair;
 
         loggers.server.info(`✅ Generated new keypair at ${keyPairPath}`);
-        loggers.server.info({ pub: newKeyPair.pub, pubLength: newKeyPair.pub.length }, `🔑 Public key (auto-generated)`);
+        loggers.server.info(
+          { pub: newKeyPair.pub, pubLength: newKeyPair.pub.length },
+          `🔑 Public key (auto-generated)`
+        );
         loggers.server.warn(
           `⚠️ IMPORTANT: Save this keypair file securely or set RELAY_SEA_KEYPAIR_PATH!`
         );
@@ -1170,8 +1177,6 @@ See docs/RELAY_KEYS.md for more information.
   app.set("IPFS_API_TOKEN", IPFS_API_TOKEN);
   app.set("IPFS_GATEWAY_URL", IPFS_GATEWAY_URL);
 
-
-
   // Esponi l'istanza Gun globalmente per le route
   (global as any).gunInstance = gun;
 
@@ -1212,7 +1217,6 @@ See docs/RELAY_KEYS.md for more information.
   app.use("/api/v1/torrents", torrentRoutes);
   app.use("/api/v1/graph", visualGraphRoutes);
   app.use("/api/v1/drive", driveRoutes);
-
 
   // Route legacy per compatibilità (definite prima delle route modulari)
 
@@ -1836,11 +1840,14 @@ See docs/RELAY_KEYS.md for more information.
       };
 
       // Warn if host is localhost (common discovery issue)
-      if (host.includes('localhost') || host.includes('127.0.0.1')) {
+      if (host.includes("localhost") || host.includes("127.0.0.1")) {
         // Only warn once every ~100 pulses to avoid spam, or warn at startup (but this is a loop)
         // Check random chance or just debug log
         if (Math.random() < 0.05) {
-          loggers.server.warn({ host }, "⚠️  Relay host is configured as localhost. External relays will not be able to connect to you. Set RELAY_HOST in .env");
+          loggers.server.warn(
+            { host },
+            "⚠️  Relay host is configured as localhost. External relays will not be able to connect to you. Set RELAY_HOST in .env"
+          );
         }
       }
 

@@ -11,7 +11,7 @@ const router = express.Router();
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(process.cwd(), 'data', 'torrents', 'uploads');
+    const uploadDir = path.join(process.cwd(), "data", "torrents", "uploads");
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     // Keep original filename
     cb(null, file.originalname);
-  }
+  },
 });
 const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } }); // 500MB limit
 
@@ -73,7 +73,7 @@ router.get("/stats", async (req, res) => {
   try {
     const status = torrentManager.getStatus();
     const storageStats = torrentManager.getStorageStats();
-    
+
     res.json({
       success: true,
       stats: {
@@ -101,27 +101,27 @@ router.get("/stats", async (req, res) => {
 router.post("/add", express.json(), async (req, res) => {
   try {
     const { magnet } = req.body;
-    
-    if (!magnet || typeof magnet !== 'string') {
-        return res.status(400).json({
-            success: false,
-            error: "Magnet link is required"
-        });
+
+    if (!magnet || typeof magnet !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Magnet link is required",
+      });
     }
 
     loggers.server.info(`📚 Adding torrent via API: ${magnet.substring(0, 50)}...`);
 
     const torrent = torrentManager.addTorrent(magnet);
-    
+
     if (!torrent) {
-        throw new Error("Failed to add torrent - internal error");
+      throw new Error("Failed to add torrent - internal error");
     }
 
     res.json({
       success: true,
       message: "Torrent added successfully",
       name: torrent.name,
-      infoHash: torrent.infoHash
+      infoHash: torrent.infoHash,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to add torrent");
@@ -137,37 +137,40 @@ router.post("/add", express.json(), async (req, res) => {
  * Upload files and create a torrent from them
  * Responds immediately after upload, creates torrent in background
  */
-router.post("/create", upload.array('files', 20), async (req, res) => {
+router.post("/create", upload.array("files", 20), async (req, res) => {
   try {
     const files = req.files as Express.Multer.File[];
-    
+
     if (!files || files.length === 0) {
       return res.status(400).json({
         success: false,
-        error: "No files uploaded"
+        error: "No files uploaded",
       });
     }
 
     loggers.server.info(`📚 Creating torrent from ${files.length} files`);
 
     // Get file paths
-    const filePaths = files.map(f => f.path);
-    
+    const filePaths = files.map((f) => f.path);
+
     // Start torrent creation in background (don't await)
-    torrentManager.createTorrent(filePaths)
-      .then(result => {
-        loggers.server.info(`📚 Torrent created: ${result.name} - ${result.magnetURI.substring(0, 60)}...`);
+    torrentManager
+      .createTorrent(filePaths)
+      .then((result) => {
+        loggers.server.info(
+          `📚 Torrent created: ${result.name} - ${result.magnetURI.substring(0, 60)}...`
+        );
       })
-      .catch(err => {
+      .catch((err) => {
         loggers.server.error({ err }, "📚 Background torrent creation failed");
       });
-    
+
     // Respond immediately with files info
     res.json({
       success: true,
       message: "Files uploaded, torrent creation started. Check Active Torrents in a few seconds.",
-      files: files.map(f => f.originalname),
-      note: "Refresh the dashboard to see the new torrent"
+      files: files.map((f) => f.originalname),
+      note: "Refresh the dashboard to see the new torrent",
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to create torrent");
@@ -186,40 +189,40 @@ router.post("/create", upload.array('files', 20), async (req, res) => {
 router.post("/control", express.json(), async (req, res) => {
   try {
     const { infoHash, action, deleteFiles } = req.body;
-    
+
     if (!infoHash || !action) {
       return res.status(400).json({
         success: false,
-        error: "infoHash and action are required"
+        error: "infoHash and action are required",
       });
     }
-    
-    const validActions = ['pause', 'resume', 'remove'];
+
+    const validActions = ["pause", "resume", "remove"];
     if (!validActions.includes(action)) {
       return res.status(400).json({
         success: false,
-        error: `Invalid action. Must be one of: ${validActions.join(', ')}`
+        error: `Invalid action. Must be one of: ${validActions.join(", ")}`,
       });
     }
-    
+
     switch (action) {
-      case 'pause':
+      case "pause":
         torrentManager.pauseTorrent(infoHash);
         break;
-      case 'resume':
+      case "resume":
         torrentManager.resumeTorrent(infoHash);
         break;
-      case 'remove':
+      case "remove":
         await torrentManager.removeTorrent(infoHash, deleteFiles === true);
         break;
     }
-    
+
     res.json({
       success: true,
-      message: `Torrent ${action} successful`
+      message: `Torrent ${action} successful`,
     });
   } catch (error: any) {
-    loggers.server.error({ err: error }, `Failed to ${req.body?.action || 'control'} torrent`);
+    loggers.server.error({ err: error }, `Failed to ${req.body?.action || "control"} torrent`);
     res.status(500).json({
       success: false,
       error: error.message || "Internal Server Error",
@@ -234,12 +237,12 @@ router.post("/control", express.json(), async (req, res) => {
 router.post("/pause/:infoHash", async (req, res) => {
   try {
     const { infoHash } = req.params;
-    
+
     torrentManager.pauseTorrent(infoHash);
-    
+
     res.json({
       success: true,
-      message: "Torrent paused successfully"
+      message: "Torrent paused successfully",
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to pause torrent");
@@ -257,12 +260,12 @@ router.post("/pause/:infoHash", async (req, res) => {
 router.post("/resume/:infoHash", async (req, res) => {
   try {
     const { infoHash } = req.params;
-    
+
     torrentManager.resumeTorrent(infoHash);
-    
+
     res.json({
       success: true,
-      message: "Torrent resumed successfully"
+      message: "Torrent resumed successfully",
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to resume torrent");
@@ -280,13 +283,13 @@ router.post("/resume/:infoHash", async (req, res) => {
 router.delete("/remove/:infoHash", async (req, res) => {
   try {
     const { infoHash } = req.params;
-    const deleteFiles = req.query.deleteFiles === 'true';
-    
+    const deleteFiles = req.query.deleteFiles === "true";
+
     await torrentManager.removeTorrent(infoHash, deleteFiles);
-    
+
     res.json({
       success: true,
-      message: `Torrent removed${deleteFiles ? ' (files deleted)' : ''}, IPFS pins removed`
+      message: `Torrent removed${deleteFiles ? " (files deleted)" : ""}, IPFS pins removed`,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to remove torrent");
@@ -304,26 +307,26 @@ router.delete("/remove/:infoHash", async (req, res) => {
 router.post("/pin", async (req, res) => {
   try {
     const { infoHash, filePath } = req.body;
-    
+
     if (!infoHash || !filePath) {
       return res.status(400).json({
         success: false,
-        error: "infoHash and filePath are required"
+        error: "infoHash and filePath are required",
       });
     }
-    
+
     const result = await torrentManager.pinFile(infoHash, filePath);
-    
+
     if (result.success) {
       res.json({
         success: true,
         cid: result.cid,
-        message: `File pinned to IPFS: ${result.cid}`
+        message: `File pinned to IPFS: ${result.cid}`,
       });
     } else {
       res.status(400).json({
         success: false,
-        error: result.error
+        error: result.error,
       });
     }
   } catch (error: any) {
@@ -342,22 +345,22 @@ router.post("/pin", async (req, res) => {
 router.post("/pin-all", async (req, res) => {
   try {
     const { infoHash } = req.body;
-    
+
     if (!infoHash) {
       return res.status(400).json({
         success: false,
-        error: "infoHash is required"
+        error: "infoHash is required",
       });
     }
-    
+
     const result = await torrentManager.pinTorrent(infoHash);
-    
+
     res.json({
       success: result.success,
       pinned: result.pinned,
       total: result.total,
       errors: result.errors,
-      message: `Pinned ${result.pinned}/${result.total} files`
+      message: `Pinned ${result.pinned}/${result.total} files`,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to pin torrent to IPFS");
@@ -376,12 +379,12 @@ router.post("/pin-all", async (req, res) => {
 router.get("/files/:infoHash?", async (req, res) => {
   try {
     const { infoHash } = req.params;
-    
+
     const files = torrentManager.getFiles(infoHash);
-    
+
     res.json({
       success: true,
-      data: files
+      data: files,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to get files");
@@ -400,26 +403,29 @@ router.get("/files/:infoHash?", async (req, res) => {
 router.get("/catalog", async (req, res) => {
   try {
     const catalog = torrentManager.getCatalog();
-    
+
     // Build public relay URL - strip /gun suffix if present
-    let relayEndpoint = relayConfig.endpoint || process.env.PUBLIC_URL || 'http://localhost:3000';
-    if (relayEndpoint.endsWith('/gun')) {
+    let relayEndpoint = relayConfig.endpoint || process.env.PUBLIC_URL || "http://localhost:3000";
+    if (relayEndpoint.endsWith("/gun")) {
       relayEndpoint = relayEndpoint.slice(0, -4);
     }
-    const relayUrl = relayEndpoint.startsWith('http') ? relayEndpoint : `https://${relayEndpoint}`;
+    const relayUrl = relayEndpoint.startsWith("http") ? relayEndpoint : `https://${relayEndpoint}`;
     const ipfsGateway = ipfsConfig.gatewayUrl || `${relayUrl}/ipfs`;
-    
+
     res.json({
       success: true,
       relay: {
         url: relayUrl,
         ipfsGateway: ipfsGateway,
-        key: torrentManager.getRelayKey() // Include public key for chat/dm
+        key: torrentManager.getRelayKey(), // Include public key for chat/dm
       },
       catalog: catalog,
       count: catalog.length,
       totalFiles: catalog.reduce((sum, entry) => sum + entry.files.length, 0),
-      totalPinnedFiles: catalog.reduce((sum, entry) => sum + entry.files.filter(f => f.ipfsCid).length, 0)
+      totalPinnedFiles: catalog.reduce(
+        (sum, entry) => sum + entry.files.filter((f) => f.ipfsCid).length,
+        0
+      ),
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to get catalog");
@@ -437,14 +443,15 @@ router.get("/catalog", async (req, res) => {
 router.get("/network", async (req, res) => {
   try {
     const networkCatalog = await torrentManager.getNetworkCatalog();
-    
+
     res.json({
       success: true,
       network: networkCatalog,
       relays: networkCatalog.length,
-      totalTorrents: networkCatalog.reduce((sum, relay) => 
-        sum + Object.keys(relay.torrents || {}).length, 0
-      )
+      totalTorrents: networkCatalog.reduce(
+        (sum, relay) => sum + Object.keys(relay.torrents || {}).length,
+        0
+      ),
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to get network catalog");
@@ -462,15 +469,15 @@ router.get("/network", async (req, res) => {
 router.post("/refetch", express.json(), async (req, res) => {
   try {
     const maxTb = req.body.maxTb;
-    
+
     const result = await torrentManager.refetchDynamicTorrents(maxTb);
-    
+
     res.json({
       success: true,
       message: `Fetched ${result.added} new torrents from Anna's Archive`,
       added: result.added,
       skipped: result.skipped,
-      total: result.total
+      total: result.total,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to refetch torrents");
@@ -489,13 +496,13 @@ router.post("/refresh-catalog", async (req, res) => {
   try {
     const { force } = req.body;
     const result = await torrentManager.refreshCatalog(force === true);
-    
+
     res.json({
       success: true,
-      message: `Catalog refreshed: ${result.catalogSize} active torrents${result.removed > 0 ? `, removed ${result.removed} inactive` : ''}`,
+      message: `Catalog refreshed: ${result.catalogSize} active torrents${result.removed > 0 ? `, removed ${result.removed} inactive` : ""}`,
       catalogSize: result.catalogSize,
       published: result.published,
-      removed: result.removed
+      removed: result.removed,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to refresh catalog");
@@ -518,21 +525,21 @@ router.get("/registry/search", async (req, res) => {
   try {
     const query = req.query.q as string;
     const limit = parseInt(req.query.limit as string) || 50;
-    
+
     if (!query || query.length < 3) {
       return res.status(400).json({
         success: false,
-        error: "Query must be at least 3 characters"
+        error: "Query must be at least 3 characters",
       });
     }
-    
+
     const results = await torrentManager.searchGlobalRegistry(query, limit);
-    
+
     res.json({
       success: true,
       query,
       count: results.length,
-      results
+      results,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to search registry");
@@ -550,13 +557,13 @@ router.get("/registry/search", async (req, res) => {
 router.get("/registry/browse", async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 100;
-    
+
     const results = await torrentManager.browseGlobalRegistry(limit);
-    
+
     res.json({
       success: true,
       count: results.length,
-      results
+      results,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to browse registry");
@@ -574,13 +581,13 @@ router.get("/registry/browse", async (req, res) => {
 router.get("/registry/check/:infoHash", async (req, res) => {
   try {
     const { infoHash } = req.params;
-    
+
     const result = await torrentManager.checkTorrentInRegistry(infoHash);
-    
+
     res.json({
       success: true,
       exists: !!result,
-      data: result
+      data: result,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to check registry");
@@ -595,11 +602,7 @@ router.get("/registry/check/:infoHash", async (req, res) => {
 // ARCHIVE SEARCH ENDPOINTS (Internet Archive + PirateBay)
 // ============================================================================
 
-import { 
-  searchInternetArchive, 
-  searchArchives,
-  getTorrentForItem 
-} from "../utils/archive-search";
+import { searchInternetArchive, searchArchives, getTorrentForItem } from "../utils/archive-search";
 
 /**
  * GET /search
@@ -615,20 +618,22 @@ router.get("/search", async (req, res) => {
     if (!query || query.length < 2) {
       return res.status(400).json({
         success: false,
-        error: "Query (q) must be at least 2 characters"
+        error: "Query (q) must be at least 2 characters",
       });
     }
 
-    const validSources = ['internet-archive'] as const;
-    const sourceList: ('internet-archive')[] = sources 
-      ? sources.split(',').map(s => s.trim()).filter((s): s is 'internet-archive' => 
-          validSources.includes(s as any))
-      : ['internet-archive'];
+    const validSources = ["internet-archive"] as const;
+    const sourceList: "internet-archive"[] = sources
+      ? sources
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s): s is "internet-archive" => validSources.includes(s as any))
+      : ["internet-archive"];
 
     const results = await searchArchives(query, {
       sources: sourceList,
       rows: limit,
-      mediaType
+      mediaType,
     });
 
     res.json({
@@ -636,7 +641,7 @@ router.get("/search", async (req, res) => {
       query,
       sources: sourceList,
       count: results.length,
-      results
+      results,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to search archives");
@@ -661,7 +666,7 @@ router.get("/search/internet-archive", async (req, res) => {
     if (!query || query.length < 2) {
       return res.status(400).json({
         success: false,
-        error: "Query (q) must be at least 2 characters"
+        error: "Query (q) must be at least 2 characters",
       });
     }
 
@@ -669,12 +674,12 @@ router.get("/search/internet-archive", async (req, res) => {
 
     res.json({
       success: true,
-      source: 'internet-archive',
+      source: "internet-archive",
       query,
-      mediaType: mediaType || 'all',
+      mediaType: mediaType || "all",
       page,
       count: results.length,
-      results
+      results,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to search Internet Archive");
@@ -684,8 +689,6 @@ router.get("/search/internet-archive", async (req, res) => {
     });
   }
 });
-
-
 
 /**
  * POST /add-from-search
@@ -698,7 +701,7 @@ router.post("/add-from-search", express.json(), async (req, res) => {
     if (!source || !identifier) {
       return res.status(400).json({
         success: false,
-        error: "source and identifier are required"
+        error: "source and identifier are required",
       });
     }
 
@@ -715,7 +718,7 @@ router.post("/add-from-search", express.json(), async (req, res) => {
     if (!torrentData) {
       return res.status(404).json({
         success: false,
-        error: `Could not find torrent for ${source}:${identifier}`
+        error: `Could not find torrent for ${source}:${identifier}`,
       });
     }
 
@@ -724,7 +727,7 @@ router.post("/add-from-search", express.json(), async (req, res) => {
     if (!torrentUri) {
       return res.status(400).json({
         success: false,
-        error: "No magnet URI or torrent URL available"
+        error: "No magnet URI or torrent URL available",
       });
     }
 
@@ -736,7 +739,7 @@ router.post("/add-from-search", express.json(), async (req, res) => {
       source,
       identifier,
       magnetUri: torrentData.magnetUri,
-      torrentUrl: torrentData.torrentUrl
+      torrentUrl: torrentData.torrentUrl,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "Failed to add torrent from search");
@@ -748,4 +751,3 @@ router.post("/add-from-search", express.json(), async (req, res) => {
 });
 
 export default router;
-

@@ -78,7 +78,16 @@ import apiKeysRouter from "./api-keys";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import { authConfig, ipfsConfig, registryConfig, packageConfig, x402Config, dealsConfig, torrentConfig, holsterConfig } from "../config";
+import {
+  authConfig,
+  ipfsConfig,
+  registryConfig,
+  packageConfig,
+  x402Config,
+  dealsConfig,
+  torrentConfig,
+  holsterConfig,
+} from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -351,10 +360,10 @@ export default (app: express.Application) => {
           details: err.message,
           fallback: hash
             ? {
-              publicGateway: `https://ipfs.io/ipfs/${hash}`,
-              cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${hash}`,
-              dweb: `https://dweb.link/ipfs/${hash}`,
-            }
+                publicGateway: `https://ipfs.io/ipfs/${hash}`,
+                cloudflareGateway: `https://cloudflare-ipfs.com/ipfs/${hash}`,
+                dweb: `https://dweb.link/ipfs/${hash}`,
+              }
             : undefined,
         });
       },
@@ -630,8 +639,6 @@ export default (app: express.Application) => {
     });
   }
 
-
-
   // Route per Torrent (conditional)
   if (torrentConfig.enabled) {
     app.use(`${baseRoute}/torrent`, torrentRouter);
@@ -690,10 +697,14 @@ export default (app: express.Application) => {
 
   // Public endpoint for accessing files via share links (NO AUTH REQUIRED)
   // This uses the same initialization middleware to ensure manager is ready
-  app.get(`${baseRoute}/drive/public/:linkId`, driveInitMiddleware, async (req: Request, res: Response) => {
-    const { handlePublicLinkAccess } = await import("./drive");
-    handlePublicLinkAccess(req, res);
-  });
+  app.get(
+    `${baseRoute}/drive/public/:linkId`,
+    driveInitMiddleware,
+    async (req: Request, res: Response) => {
+      const { handlePublicLinkAccess } = await import("./drive");
+      handlePublicLinkAccess(req, res);
+    }
+  );
 
   loggers.server.info(`✅ Drive routes registered`);
 
@@ -715,8 +726,8 @@ export default (app: express.Application) => {
       adminPasswordLength: authConfig.adminPassword ? authConfig.adminPassword.length : 0,
       adminPasswordPreview: authConfig.adminPassword
         ? authConfig.adminPassword.substring(0, 4) +
-        "..." +
-        authConfig.adminPassword.substring(authConfig.adminPassword.length - 4)
+          "..." +
+          authConfig.adminPassword.substring(authConfig.adminPassword.length - 4)
         : "N/A",
       timestamp: Date.now(),
     });
@@ -842,158 +853,168 @@ export default (app: express.Application) => {
    * Get the relay's SEA keypair (pub, priv, epub, epriv)
    * Admin only - requires authentication
    */
-  app.get(`${baseRoute}/admin/relay-keys`, tokenAuthMiddleware, async (req: Request, res: Response) => {
-    try {
-      const { getRelayKeyPair, getRelayPub } = await import("../utils/relay-user");
-      const keyPair = getRelayKeyPair();
-      const pub = getRelayPub();
+  app.get(
+    `${baseRoute}/admin/relay-keys`,
+    tokenAuthMiddleware,
+    async (req: Request, res: Response) => {
+      try {
+        const { getRelayKeyPair, getRelayPub } = await import("../utils/relay-user");
+        const keyPair = getRelayKeyPair();
+        const pub = getRelayPub();
 
-      if (!keyPair || !pub) {
-        return res.status(503).json({
+        if (!keyPair || !pub) {
+          return res.status(503).json({
+            success: false,
+            error: "Relay user not initialized",
+          });
+        }
+
+        res.json({
+          success: true,
+          keys: {
+            pub: keyPair.pub,
+            priv: keyPair.priv,
+            epub: keyPair.epub,
+            epriv: keyPair.epriv,
+          },
+        });
+      } catch (error: any) {
+        loggers.server.error({ err: error }, "Failed to get relay keys");
+        res.status(500).json({
           success: false,
-          error: "Relay user not initialized",
+          error: error.message || "Internal server error",
         });
       }
-
-      res.json({
-        success: true,
-        keys: {
-          pub: keyPair.pub,
-          priv: keyPair.priv,
-          epub: keyPair.epub,
-          epriv: keyPair.epriv,
-        },
-      });
-    } catch (error: any) {
-      loggers.server.error({ err: error }, "Failed to get relay keys");
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal server error",
-      });
     }
-  });
+  );
 
   /**
    * GET /api/v1/admin/storage-stats
    * Get storage usage statistics for all data directories
    * Admin only - requires authentication
    */
-  app.get(`${baseRoute}/admin/storage-stats`, tokenAuthMiddleware, async (req: Request, res: Response) => {
-    try {
-      const dataDir = path.resolve(process.cwd(), "data");
-      const radataDir = path.resolve(process.cwd(), "radata");
+  app.get(
+    `${baseRoute}/admin/storage-stats`,
+    tokenAuthMiddleware,
+    async (req: Request, res: Response) => {
+      try {
+        const dataDir = path.resolve(process.cwd(), "data");
+        const radataDir = path.resolve(process.cwd(), "radata");
 
-      // Helper function to get directory size
-      const getDirSize = (dirPath: string): { bytes: number; files: number } => {
-        let totalSize = 0;
-        let fileCount = 0;
+        // Helper function to get directory size
+        const getDirSize = (dirPath: string): { bytes: number; files: number } => {
+          let totalSize = 0;
+          let fileCount = 0;
 
-        if (!fs.existsSync(dirPath)) {
-          return { bytes: 0, files: 0 };
-        }
+          if (!fs.existsSync(dirPath)) {
+            return { bytes: 0, files: 0 };
+          }
 
-        const walkDir = (dir: string) => {
-          try {
-            const items = fs.readdirSync(dir, { withFileTypes: true });
-            for (const item of items) {
-              const fullPath = path.join(dir, item.name);
-              if (item.isDirectory()) {
-                walkDir(fullPath);
-              } else if (item.isFile()) {
-                try {
-                  const stats = fs.statSync(fullPath);
-                  totalSize += stats.size;
-                  fileCount++;
-                } catch (e) {
-                  // Ignore unreadable files
+          const walkDir = (dir: string) => {
+            try {
+              const items = fs.readdirSync(dir, { withFileTypes: true });
+              for (const item of items) {
+                const fullPath = path.join(dir, item.name);
+                if (item.isDirectory()) {
+                  walkDir(fullPath);
+                } else if (item.isFile()) {
+                  try {
+                    const stats = fs.statSync(fullPath);
+                    totalSize += stats.size;
+                    fileCount++;
+                  } catch (e) {
+                    // Ignore unreadable files
+                  }
                 }
               }
+            } catch (e) {
+              // Ignore unreadable directories
             }
-          } catch (e) {
-            // Ignore unreadable directories
-          }
+          };
+
+          walkDir(dirPath);
+          return { bytes: totalSize, files: fileCount };
         };
 
-        walkDir(dirPath);
-        return { bytes: totalSize, files: fileCount };
-      };
-
-      const formatSize = (bytes: number) => {
-        const mb = bytes / (1024 * 1024);
-        const gb = bytes / (1024 * 1024 * 1024);
-        return {
-          bytes,
-          mb: Math.round(mb * 100) / 100,
-          gb: Math.round(gb * 100) / 100,
-          formatted: gb >= 1 ? `${gb.toFixed(2)} GB` : `${mb.toFixed(2)} MB`,
+        const formatSize = (bytes: number) => {
+          const mb = bytes / (1024 * 1024);
+          const gb = bytes / (1024 * 1024 * 1024);
+          return {
+            bytes,
+            mb: Math.round(mb * 100) / 100,
+            gb: Math.round(gb * 100) / 100,
+            formatted: gb >= 1 ? `${gb.toFixed(2)} GB` : `${mb.toFixed(2)} MB`,
+          };
         };
-      };
 
-      // Calculate sizes for each directory
-      const dataStats = getDirSize(dataDir);
-      const radataStats = getDirSize(radataDir);
-      const torrentsStats = getDirSize(path.join(dataDir, "torrents"));
-      const ipfsStats = getDirSize(path.join(dataDir, "ipfs"));
-      const dealsStats = getDirSize(path.join(dataDir, "deals"));
+        // Calculate sizes for each directory
+        const dataStats = getDirSize(dataDir);
+        const radataStats = getDirSize(radataDir);
+        const torrentsStats = getDirSize(path.join(dataDir, "torrents"));
+        const ipfsStats = getDirSize(path.join(dataDir, "ipfs"));
+        const dealsStats = getDirSize(path.join(dataDir, "deals"));
 
-      // Get GunDB storage stats from the configured backend (sqlite, s3, or radisk)
-      // Pass the store instance if available for accurate stats
-      const gunStore = req.app.get("gunStore");
-      const gundbStats = await getGunStorageStats(gunStore);
+        // Get GunDB storage stats from the configured backend (sqlite, s3, or radisk)
+        // Pass the store instance if available for accurate stats
+        const gunStore = req.app.get("gunStore");
+        const gundbStats = await getGunStorageStats(gunStore);
 
-      const totalBytes = dataStats.bytes + radataStats.bytes;
+        const totalBytes = dataStats.bytes + radataStats.bytes;
 
-      res.json({
-        success: true,
-        storage: {
-          total: formatSize(totalBytes),
-          data: {
-            ...formatSize(dataStats.bytes),
-            path: dataDir,
-            files: dataStats.files,
+        res.json({
+          success: true,
+          storage: {
+            total: formatSize(totalBytes),
+            data: {
+              ...formatSize(dataStats.bytes),
+              path: dataDir,
+              files: dataStats.files,
+            },
+            radata: {
+              ...formatSize(radataStats.bytes),
+              path: radataDir,
+              files: radataStats.files,
+              description: "GunDB radix storage",
+            },
+            breakdown: {
+              torrents: {
+                ...formatSize(torrentsStats.bytes),
+                path: path.join(dataDir, "torrents"),
+                files: torrentsStats.files,
+              },
+              ipfs: {
+                ...formatSize(ipfsStats.bytes),
+                path: path.join(dataDir, "ipfs"),
+                files: ipfsStats.files,
+              },
+              gundb: {
+                ...formatSize(gundbStats.bytes),
+                backend: gundbStats.backend,
+                files: gundbStats.files,
+                description: gundbStats.description,
+                ...(gundbStats.path ? { path: gundbStats.path } : {}),
+                ...(gundbStats.bucket
+                  ? { bucket: gundbStats.bucket, endpoint: gundbStats.endpoint }
+                  : {}),
+              },
+              deals: {
+                ...formatSize(dealsStats.bytes),
+                path: path.join(dataDir, "deals"),
+                files: dealsStats.files,
+              },
+            },
           },
-          radata: {
-            ...formatSize(radataStats.bytes),
-            path: radataDir,
-            files: radataStats.files,
-            description: "GunDB radix storage",
-          },
-          breakdown: {
-            torrents: {
-              ...formatSize(torrentsStats.bytes),
-              path: path.join(dataDir, "torrents"),
-              files: torrentsStats.files,
-            },
-            ipfs: {
-              ...formatSize(ipfsStats.bytes),
-              path: path.join(dataDir, "ipfs"),
-              files: ipfsStats.files,
-            },
-            gundb: {
-              ...formatSize(gundbStats.bytes),
-              backend: gundbStats.backend,
-              files: gundbStats.files,
-              description: gundbStats.description,
-              ...(gundbStats.path ? { path: gundbStats.path } : {}),
-              ...(gundbStats.bucket ? { bucket: gundbStats.bucket, endpoint: gundbStats.endpoint } : {}),
-            },
-            deals: {
-              ...formatSize(dealsStats.bytes),
-              path: path.join(dataDir, "deals"),
-              files: dealsStats.files,
-            },
-          },
-        },
-        timestamp: Date.now(),
-      });
-    } catch (error: any) {
-      loggers.server.error({ err: error }, "Failed to get storage stats");
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal server error",
-      });
+          timestamp: Date.now(),
+        });
+      } catch (error: any) {
+        loggers.server.error({ err: error }, "Failed to get storage stats");
+        res.status(500).json({
+          success: false,
+          error: error.message || "Internal server error",
+        });
+      }
     }
-  });
+  );
 
   /**
    * GET /api/v1/admin/config
@@ -1002,7 +1023,8 @@ export default (app: express.Application) => {
    */
   app.get(`${baseRoute}/admin/config`, tokenAuthMiddleware, async (req: Request, res: Response) => {
     try {
-      const { getAllConfig, HOT_RELOADABLE_KEYS, RESTART_REQUIRED_KEYS } = await import("../utils/runtime-config");
+      const { getAllConfig, HOT_RELOADABLE_KEYS, RESTART_REQUIRED_KEYS } =
+        await import("../utils/runtime-config");
 
       const config = getAllConfig();
 
@@ -1034,7 +1056,7 @@ export default (app: express.Application) => {
    * PUT /api/v1/admin/config
    * Update hot-reloadable configuration values (no restart required)
    * Admin only
-   * 
+   *
    * DISABLED: Configuration editing is disabled via API.
    */
   /*
@@ -1089,40 +1111,42 @@ export default (app: express.Application) => {
   });
   */
 
-
-
   /**
    * GET /api/v1/admin/config/env
    * Read the current .env file contents
    * Admin only
    */
-  app.get(`${baseRoute}/admin/config/env`, tokenAuthMiddleware, async (req: Request, res: Response) => {
-    try {
-      const { readEnvFile, parseEnvFile } = await import("../utils/runtime-config");
+  app.get(
+    `${baseRoute}/admin/config/env`,
+    tokenAuthMiddleware,
+    async (req: Request, res: Response) => {
+      try {
+        const { readEnvFile, parseEnvFile } = await import("../utils/runtime-config");
 
-      const content = readEnvFile();
-      if (content === null) {
-        return res.status(404).json({
+        const content = readEnvFile();
+        if (content === null) {
+          return res.status(404).json({
+            success: false,
+            error: ".env file not found",
+          });
+        }
+
+        const parsed = parseEnvFile(content);
+
+        res.json({
+          success: true,
+          raw: content,
+          parsed,
+        });
+      } catch (error: any) {
+        loggers.server.error({ err: error }, "Failed to read .env file");
+        res.status(500).json({
           success: false,
-          error: ".env file not found",
+          error: error.message || "Internal server error",
         });
       }
-
-      const parsed = parseEnvFile(content);
-
-      res.json({
-        success: true,
-        raw: content,
-        parsed,
-      });
-    } catch (error: any) {
-      loggers.server.error({ err: error }, "Failed to read .env file");
-      res.status(500).json({
-        success: false,
-        error: error.message || "Internal server error",
-      });
     }
-  });
+  );
 
   loggers.server.info(`✅ Admin routes registered`);
 

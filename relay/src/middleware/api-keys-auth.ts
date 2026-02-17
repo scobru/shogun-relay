@@ -1,6 +1,6 @@
 /**
  * API Keys Authentication Middleware
- * 
+ *
  * Generic middleware for validating API keys across all services
  */
 
@@ -46,4 +46,3 @@ export async function validateApiKeyToken(token: string): Promise<any | null> {
     return null;
   }
 }
-

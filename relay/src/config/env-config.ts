@@ -52,18 +52,20 @@ export const config = {
     peers: (() => {
       const peersEnv = process.env.RELAY_PEERS || process.env.GUN_PEERS;
       if (peersEnv) {
-        return peersEnv.split(",").map(p => p.trim()).filter(p => p.length > 0);
+        return peersEnv
+          .split(",")
+          .map((p) => p.trim())
+          .filter((p) => p.length > 0);
       }
       // Default public Gun peers
       return [
-        'https://gun-manhattan.herokuapp.com/gun',
-        'https://peer.wallie.io/gun',
-        'https://gundb-relay-mlccl.ondigitalocean.app/gun',
-        'https://plankton-app-6qfp3.ondigitalocean.app/gun',
-        'https://gun.defucc.me/gun',
-        'https://shogun-relay.scobrudot.dev/gun',
-        'https://shogun-relay-2.scobrudot.dev/gun',
-
+        "https://gun-manhattan.herokuapp.com/gun",
+        "https://peer.wallie.io/gun",
+        "https://gundb-relay-mlccl.ondigitalocean.app/gun",
+        "https://plankton-app-6qfp3.ondigitalocean.app/gun",
+        "https://gun.defucc.me/gun",
+        "https://shogun-relay.scobrudot.dev/gun",
+        "https://shogun-relay-2.scobrudot.dev/gun",
       ];
     })(),
   },
@@ -145,7 +147,9 @@ export const config = {
       secretAccessKey: process.env.GUN_S3_SECRET_KEY || process.env.MINIO_SECRET_KEY,
       bucket: process.env.GUN_S3_BUCKET || "shogun-gun-data",
       region: process.env.GUN_S3_REGION || process.env.MINIO_REGION || "us-east-1",
-      skipSslVerify: process.env.GUN_S3_SKIP_SSL_VERIFY === "true" || process.env.MINIO_SKIP_SSL_VERIFY === "true",
+      skipSslVerify:
+        process.env.GUN_S3_SKIP_SSL_VERIFY === "true" ||
+        process.env.MINIO_SKIP_SSL_VERIFY === "true",
     },
   },
 
@@ -366,7 +370,6 @@ export const config = {
   // PACKAGE METADATA
   // ============================================================================
 
-
   // ============================================================================
   // ANNA'S ARCHIVE CONFIGURATION
   // ============================================================================
@@ -374,24 +377,17 @@ export const config = {
   torrent: {
     enabled: process.env.TORRENT_ENABLED === "true",
     annasArchiveUrl:
-      process.env.TORRENT_ANNAS_ARCHIVE_URL ||
-      "https://annas-archive.li/dyn/generate_torrents",
-    dataDir:
-      process.env.TORRENT_DATA_DIR ||
-      path.join(process.cwd(), "data", "torrents"),
+      process.env.TORRENT_ANNAS_ARCHIVE_URL || "https://annas-archive.li/dyn/generate_torrents",
+    dataDir: process.env.TORRENT_DATA_DIR || path.join(process.cwd(), "data", "torrents"),
     maxTb: parseFloat(process.env.TORRENT_MAX_TB || "0"),
   },
-
-
 
   // ============================================================================
   // ADMIN DRIVE CONFIGURATION
   // ============================================================================
 
   drive: {
-    dataDir:
-      process.env.DRIVE_DATA_DIR ||
-      path.join(process.cwd(), "data", "drive"),
+    dataDir: process.env.DRIVE_DATA_DIR || path.join(process.cwd(), "data", "drive"),
 
     // Storage backend: "fs" (local filesystem) or "minio" (S3-compatible)
     storageType: (process.env.DRIVE_STORAGE_TYPE || "fs") as "fs" | "minio",

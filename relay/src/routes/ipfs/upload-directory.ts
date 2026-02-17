@@ -88,13 +88,11 @@ router.post(
         } catch (error: unknown) {
           loggers.server.error({ err: error }, "Subscription check error");
           const errorMessage = error instanceof Error ? error.message : String(error);
-          return res
-            .status(500)
-            .json({
-              success: false,
-              error: "Error checking subscription status",
-              details: errorMessage,
-            });
+          return res.status(500).json({
+            success: false,
+            error: "Error checking subscription status",
+            details: errorMessage,
+          });
         }
       } else {
         loggers.server.info(

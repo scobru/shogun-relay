@@ -1,11 +1,11 @@
 /**
  * GunDB Storage Stats Utility
- * 
+ *
  * Provides unified storage statistics fetching for all GunDB backends:
  * - radisk (local filesystem)
  * - SQLite (better-sqlite3)
  * - S3/MinIO (AWS S3-compatible)
- * 
+ *
  * Used by the /admin/storage-stats endpoint to report accurate GunDB storage usage.
  */
 
@@ -21,24 +21,24 @@ const log = loggers.server;
 // ============================================================================
 
 export interface GunStorageStats {
-    /** Storage backend type */
-    backend: "sqlite" | "radisk" | "s3";
-    /** Total storage in bytes */
-    bytes: number;
-    /** Total storage in MB */
-    mb: number;
-    /** Total storage in GB */
-    gb: number;
-    /** Number of files/records */
-    files: number;
-    /** Path to local storage (radisk/sqlite) */
-    path?: string;
-    /** S3 bucket name */
-    bucket?: string;
-    /** S3 endpoint URL */
-    endpoint?: string;
-    /** Description of the storage */
-    description: string;
+  /** Storage backend type */
+  backend: "sqlite" | "radisk" | "s3";
+  /** Total storage in bytes */
+  bytes: number;
+  /** Total storage in MB */
+  mb: number;
+  /** Total storage in GB */
+  gb: number;
+  /** Number of files/records */
+  files: number;
+  /** Path to local storage (radisk/sqlite) */
+  path?: string;
+  /** S3 bucket name */
+  bucket?: string;
+  /** S3 endpoint URL */
+  endpoint?: string;
+  /** Description of the storage */
+  description: string;
 }
 
 // ============================================================================
@@ -49,53 +49,53 @@ export interface GunStorageStats {
  * Format bytes to MB and GB
  */
 function formatBytes(bytes: number): { mb: number; gb: number } {
-    return {
-        mb: Math.round((bytes / (1024 * 1024)) * 100) / 100,
-        gb: Math.round((bytes / (1024 * 1024 * 1024)) * 100) / 100,
-    };
+  return {
+    mb: Math.round((bytes / (1024 * 1024)) * 100) / 100,
+    gb: Math.round((bytes / (1024 * 1024 * 1024)) * 100) / 100,
+  };
 }
 
 /**
  * Get radisk (filesystem) storage stats by scanning the radata directory
  */
 function getRadiskStats(dataDir: string): { bytes: number; files: number } {
-    const radataDir = path.join(dataDir, "radata");
-    let totalBytes = 0;
-    let fileCount = 0;
+  const radataDir = path.join(dataDir, "radata");
+  let totalBytes = 0;
+  let fileCount = 0;
 
-    const walkDir = (dir: string): void => {
-        try {
-            if (!fs.existsSync(dir)) return;
+  const walkDir = (dir: string): void => {
+    try {
+      if (!fs.existsSync(dir)) return;
 
-            const items = fs.readdirSync(dir, { withFileTypes: true });
-            for (const item of items) {
-                const fullPath = path.join(dir, item.name);
-                if (item.isDirectory()) {
-                    walkDir(fullPath);
-                } else if (item.isFile()) {
-                    try {
-                        const stats = fs.statSync(fullPath);
-                        totalBytes += stats.size;
-                        fileCount++;
-                    } catch {
-                        // Ignore unreadable files
-                    }
-                }
-            }
-        } catch {
-            // Ignore unreadable directories
+      const items = fs.readdirSync(dir, { withFileTypes: true });
+      for (const item of items) {
+        const fullPath = path.join(dir, item.name);
+        if (item.isDirectory()) {
+          walkDir(fullPath);
+        } else if (item.isFile()) {
+          try {
+            const stats = fs.statSync(fullPath);
+            totalBytes += stats.size;
+            fileCount++;
+          } catch {
+            // Ignore unreadable files
+          }
         }
-    };
-
-    walkDir(radataDir);
-
-    // Also check the old "radata" in cwd for backward compatibility
-    const cwdRadataDir = path.resolve(process.cwd(), "radata");
-    if (cwdRadataDir !== radataDir && fs.existsSync(cwdRadataDir)) {
-        walkDir(cwdRadataDir);
+      }
+    } catch {
+      // Ignore unreadable directories
     }
+  };
 
-    return { bytes: totalBytes, files: fileCount };
+  walkDir(radataDir);
+
+  // Also check the old "radata" in cwd for backward compatibility
+  const cwdRadataDir = path.resolve(process.cwd(), "radata");
+  if (cwdRadataDir !== radataDir && fs.existsSync(cwdRadataDir)) {
+    walkDir(cwdRadataDir);
+  }
+
+  return { bytes: totalBytes, files: fileCount };
 }
 
 // ============================================================================
@@ -104,115 +104,114 @@ function getRadiskStats(dataDir: string): { bytes: number; files: number } {
 
 /**
  * Get GunDB storage statistics based on the configured backend
- * 
+ *
  * @param store - Optional store instance (SQLiteStore or S3Store) if already initialized
  * @returns GunStorageStats object with storage information
  */
 export async function getGunStorageStats(store?: any): Promise<GunStorageStats> {
-    const storageType = storageConfig.storageType;
-    const dataDir = storageConfig.dataDir;
+  const storageType = storageConfig.storageType;
+  const dataDir = storageConfig.dataDir;
 
-    try {
-        // SQLite storage
-        if (storageType === "sqlite") {
-            const dbPath = path.join(dataDir, "gun.db");
+  try {
+    // SQLite storage
+    if (storageType === "sqlite") {
+      const dbPath = path.join(dataDir, "gun.db");
 
-            if (store && typeof store.getStorageStats === "function") {
-                // Use existing store instance
-                const stats = store.getStorageStats();
-                const formatted = formatBytes(stats.bytes);
-                return {
-                    backend: "sqlite",
-                    bytes: stats.bytes,
-                    mb: formatted.mb,
-                    gb: formatted.gb,
-                    files: stats.files,
-                    path: dbPath,
-                    description: "GunDB SQLite storage",
-                };
-            }
-
-            // Fallback: just get file size if no store instance
-            let bytes = 0;
-            try {
-                const dbStats = fs.statSync(dbPath);
-                bytes = dbStats.size;
-            } catch {
-                // DB file doesn't exist yet
-            }
-
-            const formatted = formatBytes(bytes);
-            return {
-                backend: "sqlite",
-                bytes,
-                mb: formatted.mb,
-                gb: formatted.gb,
-                files: 0, // Can't count without db connection
-                path: dbPath,
-                description: "GunDB SQLite storage",
-            };
-        }
-
-        // S3/MinIO storage
-        if (storageType === "s3") {
-            const s3Conf = storageConfig.s3;
-
-            if (store && typeof store.getStorageStats === "function") {
-                // Use existing store instance
-                const stats = await store.getStorageStats();
-                const formatted = formatBytes(stats.bytes);
-                return {
-                    backend: "s3",
-                    bytes: stats.bytes,
-                    mb: formatted.mb,
-                    gb: formatted.gb,
-                    files: stats.files,
-                    bucket: s3Conf.bucket,
-                    endpoint: s3Conf.endpoint,
-                    description: "GunDB S3/MinIO storage",
-                };
-            }
-
-            // No store instance - return config info with empty stats
-            return {
-                backend: "s3",
-                bytes: 0,
-                mb: 0,
-                gb: 0,
-                files: 0,
-                bucket: s3Conf.bucket,
-                endpoint: s3Conf.endpoint,
-                description: "GunDB S3/MinIO storage (stats unavailable - no store instance)",
-            };
-        }
-
-        // Default: radisk (filesystem) storage
-        const stats = getRadiskStats(dataDir);
+      if (store && typeof store.getStorageStats === "function") {
+        // Use existing store instance
+        const stats = store.getStorageStats();
         const formatted = formatBytes(stats.bytes);
-        const radataPath = path.join(dataDir, "radata");
-
         return {
-            backend: "radisk",
-            bytes: stats.bytes,
-            mb: formatted.mb,
-            gb: formatted.gb,
-            files: stats.files,
-            path: fs.existsSync(radataPath) ? radataPath : path.resolve(process.cwd(), "radata"),
-            description: "GunDB radisk file storage",
+          backend: "sqlite",
+          bytes: stats.bytes,
+          mb: formatted.mb,
+          gb: formatted.gb,
+          files: stats.files,
+          path: dbPath,
+          description: "GunDB SQLite storage",
         };
+      }
 
-    } catch (err) {
-        log.error({ err, storageType }, "Failed to get GunDB storage stats");
+      // Fallback: just get file size if no store instance
+      let bytes = 0;
+      try {
+        const dbStats = fs.statSync(dbPath);
+        bytes = dbStats.size;
+      } catch {
+        // DB file doesn't exist yet
+      }
 
-        return {
-            backend: storageType as "sqlite" | "radisk" | "s3",
-            bytes: 0,
-            mb: 0,
-            gb: 0,
-            files: 0,
-            description: `GunDB ${storageType} storage (error fetching stats)`,
-        };
+      const formatted = formatBytes(bytes);
+      return {
+        backend: "sqlite",
+        bytes,
+        mb: formatted.mb,
+        gb: formatted.gb,
+        files: 0, // Can't count without db connection
+        path: dbPath,
+        description: "GunDB SQLite storage",
+      };
     }
+
+    // S3/MinIO storage
+    if (storageType === "s3") {
+      const s3Conf = storageConfig.s3;
+
+      if (store && typeof store.getStorageStats === "function") {
+        // Use existing store instance
+        const stats = await store.getStorageStats();
+        const formatted = formatBytes(stats.bytes);
+        return {
+          backend: "s3",
+          bytes: stats.bytes,
+          mb: formatted.mb,
+          gb: formatted.gb,
+          files: stats.files,
+          bucket: s3Conf.bucket,
+          endpoint: s3Conf.endpoint,
+          description: "GunDB S3/MinIO storage",
+        };
+      }
+
+      // No store instance - return config info with empty stats
+      return {
+        backend: "s3",
+        bytes: 0,
+        mb: 0,
+        gb: 0,
+        files: 0,
+        bucket: s3Conf.bucket,
+        endpoint: s3Conf.endpoint,
+        description: "GunDB S3/MinIO storage (stats unavailable - no store instance)",
+      };
+    }
+
+    // Default: radisk (filesystem) storage
+    const stats = getRadiskStats(dataDir);
+    const formatted = formatBytes(stats.bytes);
+    const radataPath = path.join(dataDir, "radata");
+
+    return {
+      backend: "radisk",
+      bytes: stats.bytes,
+      mb: formatted.mb,
+      gb: formatted.gb,
+      files: stats.files,
+      path: fs.existsSync(radataPath) ? radataPath : path.resolve(process.cwd(), "radata"),
+      description: "GunDB radisk file storage",
+    };
+  } catch (err) {
+    log.error({ err, storageType }, "Failed to get GunDB storage stats");
+
+    return {
+      backend: storageType as "sqlite" | "radisk" | "s3",
+      bytes: 0,
+      mb: 0,
+      gb: 0,
+      files: 0,
+      description: `GunDB ${storageType} storage (error fetching stats)`,
+    };
+  }
 }
 
 export default { getGunStorageStats };

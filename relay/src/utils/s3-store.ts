@@ -12,12 +12,12 @@
 import https from "https";
 import http from "http";
 import {
-    S3Client,
-    GetObjectCommand,
-    PutObjectCommand,
-    ListObjectsV2Command,
-    HeadBucketCommand,
-    CreateBucketCommand,
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+  ListObjectsV2Command,
+  HeadBucketCommand,
+  CreateBucketCommand,
 } from "@aws-sdk/client-s3";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { loggers } from "./logger";
@@ -29,295 +29,292 @@ type PutCallback = (err: Error | null, ok: number | null) => void;
 type ListCallback = (file: string | null) => void;
 
 export interface S3StoreOptions {
-    endpoint: string;
-    accessKeyId: string;
-    secretAccessKey: string;
-    bucket?: string;
-    region?: string;
-    /** When true, accept self-signed TLS certs (e.g. MinIO over HTTPS). Set GUN_S3_SKIP_SSL_VERIFY or MINIO_SKIP_SSL_VERIFY=true */
-    skipSslVerify?: boolean;
+  endpoint: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket?: string;
+  region?: string;
+  /** When true, accept self-signed TLS certs (e.g. MinIO over HTTPS). Set GUN_S3_SKIP_SSL_VERIFY or MINIO_SKIP_SSL_VERIFY=true */
+  skipSslVerify?: boolean;
 }
 
 /**
  * Convert stream to string (for AWS SDK v3)
  */
 async function streamToString(stream: any): Promise<string> {
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of stream) {
-        chunks.push(chunk);
-    }
-    return Buffer.concat(chunks).toString("utf-8");
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks).toString("utf-8");
 }
 
 class S3Store {
-    private client: S3Client;
-    private bucket: string;
-    private isClosed: boolean;
-    private initialized: boolean;
-    private cache: { p: Record<string, string>; g: Record<string, GetCallback[]> };
+  private client: S3Client;
+  private bucket: string;
+  private isClosed: boolean;
+  private initialized: boolean;
+  private cache: { p: Record<string, string>; g: Record<string, GetCallback[]> };
 
-    constructor(options: S3StoreOptions) {
-        if (!options.endpoint || !options.accessKeyId || !options.secretAccessKey) {
-            throw new Error(
-                "S3Store: endpoint, accessKeyId, and secretAccessKey are required"
-            );
-        }
-
-        this.bucket = options.bucket || "shogun-gun-data";
-        this.isClosed = false;
-        this.initialized = false;
-        this.cache = { p: {}, g: {} };
-
-        // Parse endpoint URL for SSL detection
-        const useSSL = options.endpoint.startsWith("https://");
-        const skipSslVerify = options.skipSslVerify === true;
-
-        this.client = new S3Client({
-            endpoint: options.endpoint,
-            region: options.region || "us-east-1",
-            credentials: {
-                accessKeyId: options.accessKeyId,
-                secretAccessKey: options.secretAccessKey,
-            },
-            forcePathStyle: true, // Required for MinIO and most S3-compatible services
-            requestHandler: new NodeHttpHandler({
-                connectionTimeout: 5000,
-                socketTimeout: 30000,
-                httpsAgent: new https.Agent({
-                    maxSockets: 500,
-                    keepAlive: true,
-                    rejectUnauthorized: !skipSslVerify,
-                }),
-                httpAgent: new http.Agent({
-                    maxSockets: 500,
-                    keepAlive: true,
-                }),
-            }),
-            ...(useSSL ? {} : { tls: false }),
-        });
-
-        log.info(
-            { endpoint: options.endpoint, bucket: this.bucket, skipSslVerify },
-            "🪣 S3Store initialized"
-        );
-        if (skipSslVerify) {
-            log.warn("⚠️ S3/MinIO TLS verification disabled (skipSslVerify=true). Use only in dev or trusted networks.");
-        }
-
-        // Initialize bucket in background
-        this.ensureBucket();
+  constructor(options: S3StoreOptions) {
+    if (!options.endpoint || !options.accessKeyId || !options.secretAccessKey) {
+      throw new Error("S3Store: endpoint, accessKeyId, and secretAccessKey are required");
     }
 
-    private async ensureBucket(): Promise<void> {
-        if (this.initialized) return;
+    this.bucket = options.bucket || "shogun-gun-data";
+    this.isClosed = false;
+    this.initialized = false;
+    this.cache = { p: {}, g: {} };
 
+    // Parse endpoint URL for SSL detection
+    const useSSL = options.endpoint.startsWith("https://");
+    const skipSslVerify = options.skipSslVerify === true;
+
+    this.client = new S3Client({
+      endpoint: options.endpoint,
+      region: options.region || "us-east-1",
+      credentials: {
+        accessKeyId: options.accessKeyId,
+        secretAccessKey: options.secretAccessKey,
+      },
+      forcePathStyle: true, // Required for MinIO and most S3-compatible services
+      requestHandler: new NodeHttpHandler({
+        connectionTimeout: 5000,
+        socketTimeout: 30000,
+        httpsAgent: new https.Agent({
+          maxSockets: 500,
+          keepAlive: true,
+          rejectUnauthorized: !skipSslVerify,
+        }),
+        httpAgent: new http.Agent({
+          maxSockets: 500,
+          keepAlive: true,
+        }),
+      }),
+      ...(useSSL ? {} : { tls: false }),
+    });
+
+    log.info(
+      { endpoint: options.endpoint, bucket: this.bucket, skipSslVerify },
+      "🪣 S3Store initialized"
+    );
+    if (skipSslVerify) {
+      log.warn(
+        "⚠️ S3/MinIO TLS verification disabled (skipSslVerify=true). Use only in dev or trusted networks."
+      );
+    }
+
+    // Initialize bucket in background
+    this.ensureBucket();
+  }
+
+  private async ensureBucket(): Promise<void> {
+    if (this.initialized) return;
+
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+      log.info({ bucket: this.bucket }, "🪣 S3 bucket exists");
+    } catch (error: any) {
+      if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
         try {
-            await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
-            log.info({ bucket: this.bucket }, "🪣 S3 bucket exists");
-        } catch (error: any) {
-            if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
-                try {
-                    await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
-                    log.info({ bucket: this.bucket }, "🪣 S3 bucket created");
-                } catch (createError: any) {
-                    log.error({ err: createError, bucket: this.bucket }, "Failed to create S3 bucket");
-                    throw createError;
-                }
-            } else {
-                log.error({ err: error, bucket: this.bucket }, "Failed to check S3 bucket");
-                throw error;
-            }
+          await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+          log.info({ bucket: this.bucket }, "🪣 S3 bucket created");
+        } catch (createError: any) {
+          log.error({ err: createError, bucket: this.bucket }, "Failed to create S3 bucket");
+          throw createError;
         }
-
-        this.initialized = true;
+      } else {
+        log.error({ err: error, bucket: this.bucket }, "Failed to check S3 bucket");
+        throw error;
+      }
     }
 
-    /**
-     * Get data from S3
-     * @param file - File name (key)
-     * @param cb - Callback(err, data)
-     */
-    get(file: string, cb: GetCallback): void {
-        if (this.isClosed) {
-            return cb(null, null);
-        }
+    this.initialized = true;
+  }
 
-        // Check put cache first
-        const cachedPut = this.cache.p[file];
-        if (cachedPut) {
-            return cb(null, cachedPut);
-        }
-
-        // Check if already fetching
-        const pendingCallbacks = this.cache.g[file];
-        if (pendingCallbacks) {
-            pendingCallbacks.push(cb);
-            return;
-        }
-
-        // Start new fetch
-        const callbacks = (this.cache.g[file] = [cb]);
-
-        this.client
-            .send(
-                new GetObjectCommand({
-                    Bucket: this.bucket,
-                    Key: file,
-                })
-            )
-            .then(async (response) => {
-                delete this.cache.g[file];
-                const data = await streamToString(response.Body);
-
-                // Validate JSON before returning
-                try {
-                    JSON.parse(data);
-                    callbacks.forEach((callback) => callback(null, data));
-                } catch (parseErr) {
-                    log.warn(
-                        { file },
-                        "Corrupted JSON data detected in S3 file, skipping"
-                    );
-                    callbacks.forEach((callback) => callback(null, null));
-                }
-            })
-            .catch((err) => {
-                delete this.cache.g[file];
-                // NoSuchKey means file doesn't exist - not an error
-                if (err.name === "NoSuchKey" || err.Code === "NoSuchKey") {
-                    callbacks.forEach((callback) => callback(null, null));
-                } else {
-                    callbacks.forEach((callback) => callback(err, null));
-                }
-            });
+  /**
+   * Get data from S3
+   * @param file - File name (key)
+   * @param cb - Callback(err, data)
+   */
+  get(file: string, cb: GetCallback): void {
+    if (this.isClosed) {
+      return cb(null, null);
     }
 
-    /**
-     * Put data to S3
-     * @param file - File name (key)
-     * @param data - Data to store (JSON string)
-     * @param cb - Callback(err, ok)
-     */
-    put(file: string, data: string, cb: PutCallback): void {
-        if (this.isClosed) {
-            return cb(null, 1);
-        }
+    // Check put cache first
+    const cachedPut = this.cache.p[file];
+    if (cachedPut) {
+      return cb(null, cachedPut);
+    }
 
-        // Cache the write
-        this.cache.p[file] = data;
+    // Check if already fetching
+    const pendingCallbacks = this.cache.g[file];
+    if (pendingCallbacks) {
+      pendingCallbacks.push(cb);
+      return;
+    }
+
+    // Start new fetch
+    const callbacks = (this.cache.g[file] = [cb]);
+
+    this.client
+      .send(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: file,
+        })
+      )
+      .then(async (response) => {
         delete this.cache.g[file];
+        const data = await streamToString(response.Body);
 
-        this.client
-            .send(
-                new PutObjectCommand({
-                    Bucket: this.bucket,
-                    Key: file,
-                    Body: data,
-                    ContentType: "application/json",
-                })
-            )
-            .then(() => {
-                delete this.cache.p[file];
-                cb(null, 1);
-            })
-            .catch((err) => {
-                delete this.cache.p[file];
-                cb(err, null);
-            });
-    }
-
-    /**
-     * List all files
-     * @param cb - Callback(file) called for each file, then with null when done
-     */
-    list(cb: ListCallback): void {
-        if (this.isClosed) {
-            return cb(null);
-        }
-
-        this.listRecursive(cb, undefined);
-    }
-
-    private listRecursive(cb: ListCallback, continuationToken?: string): void {
-        this.client
-            .send(
-                new ListObjectsV2Command({
-                    Bucket: this.bucket,
-                    ContinuationToken: continuationToken,
-                })
-            )
-            .then((response) => {
-                // Emit each file
-                for (const obj of response.Contents || []) {
-                    if (obj.Key) {
-                        cb(obj.Key);
-                    }
-                }
-
-                // Continue pagination or signal completion
-                if (response.IsTruncated && response.NextContinuationToken) {
-                    this.listRecursive(cb, response.NextContinuationToken);
-                } else {
-                    cb(null); // Signal completion
-                }
-            })
-            .catch((err) => {
-                log.error({ err }, "Error listing S3 objects");
-                cb(null); // Signal completion on error
-            });
-    }
-
-    /**
-     * Get storage statistics from S3 bucket
-     * @returns Promise with bytes and files count
-     */
-    async getStorageStats(): Promise<{ bytes: number; files: number }> {
-        if (this.isClosed) {
-            return { bytes: 0, files: 0 };
-        }
-
+        // Validate JSON before returning
         try {
-            await this.ensureBucket();
-
-            let totalBytes = 0;
-            let fileCount = 0;
-            let continuationToken: string | undefined;
-
-            do {
-                const response = await this.client.send(
-                    new ListObjectsV2Command({
-                        Bucket: this.bucket,
-                        ContinuationToken: continuationToken,
-                    })
-                );
-
-                for (const obj of response.Contents || []) {
-                    if (obj.Key && obj.Size !== undefined) {
-                        fileCount++;
-                        totalBytes += obj.Size;
-                    }
-                }
-
-                continuationToken = response.NextContinuationToken;
-            } while (continuationToken);
-
-            return { bytes: totalBytes, files: fileCount };
-        } catch (err) {
-            log.error({ err }, "Failed to get storage stats from S3");
-            return { bytes: 0, files: 0 };
+          JSON.parse(data);
+          callbacks.forEach((callback) => callback(null, data));
+        } catch (parseErr) {
+          log.warn({ file }, "Corrupted JSON data detected in S3 file, skipping");
+          callbacks.forEach((callback) => callback(null, null));
         }
+      })
+      .catch((err) => {
+        delete this.cache.g[file];
+        // NoSuchKey means file doesn't exist - not an error
+        if (err.name === "NoSuchKey" || err.Code === "NoSuchKey") {
+          callbacks.forEach((callback) => callback(null, null));
+        } else {
+          callbacks.forEach((callback) => callback(err, null));
+        }
+      });
+  }
+
+  /**
+   * Put data to S3
+   * @param file - File name (key)
+   * @param data - Data to store (JSON string)
+   * @param cb - Callback(err, ok)
+   */
+  put(file: string, data: string, cb: PutCallback): void {
+    if (this.isClosed) {
+      return cb(null, 1);
     }
 
-    /**
-     * Close the store (cleanup)
-     */
-    close(): void {
-        if (!this.isClosed) {
-            this.isClosed = true;
-            this.client.destroy();
-            log.info("🪣 S3Store closed");
-        }
+    // Cache the write
+    this.cache.p[file] = data;
+    delete this.cache.g[file];
+
+    this.client
+      .send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: file,
+          Body: data,
+          ContentType: "application/json",
+        })
+      )
+      .then(() => {
+        delete this.cache.p[file];
+        cb(null, 1);
+      })
+      .catch((err) => {
+        delete this.cache.p[file];
+        cb(err, null);
+      });
+  }
+
+  /**
+   * List all files
+   * @param cb - Callback(file) called for each file, then with null when done
+   */
+  list(cb: ListCallback): void {
+    if (this.isClosed) {
+      return cb(null);
     }
+
+    this.listRecursive(cb, undefined);
+  }
+
+  private listRecursive(cb: ListCallback, continuationToken?: string): void {
+    this.client
+      .send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          ContinuationToken: continuationToken,
+        })
+      )
+      .then((response) => {
+        // Emit each file
+        for (const obj of response.Contents || []) {
+          if (obj.Key) {
+            cb(obj.Key);
+          }
+        }
+
+        // Continue pagination or signal completion
+        if (response.IsTruncated && response.NextContinuationToken) {
+          this.listRecursive(cb, response.NextContinuationToken);
+        } else {
+          cb(null); // Signal completion
+        }
+      })
+      .catch((err) => {
+        log.error({ err }, "Error listing S3 objects");
+        cb(null); // Signal completion on error
+      });
+  }
+
+  /**
+   * Get storage statistics from S3 bucket
+   * @returns Promise with bytes and files count
+   */
+  async getStorageStats(): Promise<{ bytes: number; files: number }> {
+    if (this.isClosed) {
+      return { bytes: 0, files: 0 };
+    }
+
+    try {
+      await this.ensureBucket();
+
+      let totalBytes = 0;
+      let fileCount = 0;
+      let continuationToken: string | undefined;
+
+      do {
+        const response = await this.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            ContinuationToken: continuationToken,
+          })
+        );
+
+        for (const obj of response.Contents || []) {
+          if (obj.Key && obj.Size !== undefined) {
+            fileCount++;
+            totalBytes += obj.Size;
+          }
+        }
+
+        continuationToken = response.NextContinuationToken;
+      } while (continuationToken);
+
+      return { bytes: totalBytes, files: fileCount };
+    } catch (err) {
+      log.error({ err }, "Failed to get storage stats from S3");
+      return { bytes: 0, files: 0 };
+    }
+  }
+
+  /**
+   * Close the store (cleanup)
+   */
+  close(): void {
+    if (!this.isClosed) {
+      this.isClosed = true;
+      this.client.destroy();
+      log.info("🪣 S3Store closed");
+    }
+  }
 }
 
 export default S3Store;

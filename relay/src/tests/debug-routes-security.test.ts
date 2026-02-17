@@ -1,5 +1,4 @@
-
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mocks must be hoisted or defined before imports if using vi.mock factory
 const mockRouter = {
@@ -8,13 +7,13 @@ const mockRouter = {
   use: vi.fn(),
 };
 
-vi.mock('express', () => ({
+vi.mock("express", () => ({
   default: {
     Router: () => mockRouter,
   },
 }));
 
-vi.mock('../utils/logger', () => ({
+vi.mock("../utils/logger", () => ({
   loggers: {
     server: {
       debug: vi.fn(),
@@ -25,31 +24,31 @@ vi.mock('../utils/logger', () => ({
   },
 }));
 
-vi.mock('../utils/gun-paths', () => ({
+vi.mock("../utils/gun-paths", () => ({
   GUN_PATHS: {
-    MB_USAGE: 'mb-usage',
-    UPLOADS: 'uploads',
-    TEST: 'test',
+    MB_USAGE: "mb-usage",
+    UPLOADS: "uploads",
+    TEST: "test",
   },
 }));
 
 // Mock the middleware module
-vi.mock('../middleware/admin-auth', () => ({
+vi.mock("../middleware/admin-auth", () => ({
   adminAuthMiddleware: vi.fn(),
 }));
 
-describe('Debug Routes Security', () => {
+describe("Debug Routes Security", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
   });
 
-  it('should apply adminAuthMiddleware to all routes', async () => {
+  it("should apply adminAuthMiddleware to all routes", async () => {
     // Import the middleware to get the mock reference
-    const { adminAuthMiddleware } = await import('../middleware/admin-auth');
+    const { adminAuthMiddleware } = await import("../middleware/admin-auth");
 
     // Import the router (this executes the code in debug.ts)
-    await import('../routes/debug');
+    await import("../routes/debug");
 
     // Check if router.use was called with the middleware
     // If this fails, it means the routes are unprotected!

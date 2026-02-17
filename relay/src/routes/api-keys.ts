@@ -1,6 +1,6 @@
 /**
  * API Keys Management Routes
- * 
+ *
  * Generic API key management endpoints, usable across all services
  */
 
@@ -132,4 +132,3 @@ router.delete("/:keyId", adminAuthMiddleware, async (req: Request, res: Response
 });
 
 export default router;
-
