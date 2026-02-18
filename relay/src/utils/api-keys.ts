@@ -1,6 +1,6 @@
 /**
  * API Keys Manager
- * 
+ *
  * Generic API key management service, usable across all relay services (Drive, IPFS, etc.)
  * Keys are stored in GunDB user space
  */
@@ -69,7 +69,7 @@ export class ApiKeysManager {
         relayPub,
         userAuthenticated,
         relayUserExists: !!relayUser,
-        relayUserIs: relayUser?.is ? 'authenticated' : 'not authenticated'
+        relayUserIs: relayUser?.is ? "authenticated" : "not authenticated",
       },
       "API Keys Manager initialized (using relay user space)"
     );
@@ -113,7 +113,7 @@ export class ApiKeysManager {
             name: keyData.name,
             relayPub: this.relayPub,
             userAuthenticated: isAuthenticated,
-            hashPreview: keyData.hash.substring(0, 16) + "..."
+            hashPreview: keyData.hash.substring(0, 16) + "...",
           },
           "💾 Attempting to save API key"
         );
@@ -227,7 +227,7 @@ export class ApiKeysManager {
             tokenPreview,
             hashPreview,
             relayPub: this.relayPub,
-            publicNodePath: `~${this.relayPub}/api-keys`
+            publicNodePath: `~${this.relayPub}/api-keys`,
           },
           "🔍 Attempting to validate API key"
         );
@@ -260,7 +260,7 @@ export class ApiKeysManager {
               dataHash: data.hash?.substring(0, 16) + "...",
               searchHash: hashPreview,
               matches: isMatch,
-              keyName: data.name
+              keyName: data.name,
             },
             `🔑 Checking API key #${keysChecked}`
           );
@@ -279,7 +279,10 @@ export class ApiKeysManager {
             if (this.relayUser) {
               try {
                 const userKeysNode = this.getUserSpaceKeysNode();
-                userKeysNode.get(data.keyId || keyId).get("lastUsedAt").put(Date.now());
+                userKeysNode
+                  .get(data.keyId || keyId)
+                  .get("lastUsedAt")
+                  .put(Date.now());
               } catch (updateError) {
                 loggers.server.warn({ err: updateError }, "Failed to update lastUsedAt");
               }
@@ -365,4 +368,3 @@ export class ApiKeysManager {
     };
   }
 }
-

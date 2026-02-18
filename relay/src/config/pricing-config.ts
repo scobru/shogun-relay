@@ -102,4 +102,3 @@ export const PRICING_CONFIG: PricingConfig = {
     return getSubscriptionPricing();
   },
 };
-

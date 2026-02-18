@@ -41,7 +41,7 @@ export function handleDriveError(
   if (errorMessage.includes("does not exist")) {
     return res.status(404).json({
       success: false,
-      error: useErrorMsg ? (errorMessage || notFoundDefault) : notFoundDefault,
+      error: useErrorMsg ? errorMessage || notFoundDefault : notFoundDefault,
     });
   }
 
@@ -49,7 +49,7 @@ export function handleDriveError(
   if (errorMessage.includes("already exists")) {
     return res.status(409).json({
       success: false,
-      error: useErrorMsg ? (errorMessage || alreadyExistsDefault) : alreadyExistsDefault,
+      error: useErrorMsg ? errorMessage || alreadyExistsDefault : alreadyExistsDefault,
     });
   }
 

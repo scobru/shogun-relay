@@ -28,7 +28,7 @@ const REGISTRY_CHAIN_ID: number = registryConfig.chainId;
  * Get the relay private key dynamically to avoid caching issues.
  * This ensures that if the private key is changed and the server is restarted,
  * the new key is used instead of a cached value.
- * 
+ *
  * Priority order:
  * 1. RELAY_PRIVATE_KEY (preferred)
  * 2. PRIVATE_KEY (fallback)
@@ -38,8 +38,8 @@ function getRelayPrivateKey(): string | undefined {
   // Log the source for debugging (only first/last 4 chars for security)
   if (key && key.length > 10) {
     const masked = `${key.slice(0, 6)}...${key.slice(-4)}`;
-    const source = process.env.RELAY_PRIVATE_KEY ? 'RELAY_PRIVATE_KEY' : 'PRIVATE_KEY';
-    loggers.registry.debug({ source, masked }, 'Using private key');
+    const source = process.env.RELAY_PRIVATE_KEY ? "RELAY_PRIVATE_KEY" : "PRIVATE_KEY";
+    loggers.registry.debug({ source, masked }, "Using private key");
   }
   return key;
 }
@@ -220,13 +220,19 @@ router.post("/register", async (req: Request, res: Response) => {
     }
 
     // Convert stakeAmount to string if it's a number (for backward compatibility)
-    const stakeAmountStr = typeof stakeAmount === "number" ? stakeAmount.toString() : String(stakeAmount);
+    const stakeAmountStr =
+      typeof stakeAmount === "number" ? stakeAmount.toString() : String(stakeAmount);
 
     // Use provided griefingRatio or default to 0 (contract will use default)
     const finalGriefingRatio: number = griefingRatio !== undefined ? parseInt(griefingRatio) : 0;
 
     loggers.registry.info({ endpoint }, "Registering relay on-chain");
-    const result = await client.registerRelay(endpoint, gunPubKey, stakeAmountStr, finalGriefingRatio);
+    const result = await client.registerRelay(
+      endpoint,
+      gunPubKey,
+      stakeAmountStr,
+      finalGriefingRatio
+    );
 
     res.json({
       success: true,
@@ -829,7 +835,7 @@ router.post("/deal/grief", async (req: Request, res: Response) => {
 router.get("/debug/wallet", async (req: Request, res: Response) => {
   try {
     const { ethers } = await import("ethers");
-    
+
     // Read directly from process.env (no caching)
     const relayPrivateKeyFromEnv = process.env.RELAY_PRIVATE_KEY;
     const privateKeyFromEnv = process.env.PRIVATE_KEY;
@@ -839,30 +845,38 @@ router.get("/debug/wallet", async (req: Request, res: Response) => {
     const results: any = {
       timestamp: new Date().toISOString(),
       sources: {
-        RELAY_PRIVATE_KEY: relayPrivateKeyFromEnv ? {
-          present: true,
-          length: relayPrivateKeyFromEnv.length,
-          prefix: relayPrivateKeyFromEnv.slice(0, 6),
-          suffix: relayPrivateKeyFromEnv.slice(-4),
-        } : { present: false },
-        PRIVATE_KEY: privateKeyFromEnv ? {
-          present: true,
-          length: privateKeyFromEnv.length,
-          prefix: privateKeyFromEnv.slice(0, 6),
-          suffix: privateKeyFromEnv.slice(-4),
-        } : { present: false },
-        configCached: keyFromConfig ? {
-          present: true,
-          length: keyFromConfig.length,
-          prefix: keyFromConfig.slice(0, 6),
-          suffix: keyFromConfig.slice(-4),
-        } : { present: false },
-        getterFunction: keyFromGetter ? {
-          present: true,
-          length: keyFromGetter.length,
-          prefix: keyFromGetter.slice(0, 6),
-          suffix: keyFromGetter.slice(-4),
-        } : { present: false },
+        RELAY_PRIVATE_KEY: relayPrivateKeyFromEnv
+          ? {
+              present: true,
+              length: relayPrivateKeyFromEnv.length,
+              prefix: relayPrivateKeyFromEnv.slice(0, 6),
+              suffix: relayPrivateKeyFromEnv.slice(-4),
+            }
+          : { present: false },
+        PRIVATE_KEY: privateKeyFromEnv
+          ? {
+              present: true,
+              length: privateKeyFromEnv.length,
+              prefix: privateKeyFromEnv.slice(0, 6),
+              suffix: privateKeyFromEnv.slice(-4),
+            }
+          : { present: false },
+        configCached: keyFromConfig
+          ? {
+              present: true,
+              length: keyFromConfig.length,
+              prefix: keyFromConfig.slice(0, 6),
+              suffix: keyFromConfig.slice(-4),
+            }
+          : { present: false },
+        getterFunction: keyFromGetter
+          ? {
+              present: true,
+              length: keyFromGetter.length,
+              prefix: keyFromGetter.slice(0, 6),
+              suffix: keyFromGetter.slice(-4),
+            }
+          : { present: false },
       },
       addresses: {} as any,
       match: false,
@@ -907,15 +921,16 @@ router.get("/debug/wallet", async (req: Request, res: Response) => {
 
     // Check if all addresses match
     const addressValues = Object.values(results.addresses).filter(
-      (a: any) => typeof a === 'string' && a.startsWith('0x')
+      (a: any) => typeof a === "string" && a.startsWith("0x")
     );
-    results.match = addressValues.length > 0 && 
-      addressValues.every((a: any) => a === addressValues[0]);
-    
-    results.activeAddress = results.addresses.fromGetterFunction || 
-      results.addresses.fromRELAY_PRIVATE_KEY || 
-      results.addresses.fromPRIVATE_KEY || 
-      'Not configured';
+    results.match =
+      addressValues.length > 0 && addressValues.every((a: any) => a === addressValues[0]);
+
+    results.activeAddress =
+      results.addresses.fromGetterFunction ||
+      results.addresses.fromRELAY_PRIVATE_KEY ||
+      results.addresses.fromPRIVATE_KEY ||
+      "Not configured";
 
     res.json({
       success: true,

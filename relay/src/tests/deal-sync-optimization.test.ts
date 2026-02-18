@@ -1,15 +1,14 @@
-
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as registryClient from '../utils/registry-client';
-import http from 'http';
-import https from 'https';
-import { EventEmitter } from 'events';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import * as registryClient from "../utils/registry-client";
+import http from "http";
+import https from "https";
+import { EventEmitter } from "events";
 
 // Mock dependencies
-vi.mock('../utils/registry-client');
-vi.mock('http');
-vi.mock('https');
-vi.mock('../utils/logger', () => {
+vi.mock("../utils/registry-client");
+vi.mock("http");
+vi.mock("https");
+vi.mock("../utils/logger", () => {
   const mockLogger = {
     debug: vi.fn(),
     info: vi.fn(),
@@ -28,9 +27,9 @@ vi.mock('../utils/logger', () => {
 // We need to import the module under test AFTER mocking dependencies
 // But we also need to modify it to export the function we want to test
 // For now, we'll test the public API syncDealsWithIPFS
-import { syncDealsWithIPFS } from '../utils/deal-sync';
+import { syncDealsWithIPFS } from "../utils/deal-sync";
 
-describe('Deal Sync Optimization', () => {
+describe("Deal Sync Optimization", () => {
   let mockRequest: any;
   let mockResponse: any;
 
@@ -59,12 +58,27 @@ describe('Deal Sync Optimization', () => {
     });
   });
 
-  it('should batch IPFS pin checks', async () => {
+  it("should batch IPFS pin checks", async () => {
     // Setup 3 active deals
     const mockDeals = [
-      { dealId: '1', cid: 'QmHash1', active: true, expiresAt: new Date(Date.now() + 10000).toISOString() },
-      { dealId: '2', cid: 'QmHash2', active: true, expiresAt: new Date(Date.now() + 10000).toISOString() },
-      { dealId: '3', cid: 'QmHash3', active: true, expiresAt: new Date(Date.now() + 10000).toISOString() },
+      {
+        dealId: "1",
+        cid: "QmHash1",
+        active: true,
+        expiresAt: new Date(Date.now() + 10000).toISOString(),
+      },
+      {
+        dealId: "2",
+        cid: "QmHash2",
+        active: true,
+        expiresAt: new Date(Date.now() + 10000).toISOString(),
+      },
+      {
+        dealId: "3",
+        cid: "QmHash3",
+        active: true,
+        expiresAt: new Date(Date.now() + 10000).toISOString(),
+      },
     ];
 
     // Mock registry client
@@ -76,10 +90,10 @@ describe('Deal Sync Optimization', () => {
     // We expect this to be called first
     const batchPinsResponse = {
       Keys: {
-        'QmHash1': { Type: 'recursive' },
-        'QmHash2': { Type: 'recursive' },
-        'QmHash3': { Type: 'recursive' },
-      }
+        QmHash1: { Type: "recursive" },
+        QmHash2: { Type: "recursive" },
+        QmHash3: { Type: "recursive" },
+      },
     };
 
     // We need to simulate the response streaming
@@ -95,47 +109,49 @@ describe('Deal Sync Optimization', () => {
       callback(mockResponse);
 
       // Determine what to return based on path
-      if (options.path.includes('/api/v0/pin/ls?type=recursive')) {
+      if (options.path.includes("/api/v0/pin/ls?type=recursive")) {
         // This is the optimized path
         setTimeout(() => {
-            mockResponse.emit('data', JSON.stringify(batchPinsResponse));
-            mockResponse.emit('end');
+          mockResponse.emit("data", JSON.stringify(batchPinsResponse));
+          mockResponse.emit("end");
         }, 10);
-      } else if (options.path.includes('/api/v0/pin/ls?arg=')) {
+      } else if (options.path.includes("/api/v0/pin/ls?arg=")) {
         // This is the unoptimized path (individual check)
         const cid = options.path.match(/arg=([^&]+)/)[1];
         const response = {
           Keys: {
-            [decodeURIComponent(cid)]: { Type: 'recursive' }
-          }
+            [decodeURIComponent(cid)]: { Type: "recursive" },
+          },
         };
         setTimeout(() => {
-            mockResponse.emit('data', JSON.stringify(response));
-            mockResponse.emit('end');
+          mockResponse.emit("data", JSON.stringify(response));
+          mockResponse.emit("end");
         }, 10);
       } else {
-         setTimeout(() => {
-            mockResponse.emit('data', '{}');
-            mockResponse.emit('end');
+        setTimeout(() => {
+          mockResponse.emit("data", "{}");
+          mockResponse.emit("end");
         }, 10);
       }
 
       return mockRequest;
     });
 
-    await syncDealsWithIPFS('0xRelay', 84532);
+    await syncDealsWithIPFS("0xRelay", 84532);
 
     // Verify calls
     const calls = (http.request as any).mock.calls;
     const paths = calls.map((c: any) => c[0].path);
 
     // Check if we used the batch endpoint
-    const usedBatch = paths.some((p: string) => p.includes('type=recursive') && !p.includes('arg='));
+    const usedBatch = paths.some(
+      (p: string) => p.includes("type=recursive") && !p.includes("arg=")
+    );
 
     // Check if we used individual endpoints
-    const individualCalls = paths.filter((p: string) => p.includes('arg='));
+    const individualCalls = paths.filter((p: string) => p.includes("arg="));
 
-    console.log('HTTP Calls:', paths);
+    console.log("HTTP Calls:", paths);
 
     // Assert based on optimization status (this test is expected to fail initially or show unoptimized behavior)
     // We want 1 batch call and 0 individual calls

@@ -31,14 +31,14 @@ router.post(
     const bearerToken = authHeader && authHeader.split(" ")[1];
     const customToken = req.headers["token"];
     const adminToken = bearerToken || customToken;
-    
+
     // Check admin token or API key
     let isAdmin = false;
     let isApiKey = false;
-    
+
     // Ensure adminToken is a string (could be string | string[] from headers)
     const adminTokenStr = Array.isArray(adminToken) ? adminToken[0] : adminToken;
-    
+
     if (adminTokenStr && typeof adminTokenStr === "string") {
       // Check admin password
       if (validateAdminToken(adminTokenStr)) {
@@ -93,7 +93,10 @@ router.post(
 
       const isValidSignature = await verifyWalletSignature(userAddress, signature, timestamp);
       if (!isValidSignature) {
-        loggers.server.warn({ userAddress, timestamp: !!timestamp }, "Invalid wallet signature for upload");
+        loggers.server.warn(
+          { userAddress, timestamp: !!timestamp },
+          "Invalid wallet signature for upload"
+        );
         return res.status(401).json({
           success: false,
           error: "Invalid wallet signature",
@@ -103,7 +106,10 @@ router.post(
         });
       }
 
-      loggers.server.info({ userAddress, secure: !!timestamp }, "Wallet signature verified for upload");
+      loggers.server.info(
+        { userAddress, secure: !!timestamp },
+        "Wallet signature verified for upload"
+      );
       req.authType = "user";
       req.userAddress = userAddress;
 

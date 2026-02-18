@@ -192,11 +192,15 @@ class SQLiteStore {
 
     try {
       // Get file count
-      const countResult = this.db.prepare("SELECT COUNT(*) as count FROM radisk_files").get() as { count: number } | undefined;
+      const countResult = this.db.prepare("SELECT COUNT(*) as count FROM radisk_files").get() as
+        | { count: number }
+        | undefined;
       const files = countResult?.count ?? 0;
 
       // Get total data size (length of JSON strings stored)
-      const sizeResult = this.db.prepare("SELECT SUM(LENGTH(data)) as total FROM radisk_files").get() as { total: number | null } | undefined;
+      const sizeResult = this.db
+        .prepare("SELECT SUM(LENGTH(data)) as total FROM radisk_files")
+        .get() as { total: number | null } | undefined;
       const bytes = sizeResult?.total ?? 0;
 
       // Also get actual database file size
@@ -212,7 +216,7 @@ class SQLiteStore {
       // DB file size is more accurate as it includes SQLite overhead
       return {
         bytes: Math.max(bytes, dbFileSize),
-        files
+        files,
       };
     } catch (err) {
       log.error({ err }, "Failed to get storage stats from SQLite");

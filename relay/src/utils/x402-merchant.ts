@@ -320,7 +320,6 @@ interface X402MerchantOptions {
   rpcUrl?: string;
 }
 
-
 export class X402Merchant {
   payToAddress: string;
   network: NetworkKey;
@@ -352,7 +351,8 @@ export class X402Merchant {
     if (this.privateKey) {
       this.initializeClients();
       log.debug(
-        `x402 Merchant initialized with direct settlement ${this.settlementMode === "direct" ? "(primary)" : "(fallback)"
+        `x402 Merchant initialized with direct settlement ${
+          this.settlementMode === "direct" ? "(primary)" : "(fallback)"
         }`
       );
     } else if (this.settlementMode === "facilitator") {
@@ -1259,7 +1259,8 @@ export class X402Merchant {
     const totalMB = totalBytes / (1024 * 1024);
 
     log.debug(
-      `Real IPFS storage for ${userAddress}: ${totalMB.toFixed(2)}MB across ${filesWithSizes.length
+      `Real IPFS storage for ${userAddress}: ${totalMB.toFixed(2)}MB across ${
+        filesWithSizes.length
       } files`
     );
 
@@ -1402,7 +1403,8 @@ export class X402Merchant {
     // Update GunDB if there's a discrepancy
     if (Math.abs(realUsedMB - (sub.storageUsedMB || 0)) > 0.1) {
       log.warn(
-        `Storage discrepancy detected. Recorded: ${sub.storageUsedMB || 0
+        `Storage discrepancy detected. Recorded: ${
+          sub.storageUsedMB || 0
         }MB, Actual: ${realUsedMB.toFixed(2)}MB`
       );
 

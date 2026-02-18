@@ -267,7 +267,7 @@ export async function getAllPinnedCids(): Promise<Set<string>> {
       path: `/api/v0/pin/ls?type=recursive`,
       method: "POST",
       headers: {
-        "Content-Length": "0"
+        "Content-Length": "0",
       },
     };
 
@@ -281,8 +281,8 @@ export async function getAllPinnedCids(): Promise<Set<string>> {
         res.on("data", (chunk: string) => (data += chunk));
         res.on("end", () => {
           if (res.statusCode !== 200) {
-             reject(new Error(`Status ${res.statusCode}`));
-             return;
+            reject(new Error(`Status ${res.statusCode}`));
+            return;
           }
           try {
             const result = JSON.parse(data);
@@ -298,7 +298,8 @@ export async function getAllPinnedCids(): Promise<Set<string>> {
       });
 
       req.on("error", (err) => reject(err));
-      req.setTimeout(30000, () => { // Longer timeout for large lists
+      req.setTimeout(30000, () => {
+        // Longer timeout for large lists
         req.destroy();
         reject(new Error("Timeout fetching pin list"));
       });
@@ -720,11 +721,12 @@ export async function syncDealsWithIPFS(
       }
 
       // Determine if deal is active
-      const isActive = deal.active && new Date(deal.expiresAt as unknown as string).getTime() > Date.now();
-      
+      const isActive =
+        deal.active && new Date(deal.expiresAt as unknown as string).getTime() > Date.now();
+
       // If deal is inactive and we only want active ones, SKIP PINNING but still SYNC TO GUNDB
       if (onlyActive && !isActive) {
-         if (gun && relayKeyPair && relayPub && !isShuttingDown) {
+        if (gun && relayKeyPair && relayPub && !isShuttingDown) {
           try {
             const { getDeal, saveDeal } = await import("./storage-deals");
             const existingDeal = await getDeal(gun, dealId);
@@ -734,10 +736,11 @@ export async function syncDealsWithIPFS(
             if (!existingDeal || existingDeal.status !== gunDBDeal.status) {
               await saveDeal(gun, gunDBDeal as any, relayKeyPair);
               results.gunDBSynced++;
-              if (!fastSync) log.debug(`Deal ${dealId}: Updated status to ${gunDBDeal.status} in GunDB`);
+              if (!fastSync)
+                log.debug(`Deal ${dealId}: Updated status to ${gunDBDeal.status} in GunDB`);
             }
           } catch (e) {
-             // Ignore errors during sync-only
+            // Ignore errors during sync-only
           }
         }
         continue; // Skip the rest of the loop (pinning)
@@ -890,10 +893,11 @@ export async function syncDealsWithIPFS(
             const gunDBDeal = await convertOnChainDealToGunDB(deal, relayPub);
 
             // Only save if it doesn't exist or if it's different (status changed)
-            if (!existingDeal || 
-                existingDeal.syncedFromOnChain !== true ||
-                existingDeal.status !== gunDBDeal.status) {
-              
+            if (
+              !existingDeal ||
+              existingDeal.syncedFromOnChain !== true ||
+              existingDeal.status !== gunDBDeal.status
+            ) {
               await saveDeal(gun, gunDBDeal as any, relayKeyPair);
               if (!fastSync) {
                 log.debug(`Deal ${dealId}: Synced to GunDB (Status: ${gunDBDeal.status})`);

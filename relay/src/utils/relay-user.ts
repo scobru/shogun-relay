@@ -112,12 +112,15 @@ async function initRelayUserWithKeyPair(
       // IMPORTANT: Explicitly publish epub to user graph for encrypted chat
       // This ensures other relays can find our encryption key
       if (keyPair.epub) {
-        user.get('epub').put(keyPair.epub);
-        user.get('pub').put(keyPair.pub);
+        user.get("epub").put(keyPair.epub);
+        user.get("pub").put(keyPair.pub);
         log.debug({ pub: relayPub }, "Published epub key for encrypted chat");
       }
 
-      log.debug({ pub: relayPub, pubLength: relayPub?.length }, "Relay user authenticated with keypair");
+      log.debug(
+        { pub: relayPub, pubLength: relayPub?.length },
+        "Relay user authenticated with keypair"
+      );
       resolve({ user: relayUser, pub: relayPub!, keyPair: relayKeyPair });
     });
   });
@@ -547,7 +550,9 @@ export async function getUserUploads(userAddress: string): Promise<Array<UploadI
       resolve([]);
     }, 15000);
 
-    const uploadsNode = getGunNode(relayUser!, GUN_PATHS.X402).get(GUN_PATHS.UPLOADS).get(userAddress);
+    const uploadsNode = getGunNode(relayUser!, GUN_PATHS.X402)
+      .get(GUN_PATHS.UPLOADS)
+      .get(userAddress);
 
     uploadsNode.once((parentData: Record<string, any>) => {
       clearTimeout(timeout);
@@ -655,8 +660,8 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
         return; // Wait for more data
       }
 
-      const userKeys = Object.keys(parentData).filter((key) =>
-        !["_", "#", ">", "<"].includes(key) && !processedAddresses.has(key)
+      const userKeys = Object.keys(parentData).filter(
+        (key) => !["_", "#", ">", "<"].includes(key) && !processedAddresses.has(key)
       );
 
       if (userKeys.length === 0 && processedAddresses.size === 0) {
@@ -689,7 +694,7 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
             // Only add if we have valid subscription data
             if (hasValidData) {
               // Avoid duplicates
-              const exists = subscriptions.some(s => s.userAddress === cleanData.userAddress);
+              const exists = subscriptions.some((s) => s.userAddress === cleanData.userAddress);
               if (!exists) {
                 subscriptions.push(cleanData);
                 log.debug({ userAddress, tier: cleanData.tier }, "Found subscription");
@@ -708,9 +713,7 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
         return;
       }
 
-      const userKeys = Object.keys(parentData).filter((key) =>
-        !["_", "#", ">", "<"].includes(key)
-      );
+      const userKeys = Object.keys(parentData).filter((key) => !["_", "#", ">", "<"].includes(key));
 
       if (userKeys.length === 0) {
         // If no subscriptions and nothing from .on() after 2 seconds, resolve empty
@@ -748,7 +751,7 @@ export async function getAllSubscriptions(): Promise<Array<SubscriptionData>> {
             });
 
             if (hasValidData) {
-              const exists = subscriptions.some(s => s.userAddress === cleanData.userAddress);
+              const exists = subscriptions.some((s) => s.userAddress === cleanData.userAddress);
               if (!exists) {
                 subscriptions.push(cleanData);
               }
@@ -808,7 +811,7 @@ export default {
   deleteUpload,
   getAllSubscriptions,
   savePayment,
-  getAllPayments
+  getAllPayments,
 };
 
 /**
@@ -856,10 +859,10 @@ export async function getAllPayments(limit: number = 100): Promise<Array<Payment
     }, 5000);
 
     paymentNode.map().once((data: any, key: string) => {
-      if (data && typeof data === 'object' && data.transaction) {
+      if (data && typeof data === "object" && data.transaction) {
         // Filter internal keys
         const clean: any = {};
-        Object.keys(data).forEach(k => {
+        Object.keys(data).forEach((k) => {
           if (!["_", "#", ">", "<"].includes(k)) clean[k] = data[k];
         });
         payments.push(clean as PaymentRecord);

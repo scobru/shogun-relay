@@ -189,7 +189,10 @@ async function getWormholeTransfers(
       });
     };
 
-    getGunNode(gun, GUN_PATHS.SHOGUN_WORMHOLE).get(GUN_PATHS.WORMHOLE_TRANSFERS).map().once(handler);
+    getGunNode(gun, GUN_PATHS.SHOGUN_WORMHOLE)
+      .get(GUN_PATHS.WORMHOLE_TRANSFERS)
+      .map()
+      .once(handler);
 
     // Wait a bit for all data to come in
     timeout = setTimeout(() => {
