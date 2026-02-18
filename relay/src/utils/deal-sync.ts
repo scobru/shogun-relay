@@ -661,6 +661,15 @@ export async function syncDealsWithIPFS(
     const { createStorageDealRegistryClient } = await import("./registry-client");
     const storageDealRegistryClient = createStorageDealRegistryClient(chainId);
 
+    // Pre-load storage deals module if needed for GunDB sync to avoid import in loop
+    let getDeal: typeof import("./storage-deals").getDeal | undefined;
+    let saveDeal: typeof import("./storage-deals").saveDeal | undefined;
+    if (gun) {
+      const storageDeals = await import("./storage-deals");
+      getDeal = storageDeals.getDeal;
+      saveDeal = storageDeals.saveDeal;
+    }
+
     // Fetch all deals for this relay
     const deals: Array<OnChainDeal> = await storageDealRegistryClient.getRelayDeals(relayAddress);
 
@@ -707,6 +716,9 @@ export async function syncDealsWithIPFS(
 
     // Process each deal
     for (const deal of dealsToSync) {
+      // Track if we performed a heavy operation (IPFS pin or GunDB write)
+      let heavyOperation = false;
+
       // Check if shutdown started during processing
       if (isShuttingDown) {
         log.debug(`Deal sync interrupted (shutdown in progress)`);
@@ -726,9 +738,8 @@ export async function syncDealsWithIPFS(
 
       // If deal is inactive and we only want active ones, SKIP PINNING but still SYNC TO GUNDB
       if (onlyActive && !isActive) {
-        if (gun && relayKeyPair && relayPub && !isShuttingDown) {
+        if (gun && relayKeyPair && relayPub && !isShuttingDown && getDeal && saveDeal) {
           try {
-            const { getDeal, saveDeal } = await import("./storage-deals");
             const existingDeal = await getDeal(gun, dealId);
             const gunDBDeal = await convertOnChainDealToGunDB(deal, relayPub);
 
@@ -816,6 +827,9 @@ export async function syncDealsWithIPFS(
             log.debug(`Attempting to pin CID ${cid} for deal ${dealId}...`);
           }
           const pinResult = await pinCid(cid);
+          // Attempted a pin, count as heavy operation regardless of outcome
+          heavyOperation = true;
+
           if (pinResult.success) {
             if (!fastSync) {
               log.debug(`Deal ${dealId}: CID ${cid} pinned successfully`);
@@ -881,11 +895,8 @@ export async function syncDealsWithIPFS(
         }
 
         // Sync to GunDB if enabled (skip if shutdown in progress)
-        if (gun && relayKeyPair && relayPub && !dryRun && !isShuttingDown) {
+        if (gun && relayKeyPair && relayPub && !dryRun && !isShuttingDown && getDeal && saveDeal) {
           try {
-            const { getDeal } = await import("./storage-deals");
-            const { saveDeal } = await import("./storage-deals");
-
             // Check if deal already exists in GunDB
             const existingDeal = await getDeal(gun, dealId);
 
@@ -899,6 +910,7 @@ export async function syncDealsWithIPFS(
               existingDeal.status !== gunDBDeal.status
             ) {
               await saveDeal(gun, gunDBDeal as any, relayKeyPair);
+              heavyOperation = true; // Write to GunDB is heavy
               if (!fastSync) {
                 log.debug(`Deal ${dealId}: Synced to GunDB (Status: ${gunDBDeal.status})`);
               }
@@ -926,8 +938,8 @@ export async function syncDealsWithIPFS(
           }
         }
 
-        // Small delay to avoid overwhelming IPFS/GunDB
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Conditional delay: 100ms if heavy operation occurred, 5ms otherwise to yield event loop
+        await new Promise((resolve) => setTimeout(resolve, heavyOperation ? 100 : 5));
       } catch (error) {
         log.error({ err: error }, `Error processing deal ${dealId}`);
         results.failed++;
