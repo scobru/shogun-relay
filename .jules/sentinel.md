@@ -24,3 +24,8 @@
 **Vulnerability:** Critical system endpoints (`/rpc/execute`, `/node/*`, `/logs`, etc.) were exposed without authentication, allowing unauthenticated SSRF, arbitrary GunDB data manipulation, and sensitive information disclosure.
 **Learning:** Mixing public and private routes in the same router file (`system.ts`) without careful middleware application can lead to critical exposure. The `/rpc/execute` endpoint was particularly dangerous as it allowed unauthenticated users to make arbitrary POST requests from the server.
 **Prevention:** Separate public and private routes into different router files or apply middleware explicitly to sensitive route groups. Always audit new endpoints for authentication requirements, especially those performing external requests (SSRF risk) or database operations.
+
+## 2025-05-18 - Unauthenticated Delete Endpoint via Fake Middleware
+**Vulnerability:** A critical DELETE endpoint (`/user-uploads/:identifier/:hash`) was exposed due to a "fake" middleware `(req, res, next) => { next(); }` being used as a placeholder.
+**Learning:** Developers sometimes use placeholder functions during development and forget to replace them with real security controls. This pattern of explicitly defining a middleware that does nothing is a huge red flag.
+**Prevention:** Audit codebase for empty middleware functions or "TODO" comments in route definitions. Use specific linting rules or code reviews to catch no-op middlewares in security-critical paths.
