@@ -4,6 +4,7 @@ import { loggers } from "../utils/logger";
 import { authConfig } from "../config";
 import { validateAdminToken } from "../utils/auth-utils";
 import { GUN_PATHS } from "../utils/gun-paths";
+import { adminOrApiKeyAuthMiddleware } from "../middleware/admin-or-api-key-auth";
 
 // Extended Request interface with custom properties
 interface CustomRequest extends Request {
@@ -623,9 +624,7 @@ router.get("/:identifier", async (req, res) => {
 // Endpoint per eliminare un upload specifico
 router.delete(
   "/:identifier/:hash",
-  (req, res, next) => {
-    next();
-  },
+  adminOrApiKeyAuthMiddleware,
   async (req, res) => {
     try {
       const { identifier, hash } = req.params;
