@@ -21,6 +21,7 @@ interface RelayStatus {
     totalDeals: number;
     stakedAmount: string;
     totalSlashed: string;
+    isUser?: boolean;
   };
 }
 
@@ -193,7 +194,11 @@ function Registry() {
     try {
       let endpointUrl = "/api/v1/registry/stake/increase";
       if (stakingMode === "unstake") endpointUrl = "/api/v1/registry/stake/unstake";
-      if (stakingMode === "withdraw") endpointUrl = "/api/v1/registry/stake/withdraw";
+      if (stakingMode === "withdraw") {
+        endpointUrl = status?.relay?.isUser
+          ? "/api/v1/registry/stake/withdraw-user"
+          : "/api/v1/registry/stake/withdraw";
+      }
 
       const res = await fetch(endpointUrl, {
         method: "POST",
@@ -272,17 +277,30 @@ function Registry() {
           <div className="stat-title">On-Chain Status</div>
           <div
             className={`stat-value text-lg ${
-              status?.relay?.status === "Active" ? "text-success" :
-              status?.relay?.status === "Unstaking" ? "text-warning" :
-              status?.relay?.status === "Slashed" ? "text-error" :
-              status?.registered ? "text-info" : "text-warning"
+              status?.relay?.status === "Active"
+                ? "text-success"
+                : status?.relay?.status === "Unstaking"
+                  ? "text-warning"
+                  : status?.relay?.status === "Slashed"
+                    ? "text-error"
+                    : status?.registered
+                      ? "text-info"
+                      : "text-warning"
             }`}
           >
-            {status?.relay?.status === "Active" ? "✅ Active" :
-             status?.relay?.status === "Unstaking" ? "⏳ Unstaking" :
-             status?.relay?.status === "Slashed" ? "❌ Slashed" :
-             status?.relay?.status === "Inactive" ? "⚪ Inactive" :
-             status?.registered ? "✅ Registered" : "⚠️ Not Registered"}
+            {status?.relay?.status === "Active"
+              ? status.relay.isUser
+                ? "✅ User Active"
+                : "✅ Relay Active"
+              : status?.relay?.status === "Unstaking"
+                ? "⏳ Unstaking"
+                : status?.relay?.status === "Slashed"
+                  ? "❌ Slashed"
+                  : status?.relay?.status === "Inactive"
+                    ? "⚪ Inactive"
+                    : status?.registered
+                      ? "✅ Registered"
+                      : "⚠️ Not Registered"}
           </div>
           {status?.relay?.status === "Unstaking" && (
             <div className="stat-desc text-warning">Pending unstake - not visible to clients</div>
@@ -386,17 +404,19 @@ function Registry() {
                   >
                     Increase Stake
                   </button>
-                  <button
-                    className={`tab ${stakingMode === "unstake" ? "tab-active" : ""}`}
-                    onClick={() => setStakingMode("unstake")}
-                    disabled={status.relay?.status !== "Active"}
-                  >
-                    Unstake
-                  </button>
+                  {!status.relay?.isUser && (
+                    <button
+                      className={`tab ${stakingMode === "unstake" ? "tab-active" : ""}`}
+                      onClick={() => setStakingMode("unstake")}
+                      disabled={status.relay?.status !== "Active"}
+                    >
+                      Unstake
+                    </button>
+                  )}
                   <button
                     className={`tab ${stakingMode === "withdraw" ? "tab-active" : ""}`}
                     onClick={() => setStakingMode("withdraw")}
-                    disabled={status.relay?.status !== "Unstaking"}
+                    disabled={status.relay?.status !== "Unstaking" && !status.relay?.isUser}
                   >
                     Withdraw
                   </button>
@@ -416,18 +436,25 @@ function Registry() {
                       ? "➕ Stake"
                       : stakingMode === "unstake"
                         ? "⏳ Request Unstake (All)"
-                        : "💸 Withdraw All"}
+                        : "💸 Withdraw"}
                   </button>
                 </div>
                 <p className="text-sm text-base-content/60 mt-2">
                   Current Stake: <strong>{status.relay?.stakedAmount} USDC</strong>
                   {status.relay?.status === "Unstaking" && (
-                    <span className="text-warning ml-2">• ⏳ Unstaking in progress (wait {params?.unstakingDelayDays || 7} days to withdraw)</span>
+                    <span className="text-warning ml-2">
+                      • ⏳ Unstaking in progress (wait {params?.unstakingDelayDays || 7} days to
+                      withdraw)
+                    </span>
                   )}
                 </p>
                 {stakingMode === "unstake" && status.relay?.status === "Active" && (
                   <div className="alert alert-warning mt-2">
-                    <span>⚠️ Unstaking will remove your relay from the active list. Your full stake of <strong>{status.relay?.stakedAmount} USDC</strong> will be locked for {params?.unstakingDelayDays || 7} days before withdrawal.</span>
+                    <span>
+                      ⚠️ Unstaking will remove your relay from the active list. Your full stake of{" "}
+                      <strong>{status.relay?.stakedAmount} USDC</strong> will be locked for{" "}
+                      {params?.unstakingDelayDays || 7} days before withdrawal.
+                    </span>
                   </div>
                 )}
               </div>

@@ -265,6 +265,25 @@ export function createRegistryClient(
     },
 
     /**
+     * Get user info by address
+     * @param userAddress - User address
+     * @returns User info or undefined
+     */
+    async getUserInfo(userAddress: string): Promise<FormattedRelayInfo | undefined> {
+      try {
+        const info: RelayInfo = await relayRegistry.getUserInfo(userAddress);
+        if (info.owner === ethers.ZeroAddress) {
+          return undefined;
+        }
+        // Reuse formatRelayInfo since structure is compatible
+        return formatRelayInfo(info, userAddress);
+      } catch (e) {
+        // Users might not raise an error if not found, just return undefined
+        return undefined;
+      }
+    },
+
+    /**
      * Check if address is an active relay
      * @param relayAddress - Relay address
      * @returns True if active
@@ -787,6 +806,21 @@ export function createRegistryClientWithSigner(
      */
     async requestUnstake(): Promise<TransactionResult> {
       const tx = await relayRegistry.requestUnstake();
+      const receipt = await tx.wait();
+      return {
+        success: true,
+        txHash: receipt.hash,
+      };
+    },
+
+    /**
+     * Withdraw user stake
+     * @param amount - Amount to withdraw (string, human readable)
+     * @returns Transaction result
+     */
+    async withdrawUserStake(amount: string): Promise<TransactionResult> {
+      const amountWei = ethers.parseUnits(amount, 6);
+      const tx = await relayRegistry.withdrawUserStake(amountWei);
       const receipt = await tx.wait();
       return {
         success: true,

@@ -80,6 +80,28 @@ router.get("/status", async (req: Request, res: Response) => {
     const info = await client.getRelayInfo(relayAddress);
 
     if (!info) {
+      // Check if registered as User (no endpoint)
+      try {
+        const userInfo = await client.getUserInfo(relayAddress);
+        if (userInfo) {
+          return res.json({
+            success: true,
+            registered: true,
+            configured: true,
+            relayAddress,
+            chainId: REGISTRY_CHAIN_ID,
+            registryAddress: client.registryAddress,
+            relay: {
+              ...userInfo,
+              totalDeals: 0,
+              isUser: true // Flag to indicate this is a User not a Relay
+            },
+          });
+        }
+      } catch (e) {
+        // Ignore error
+      }
+
       return res.json({
         success: true,
         registered: false,
@@ -412,6 +434,53 @@ router.post("/stake/withdraw", async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/v1/registry/stake/withdraw-user
+ *
+ * Withdraw user stake (immediate, no delay)
+ */
+router.post("/stake/withdraw-user", async (req: Request, res: Response) => {
+  try {
+    const relayPrivateKey = getRelayPrivateKey();
+    if (!relayPrivateKey) {
+      return res.status(400).json({
+        success: false,
+        error: "RELAY_PRIVATE_KEY not configured",
+      });
+    }
+
+    const { amount } = req.body;
+    if (!amount) {
+      return res.status(400).json({
+        success: false,
+        error: "amount is required",
+      });
+    }
+
+    const client = createRegistryClientWithSigner(relayPrivateKey, REGISTRY_CHAIN_ID);
+
+    // Check if user exists
+    const userInfo = await client.getUserInfo(client.wallet.address);
+    if (!userInfo) {
+      return res.status(400).json({
+        success: false,
+        error: "User not registered",
+      });
+    }
+
+    const result = await client.withdrawUserStake(amount.toString());
+
+    res.json({
+      success: true,
+      message: "User stake withdrawn successfully",
+      withdrawnAmount: amount,
+      ...result,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * POST /api/v1/registry/unstake
  *
  * Alias for /stake/unstake (for backward compatibility)
@@ -535,7 +604,7 @@ router.post("/emergency-withdraw", async (req: Request, res: Response) => {
       let decimals = 6;
       try {
         decimals = Number(await token.decimals());
-      } catch {}
+      } catch { }
       amountWei = ethers.parseUnits(String(amount), decimals);
     }
 
@@ -847,35 +916,35 @@ router.get("/debug/wallet", async (req: Request, res: Response) => {
       sources: {
         RELAY_PRIVATE_KEY: relayPrivateKeyFromEnv
           ? {
-              present: true,
-              length: relayPrivateKeyFromEnv.length,
-              prefix: relayPrivateKeyFromEnv.slice(0, 6),
-              suffix: relayPrivateKeyFromEnv.slice(-4),
-            }
+            present: true,
+            length: relayPrivateKeyFromEnv.length,
+            prefix: relayPrivateKeyFromEnv.slice(0, 6),
+            suffix: relayPrivateKeyFromEnv.slice(-4),
+          }
           : { present: false },
         PRIVATE_KEY: privateKeyFromEnv
           ? {
-              present: true,
-              length: privateKeyFromEnv.length,
-              prefix: privateKeyFromEnv.slice(0, 6),
-              suffix: privateKeyFromEnv.slice(-4),
-            }
+            present: true,
+            length: privateKeyFromEnv.length,
+            prefix: privateKeyFromEnv.slice(0, 6),
+            suffix: privateKeyFromEnv.slice(-4),
+          }
           : { present: false },
         configCached: keyFromConfig
           ? {
-              present: true,
-              length: keyFromConfig.length,
-              prefix: keyFromConfig.slice(0, 6),
-              suffix: keyFromConfig.slice(-4),
-            }
+            present: true,
+            length: keyFromConfig.length,
+            prefix: keyFromConfig.slice(0, 6),
+            suffix: keyFromConfig.slice(-4),
+          }
           : { present: false },
         getterFunction: keyFromGetter
           ? {
-              present: true,
-              length: keyFromGetter.length,
-              prefix: keyFromGetter.slice(0, 6),
-              suffix: keyFromGetter.slice(-4),
-            }
+            present: true,
+            length: keyFromGetter.length,
+            prefix: keyFromGetter.slice(0, 6),
+            suffix: keyFromGetter.slice(-4),
+          }
           : { present: false },
       },
       addresses: {} as any,
