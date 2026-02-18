@@ -46,6 +46,26 @@ interface DashboardStats {
     enabled: boolean
 }
 
+const SkeletonResult = () => (
+  <div className="card card-compact bg-base-200 shadow-sm animate-pulse">
+    <div className="card-body flex-row justify-between items-start gap-4">
+      <div className="min-w-0 flex-1">
+        <div className="h-6 bg-base-300 rounded w-3/4 mb-2"></div>
+        <div className="flex gap-2">
+          <div className="h-5 w-16 bg-base-300 rounded-full"></div>
+          <div className="h-5 w-16 bg-base-300 rounded-full"></div>
+          <div className="h-5 w-24 bg-base-300 rounded-full"></div>
+        </div>
+        <div className="h-4 bg-base-300 rounded w-1/2 mt-2"></div>
+      </div>
+      <div className="flex flex-col gap-2 shrink-0">
+        <div className="h-8 w-16 bg-base-300 rounded-lg"></div>
+        <div className="h-6 w-12 bg-base-300 rounded mx-auto"></div>
+      </div>
+    </div>
+  </div>
+)
+
 function Torrents() {
   const { isAuthenticated, getAuthHeaders } = useAuth()
   const [torrents, setTorrents] = useState<Torrent[]>([])
@@ -666,6 +686,10 @@ function Torrents() {
 
                 {/* Search Results */}
                 <div className="mt-4 space-y-2 max-h-[600px] overflow-y-auto">
+                    {searching && Array.from({ length: 3 }).map((_, i) => (
+                        <SkeletonResult key={i} />
+                    ))}
+
                     {searchResults.length === 0 && !searching && (
                         <div className="text-center p-8 text-base-content/50">
                             <span className="text-4xl block mb-2">🔍</span>

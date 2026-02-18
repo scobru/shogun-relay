@@ -63,6 +63,9 @@ export const GUN_PATHS = {
 
 export type GunPath = (typeof GUN_PATHS)[keyof typeof GUN_PATHS];
 
+// Cache for Gun nodes to prevent repetitive graph traversal and string splitting
+const gunNodeCache = new WeakMap<any, Map<string, any>>();
+
 /**
  * Helper to get a Gun node from a unified path string
  * Handles splitting path by '/' and traversing the graph hierarchically
@@ -72,10 +75,26 @@ export type GunPath = (typeof GUN_PATHS)[keyof typeof GUN_PATHS];
  * @returns - Gun node at the end of the path
  */
 export const getGunNode = (gun: any, path: string): any => {
+  // Check cache first to avoid repetitive string splitting and traversal
+  let instanceCache = gunNodeCache.get(gun);
+  if (!instanceCache) {
+    instanceCache = new Map<string, any>();
+    gunNodeCache.set(gun, instanceCache);
+  }
+
+  const cachedNode = instanceCache.get(path);
+  if (cachedNode) {
+    return cachedNode;
+  }
+
   const parts = path.split("/");
   let node = gun;
   for (const part of parts) {
     node = node.get(part);
   }
+
+  // Store in cache for future use
+  instanceCache.set(path, node);
+
   return node;
 };

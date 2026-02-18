@@ -5,3 +5,7 @@
 ## 2025-02-19 - Vite Polyfills for GunDB
 **Learning:** This project uses GunDB which requires `global` to be defined. Vite 5+ does not polyfill `global` by default.
 **Action:** When setting up Vite projects with GunDB, add `define: { global: 'window' }` to `vite.config.ts`.
+
+## 2025-02-21 - Skeleton Loader Pattern for Search Results
+**Learning:** Using empty `searchResults` array to trigger "Empty State" causes confusing layout shift when searching starts (empty state disappears, then blank, then results).
+**Action:** Always check `searching` state and render a skeleton loader BEFORE falling back to the empty state message. This maintains layout stability and provides feedback.
