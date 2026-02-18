@@ -19,3 +19,8 @@
 **Vulnerability:** Critical debug endpoints (including data reset and sensitive data exposure) were mounted publicly without authentication.
 **Learning:** The `debug.ts` router was imported and used in `index.ts` without any middleware applied at the mount point or within the router file itself, despite having sensitive operations like `reset`.
 **Prevention:** Always apply authentication middleware at the router level (using `router.use()`) for any router file containing administrative or debug functions, or verify that the mounting point in `index.ts` applies the middleware.
+
+## 2025-05-16 - Unauthenticated System Routes & SSRF
+**Vulnerability:** Critical system endpoints (`/rpc/execute`, `/node/*`, `/logs`, etc.) were exposed without authentication, allowing unauthenticated SSRF, arbitrary GunDB data manipulation, and sensitive information disclosure.
+**Learning:** Mixing public and private routes in the same router file (`system.ts`) without careful middleware application can lead to critical exposure. The `/rpc/execute` endpoint was particularly dangerous as it allowed unauthenticated users to make arbitrary POST requests from the server.
+**Prevention:** Separate public and private routes into different router files or apply middleware explicitly to sensitive route groups. Always audit new endpoints for authentication requirements, especially those performing external requests (SSRF risk) or database operations.

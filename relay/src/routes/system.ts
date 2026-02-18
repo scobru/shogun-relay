@@ -5,6 +5,7 @@ import { loggers } from "../utils/logger";
 import { packageConfig } from "../config";
 import { config } from "../config/env-config";
 import { GUN_PATHS, getGunNode } from "../utils/gun-paths";
+import { adminAuthMiddleware } from "../middleware/admin-auth";
 
 const router: Router = express.Router();
 
@@ -46,7 +47,7 @@ router.get("/relay-info", (req, res) => {
 });
 
 // All data endpoint (requires authentication)
-router.get("/alldata", (req, res) => {
+router.get("/alldata", adminAuthMiddleware, (req, res) => {
   try {
     const gun = getGunInstance(req);
 
@@ -139,7 +140,7 @@ router.get("/stats", (req, res) => {
 });
 
 // Stats update endpoint
-router.post("/stats/update", (req, res) => {
+router.post("/stats/update", adminAuthMiddleware, (req, res) => {
   try {
     const { key, value } = req.body;
     const addTimeSeriesPoint = req.app.get("addTimeSeriesPoint");
@@ -239,7 +240,7 @@ router.get("/stats.json", (req, res) => {
 });
 
 // Gun node operations
-router.get("/node/*", async (req, res) => {
+router.get("/node/*", adminAuthMiddleware, async (req, res) => {
   try {
     // @ts-ignore - req.params is an array for wildcard routes
     const path: string = req.params[0] as string;
@@ -286,7 +287,7 @@ router.get("/node/*", async (req, res) => {
   }
 });
 
-router.post("/node/*", async (req, res) => {
+router.post("/node/*", adminAuthMiddleware, async (req, res) => {
   try {
     // @ts-ignore - req.params is an array for wildcard routes
     const path: string = req.params[0] as string;
@@ -351,7 +352,7 @@ router.post("/node/*", async (req, res) => {
   }
 });
 
-router.delete("/node/*", async (req, res) => {
+router.delete("/node/*", adminAuthMiddleware, async (req, res) => {
   try {
     // @ts-ignore - req.params is an array for wildcard routes
     const path: string = req.params[0] as string;
@@ -411,7 +412,7 @@ router.delete("/node/*", async (req, res) => {
 });
 
 // Logs endpoint for real-time relay logs from file
-router.get("/logs", (req, res) => {
+router.get("/logs", adminAuthMiddleware, (req, res) => {
   try {
     const limit: number = parseInt(req.query.limit as string) || 100;
     const tail: number = parseInt(req.query.tail as string) || 100; // Number of lines to read from end
@@ -541,7 +542,7 @@ router.get("/logs", (req, res) => {
 });
 
 // Clear logs endpoint (clears GunDB logs only)
-router.delete("/logs", (req, res) => {
+router.delete("/logs", adminAuthMiddleware, (req, res) => {
   try {
     const gun = getGunInstance(req);
     const logsNode = getGunNode(gun, GUN_PATHS.LOGS);
@@ -599,7 +600,7 @@ router.get("/peers", (req, res) => {
   }
 });
 
-router.post("/peers/add", (req, res) => {
+router.post("/peers/add", adminAuthMiddleware, (req, res) => {
   try {
     const { peer } = req.body;
     const gun = getGunInstance(req);
@@ -630,7 +631,7 @@ router.post("/peers/add", (req, res) => {
 });
 
 // Services Logs endpoint
-router.get("/services/:name/logs", (req, res) => {
+router.get("/services/:name/logs", adminAuthMiddleware, (req, res) => {
   try {
     const serviceName = req.params.name;
     const limit = parseInt(req.query.limit as string) || 100;
@@ -726,7 +727,7 @@ router.get("/services/:name/logs", (req, res) => {
 });
 
 // RPC Execute endpoint
-router.post("/rpc/execute", async (req, res) => {
+router.post("/rpc/execute", adminAuthMiddleware, async (req, res) => {
   try {
     const { endpoint, request } = req.body;
 
