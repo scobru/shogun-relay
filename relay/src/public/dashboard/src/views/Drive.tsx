@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { CopyButton } from '../components/CopyButton'
 
 interface DriveItem { name: string; path: string; type: 'file' | 'directory'; size?: number; modified: number }
 interface DriveStats { totalSizeGB: string; totalSizeMB: string; fileCount: number; dirCount: number }
@@ -17,6 +18,12 @@ function Drive() {
   const [uploading, setUploading] = useState(false)
   const [renameModal, setRenameModal] = useState<{open: boolean, item: DriveItem | null, newName: string}>({open: false, item: null, newName: ''})
   const [linkModal, setLinkModal] = useState<{open: boolean, link: string | null}>({open: false, link: null})
+  const [toast, setToast] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null)
+
+  const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
+      setToast({msg, type})
+      setTimeout(() => setToast(null), 3000)
+  }
 
   const formatBytes = (bytes: number) => { if (!bytes) return '0 B'; const k = 1024; const sizes = ['B', 'KB', 'MB', 'GB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i] }
   const formatDate = (ts: number) => new Date(ts).toLocaleString()
@@ -36,9 +43,68 @@ function Drive() {
 
   const navigateTo = (path: string) => setCurrentPath(path)
   const downloadFile = async (filePath: string) => { try { const res = await fetch(`/api/v1/drive/download/${encodeURIComponent(filePath)}`, { headers: getAuthHeaders() }); if (!res.ok) throw new Error('Download failed'); const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filePath.split('/').pop() || 'file'; document.body.appendChild(a); a.click(); document.body.removeChild(a); window.URL.revokeObjectURL(url) } catch {} }
-  const deleteItem = async (itemPath: string) => { if (!confirm(`Delete "${itemPath.split('/').pop()}"?`)) return; try { const res = await fetch(`/api/v1/drive/delete/${encodeURIComponent(itemPath)}`, { method: 'DELETE', headers: getAuthHeaders() }); const data = await res.json(); if (data.success) { loadFiles(); loadStats() } } catch {} }
-  const createFolder = async () => { if (!newFolderName.trim()) return; try { const path = currentPath ? `${currentPath}/${newFolderName}` : newFolderName; const res = await fetch('/api/v1/drive/mkdir', { method: 'POST', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) }); const data = await res.json(); if (data.success) { setShowFolderModal(false); setNewFolderName(''); loadFiles(); loadStats() } } catch {} }
-  const uploadFiles = async () => { if (selectedFiles.length === 0) return; setUploading(true); try { for (const file of selectedFiles) { const formData = new FormData(); formData.append('file', file); if (currentPath) formData.append('path', currentPath); await fetch('/api/v1/drive/upload', { method: 'POST', headers: getAuthHeaders(), body: formData }) }; setShowUploadModal(false); setSelectedFiles([]); loadFiles(); loadStats() } catch {} finally { setUploading(false) } }
+  const deleteItem = async (itemPath: string) => {
+    if (!confirm(`Delete "${itemPath.split('/').pop()}"?`)) return;
+    try {
+      const res = await fetch(`/api/v1/drive/delete/${encodeURIComponent(itemPath)}`, { method: 'DELETE', headers: getAuthHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        loadFiles();
+        loadStats();
+        showToast('Item deleted successfully', 'success');
+      } else {
+        showToast('Failed to delete item', 'error');
+      }
+    } catch {
+      showToast('Network error while deleting', 'error');
+    }
+  }
+
+  const createFolder = async () => {
+    if (!newFolderName.trim()) return;
+    try {
+      const url = currentPath ? `/api/v1/drive/mkdir/${currentPath}` : '/api/v1/drive/mkdir';
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newFolderName })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowFolderModal(false);
+        setNewFolderName('');
+        loadFiles();
+        loadStats();
+        showToast('Folder created successfully', 'success');
+      } else {
+        showToast('Failed to create folder: ' + data.error, 'error');
+      }
+    } catch {
+      showToast('Network error while creating folder', 'error');
+    }
+  }
+
+  const uploadFiles = async () => {
+    if (selectedFiles.length === 0) return;
+    setUploading(true);
+    try {
+      for (const file of selectedFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (currentPath) formData.append('path', currentPath);
+        await fetch('/api/v1/drive/upload', { method: 'POST', headers: getAuthHeaders(), body: formData })
+      };
+      setShowUploadModal(false);
+      setSelectedFiles([]);
+      loadFiles();
+      loadStats();
+      showToast('Files uploaded successfully', 'success');
+    } catch {
+      showToast('Upload failed', 'error');
+    } finally {
+      setUploading(false)
+    }
+  }
   const getBreadcrumbs = () => { const parts = currentPath.split('/').filter((p: string) => p); const crumbs = [{ name: 'Home', path: '' }]; let path = ''; parts.forEach((part: string) => { path += (path ? '/' : '') + part; crumbs.push({ name: part, path }) }); return crumbs }
 
   const handleRename = async () => {
@@ -53,11 +119,13 @@ function Drive() {
           if (data.success) {
               setRenameModal({open: false, item: null, newName: ''})
               loadFiles()
+              showToast('Item renamed successfully', 'success')
           } else {
-              alert('Rename failed: ' + data.error)
+              showToast('Rename failed: ' + data.error, 'error')
           }
       } catch (e) {
           console.error(e)
+          showToast('Network error', 'error')
       }
   }
 
@@ -74,18 +142,11 @@ function Drive() {
           if (data.success && data.publicUrl) {
               setLinkModal({open: true, link: data.publicUrl})
           } else {
-              alert('Could not generate public link: ' + (data.error || 'Unknown error'))
+              showToast('Could not generate public link: ' + (data.error || 'Unknown error'), 'error')
           }
       } catch (e) {
           console.error(e)
-          alert('Failed to generate link')
-      }
-  }
-
-  const copyToClipboard = () => {
-      if (linkModal.link) {
-          navigator.clipboard.writeText(linkModal.link)
-          // Could show toast
+          showToast('Failed to generate link', 'error')
       }
   }
 
@@ -113,8 +174,10 @@ function Drive() {
       loadFiles()
       loadStats()
       setShowUploadModal(false)
+      showToast('Folder uploaded successfully', 'success')
     } catch (e) {
       console.error('Folder upload failed:', e)
+      showToast('Folder upload failed', 'error')
     } finally {
       setUploading(false)
     }
@@ -237,7 +300,11 @@ function Drive() {
                 <h3 className="font-bold text-lg">Public Link</h3>
                 <div className="flex gap-2 mt-4">
                     <input type="text" className="input input-bordered w-full" value={linkModal.link || ''} readOnly />
-                    <button className="btn btn-square" onClick={copyToClipboard} title="Copy">📋</button>
+                    <CopyButton
+                        textToCopy={linkModal.link || ''}
+                        className="btn btn-square"
+                        label="Copy link"
+                    />
                 </div>
                 <div className="modal-action">
                     <button className="btn" onClick={() => setLinkModal({open: false, link: null})}>Close</button>
@@ -245,6 +312,15 @@ function Drive() {
             </div>
             <form method="dialog" className="modal-backdrop"><button onClick={() => setLinkModal({open: false, link: null})}>close</button></form>
         </dialog>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="toast toast-end toast-bottom z-50">
+            <div className={`alert ${toast.type === 'error' ? 'alert-error' : toast.type === 'success' ? 'alert-success' : 'alert-info'}`}>
+                <span>{toast.msg}</span>
+            </div>
+        </div>
       )}
 
       {/* ... (rest of the component) ... */}
@@ -270,10 +346,10 @@ function Drive() {
                       </div>
                     </div>
                     <div className="flex gap-1">
-                      {item.type === 'file' && <button className="btn btn-ghost btn-xs" onClick={(e) => { e.stopPropagation(); downloadFile(item.path) }} title="Download">⬇️</button>}
-                      <button className="btn btn-ghost btn-xs" onClick={(e) => { e.stopPropagation(); setRenameModal({open: true, item, newName: item.name}) }} title="Rename">✏️</button>
-                      <button className="btn btn-ghost btn-xs" onClick={(e) => { e.stopPropagation(); generateLink(item.path) }} title="Share">🔗</button>
-                      <button className="btn btn-ghost btn-xs text-error" onClick={(e) => { e.stopPropagation(); deleteItem(item.path) }} title="Delete">🗑️</button>
+                      {item.type === 'file' && <button className="btn btn-ghost btn-xs" onClick={(e) => { e.stopPropagation(); downloadFile(item.path) }} title="Download" aria-label="Download">⬇️</button>}
+                      <button className="btn btn-ghost btn-xs" onClick={(e) => { e.stopPropagation(); setRenameModal({open: true, item, newName: item.name}) }} title="Rename" aria-label="Rename">✏️</button>
+                      <button className="btn btn-ghost btn-xs" onClick={(e) => { e.stopPropagation(); generateLink(item.path) }} title="Share" aria-label="Share">🔗</button>
+                      <button className="btn btn-ghost btn-xs text-error" onClick={(e) => { e.stopPropagation(); deleteItem(item.path) }} title="Delete" aria-label="Delete">🗑️</button>
                     </div>
                   </div>
                 </li>
