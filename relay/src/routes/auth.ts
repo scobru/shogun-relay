@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import { loggers } from "../utils/logger";
+import { authRateLimiter } from "../middleware/rate-limit";
 
 const router = express.Router();
 
@@ -12,7 +13,7 @@ const getGun = (req: Request) => {
  * POST /api/v1/auth/register
  * Create a new GunDB user on the Relay
  */
-router.post("/register", async (req: Request, res: Response) => {
+router.post("/register", authRateLimiter, async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
 
