@@ -179,7 +179,7 @@ router.get("/by-client/:address", async (req: Request, res: Response) => {
             sizeMB: onChainDeal.sizeMB,
             durationDays: Math.ceil(
               (Number(onChainDeal.expiresAt) - Number(onChainDeal.createdAt)) /
-              (1000 * 60 * 60 * 24)
+                (1000 * 60 * 60 * 24)
             ),
             totalPriceUSDC: parseFloat(String(onChainDeal.priceUSDC)),
             features: { erasureCoding: false },
@@ -303,10 +303,7 @@ router.get("/relay/active", async (req: Request, res: Response) => {
       try {
         const { createStorageDealRegistryClient, createRegistryClientWithSigner } =
           await import("../../utils/registry-client.js");
-        const registryClient = createRegistryClientWithSigner(
-          RELAY_PRIVATE_KEY,
-          REGISTRY_CHAIN_ID
-        );
+        const registryClient = createRegistryClientWithSigner(RELAY_PRIVATE_KEY, REGISTRY_CHAIN_ID);
         const relayAddress = registryClient.wallet.address;
         const storageDealRegistryClient = createStorageDealRegistryClient(REGISTRY_CHAIN_ID);
 

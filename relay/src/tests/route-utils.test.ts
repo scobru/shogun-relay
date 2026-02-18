@@ -66,7 +66,9 @@ describe("handleDriveError", () => {
     });
 
     const errorEmpty = { message: "error: does not exist" };
-    handleDriveError(mockRes, errorEmpty, "Test log message", { notFoundDefault: "Default Not Found" });
+    handleDriveError(mockRes, errorEmpty, "Test log message", {
+      notFoundDefault: "Default Not Found",
+    });
     expect(mockRes.json).toHaveBeenLastCalledWith({
       success: false,
       error: "error: does not exist",
@@ -74,18 +76,18 @@ describe("handleDriveError", () => {
   });
 
   it("should respect notFoundDefault if message is empty but contains 'does not exist'", () => {
-      // If message is exactly "does not exist", it will use it.
-      // If we want to test default, we need message to be JUST the substring or similar.
-      const error = new Error("does not exist");
-      handleDriveError(mockRes, error, "Log", { notFoundDefault: "Default NF" });
-      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ error: "does not exist" }));
+    // If message is exactly "does not exist", it will use it.
+    // If we want to test default, we need message to be JUST the substring or similar.
+    const error = new Error("does not exist");
+    handleDriveError(mockRes, error, "Log", { notFoundDefault: "Default NF" });
+    expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ error: "does not exist" }));
   });
 
   it("should respect useErrorMsg: false", () => {
     const error = new Error("internal detail: does not exist");
     handleDriveError(mockRes, error, "Test log message", {
       notFoundDefault: "File not found",
-      useErrorMsg: false
+      useErrorMsg: false,
     });
 
     expect(mockRes.status).toHaveBeenCalledWith(404);
@@ -98,7 +100,7 @@ describe("handleDriveError", () => {
   it("should handle custom default messages for 409", () => {
     const error = new Error("already exists");
     handleDriveError(mockRes, error, "Test log message", {
-      alreadyExistsDefault: "Target exists"
+      alreadyExistsDefault: "Target exists",
     });
 
     expect(mockRes.status).toHaveBeenCalledWith(409);

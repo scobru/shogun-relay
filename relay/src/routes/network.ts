@@ -34,7 +34,6 @@ function getRelayUserWithKeyPair(): any {
   return user;
 }
 
-
 // Helper to safely get signing keypair
 function getSigningKeyPair(): any {
   return getRelayKeyPair() || null;
@@ -46,15 +45,15 @@ function getSigningKeyPair(): any {
  * that cause "strconv.ParseFloat: parsing \"\": invalid syntax" errors
  */
 function safeParseNumber(value: unknown, defaultValue = 0): number {
-  if (value === undefined || value === null || value === '') {
+  if (value === undefined || value === null || value === "") {
     return defaultValue;
   }
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     return isNaN(value) ? defaultValue : value;
   }
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const trimmed = value.trim();
-    if (trimmed === '') {
+    if (trimmed === "") {
       return defaultValue;
     }
     const parsed = parseInt(trimmed, 10);
@@ -259,8 +258,8 @@ router.get("/peers", async (req, res) => {
               pubKey,
               alias: data.alias || null,
               lastSeen: data.lastSeen,
-              type: data.type || 'unknown',
-              torrentsCount: data.torrentsCount
+              type: data.type || "unknown",
+              torrentsCount: data.torrentsCount,
             });
           }
         });
@@ -277,7 +276,7 @@ router.get("/peers", async (req, res) => {
     res.json({
       success: true,
       count: peers.length,
-      peers
+      peers,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -319,7 +318,7 @@ router.get("/stats", async (req, res) => {
 
     // Check cache first for faster response
     const now = Date.now();
-    if (statsCache.data && (now - statsCache.timestamp) < statsCache.ttl) {
+    if (statsCache.data && now - statsCache.timestamp < statsCache.ttl) {
       loggers.server.debug("📊 Returning cached network stats");
       return res.json(statsCache.data);
     }
@@ -477,7 +476,8 @@ router.get("/stats", async (req, res) => {
           stats.totalRelays++;
           stats.activeRelays++;
           // Get connections from app locals or GunDB internals
-          const activeWires = req.app.get("activeWires") || Object.keys(gun._.opt.peers || {}).length || 0;
+          const activeWires =
+            req.app.get("activeWires") || Object.keys(gun._.opt.peers || {}).length || 0;
           stats.totalConnections += activeWires;
           relaysFound.push({ host: currentRelayHost, hasPulse: false });
 
@@ -831,7 +831,6 @@ router.get("/stats", async (req, res) => {
         loggers.server.debug(`   ⚠️ IPFS pin/ls failed. IPFS may be starting up.`);
       }
     }
-
 
     loggers.server.info({ stats }, `📊 Final network stats (with retroactive sync):`, {
       totalRelays: stats.totalRelays,
@@ -1332,8 +1331,8 @@ router.get("/reputation/:host", async (req, res) => {
     if (reputation.proofSuccessRate === undefined || reputation.proofSuccessRate === null) {
       reputation.proofSuccessRate =
         reputation.proofsTotal &&
-          reputation.proofsTotal > 0 &&
-          reputation.proofsSuccessful !== undefined
+        reputation.proofsTotal > 0 &&
+        reputation.proofsSuccessful !== undefined
           ? (reputation.proofsSuccessful / reputation.proofsTotal) * 100
           : undefined;
     }

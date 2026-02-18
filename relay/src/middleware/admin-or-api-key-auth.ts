@@ -1,6 +1,6 @@
 /**
  * Admin or API Key Authentication Middleware
- * 
+ *
  * Accepts either admin token OR valid API key
  * Can be used by any service (IPFS, Drive, etc.)
  */
@@ -102,4 +102,3 @@ export async function adminOrApiKeyAuthMiddleware(
     error: "Unauthorized - Invalid token or API key",
   });
 }
-

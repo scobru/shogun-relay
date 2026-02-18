@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import { CopyButton } from '../components/CopyButton'
 
 interface StorageStats {
   total: { formatted: string; mb: number; gb: number }
@@ -40,7 +41,6 @@ function Settings() {
   const [relayKeys, setRelayKeys] = useState<RelayKeys | null>(null)
   const [loadingKeys, setLoadingKeys] = useState(false)
   const [showKeys, setShowKeys] = useState(false)
-  const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
   // Storage Stats State
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null)
@@ -90,12 +90,6 @@ function Settings() {
       if (data.success) setConfig(data.config)
     } catch (e) { console.error('Failed to fetch config:', e) }
     finally { setLoadingConfig(false) }
-  }
-
-  const copyToClipboard = async (text: string, keyName: string) => {
-    await navigator.clipboard.writeText(text)
-    setCopiedKey(keyName)
-    setTimeout(() => setCopiedKey(null), 2000)
   }
 
   const maskKey = (key: string) => {
@@ -214,6 +208,7 @@ function Settings() {
                   type="password"
                   className="input input-bordered join-item flex-1"
                   placeholder="Admin password"
+                  aria-label="Admin password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
@@ -234,7 +229,7 @@ function Settings() {
             <div className="flex items-center justify-between">
               <h3 className="card-title">⚙️ Configuration</h3>
               <span className="badge badge-ghost badge-sm">Solo lettura</span>
-              <button className="btn btn-ghost btn-sm" onClick={fetchConfig} disabled={loadingConfig}>
+              <button className="btn btn-ghost btn-sm" onClick={fetchConfig} disabled={loadingConfig} aria-label="Refresh configuration">
                 {loadingConfig ? <span className="loading loading-spinner loading-xs"></span> : '🔄'}
               </button>
             </div>
@@ -250,7 +245,7 @@ function Settings() {
               <div className="flex justify-center p-4"><span className="loading loading-spinner"></span></div>
             ) : config ? (
               <div className="mt-2">
-                <div className="alert alert-info py-2 mb-4">
+                <div className="alert alert-info py-2 mb-4" role="alert">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                   <span className="text-xs">Configuration is read-only. To modify settings, edit the <code>.env</code> file and restart the server.</span>
                 </div>
@@ -288,7 +283,7 @@ function Settings() {
                     onChange={(e) => setShowKeys(e.target.checked)}
                   />
                 </label>
-                <button className="btn btn-ghost btn-sm" onClick={fetchRelayKeys} disabled={loadingKeys}>
+                <button className="btn btn-ghost btn-sm" onClick={fetchRelayKeys} disabled={loadingKeys} aria-label="Refresh relay keys">
                   {loadingKeys ? <span className="loading loading-spinner loading-xs"></span> : '🔄'}
                 </button>
               </div>
@@ -302,12 +297,14 @@ function Settings() {
                   <div key={keyType} className="flex flex-col gap-1">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-base-content/60 uppercase">{keyType}</span>
-                      <button
+                      <CopyButton
+                        textToCopy={relayKeys[keyType]}
+                        label={`Copy ${keyType} key`}
                         className="btn btn-ghost btn-xs"
-                        onClick={() => copyToClipboard(relayKeys[keyType], keyType)}
+                        successContent="✅ Copied!"
                       >
-                        {copiedKey === keyType ? '✅ Copied!' : '📋 Copy'}
-                      </button>
+                        📋 Copy
+                      </CopyButton>
                     </div>
                     <code className="bg-base-200 px-3 py-2 rounded text-xs break-all font-mono">
                       {maskKey(relayKeys[keyType])}
@@ -328,7 +325,7 @@ function Settings() {
           <div className="card-body">
             <div className="flex items-center justify-between">
               <h3 className="card-title">💾 Storage Overview</h3>
-              <button className="btn btn-ghost btn-sm" onClick={fetchStorageStats} disabled={loadingStorage}>
+              <button className="btn btn-ghost btn-sm" onClick={fetchStorageStats} disabled={loadingStorage} aria-label="Refresh storage statistics">
                 {loadingStorage ? <span className="loading loading-spinner loading-xs"></span> : '🔄'}
               </button>
             </div>

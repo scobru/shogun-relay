@@ -29,14 +29,14 @@ const loggerOptions: pino.LoggerOptions = {
 // In development, use pino-pretty for human-readable output
 const transport = isDev
   ? {
-    target: "pino-pretty",
-    options: {
-      colorize: true,
-      translateTime: "HH:MM:ss",
-      ignore: "pid,hostname",
-      singleLine: false,
-    },
-  }
+      target: "pino-pretty",
+      options: {
+        colorize: true,
+        translateTime: "HH:MM:ss",
+        ignore: "pid,hostname",
+        singleLine: false,
+      },
+    }
   : undefined;
 
 // Create the base logger

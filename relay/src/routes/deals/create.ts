@@ -181,22 +181,22 @@ router.post("/create", express.json(), async (req: Request, res: Response) => {
     // Prepare reputation info for response
     const reputationInfo = selectedRelayReputation
       ? {
-        score: selectedRelayReputation.calculatedScore.total,
-        tier: selectedRelayReputation.calculatedScore.tier,
-        breakdown: selectedRelayReputation.calculatedScore.breakdown,
-        hasEnoughData: selectedRelayReputation.calculatedScore.hasEnoughData,
-        metrics: {
-          uptimePercent: selectedRelayReputation.uptimePercent || 0,
-          proofSuccessRate:
-            selectedRelayReputation.proofsTotal &&
+          score: selectedRelayReputation.calculatedScore.total,
+          tier: selectedRelayReputation.calculatedScore.tier,
+          breakdown: selectedRelayReputation.calculatedScore.breakdown,
+          hasEnoughData: selectedRelayReputation.calculatedScore.hasEnoughData,
+          metrics: {
+            uptimePercent: selectedRelayReputation.uptimePercent || 0,
+            proofSuccessRate:
+              selectedRelayReputation.proofsTotal &&
               selectedRelayReputation.proofsTotal > 0 &&
               selectedRelayReputation.proofsSuccessful !== undefined
-              ? (selectedRelayReputation.proofsSuccessful / selectedRelayReputation.proofsTotal) *
-              100
-              : null,
-          avgResponseTimeMs: selectedRelayReputation.avgResponseTimeMs || null,
-        },
-      }
+                ? (selectedRelayReputation.proofsSuccessful / selectedRelayReputation.proofsTotal) *
+                  100
+                : null,
+            avgResponseTimeMs: selectedRelayReputation.avgResponseTimeMs || null,
+          },
+        }
       : null;
 
     // Return 200 OK - deal created successfully, payment needed to activate

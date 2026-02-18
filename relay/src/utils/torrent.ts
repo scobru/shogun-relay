@@ -1,12 +1,17 @@
-import WebTorrent from 'webtorrent';
-import path from 'path';
-import fs from 'fs';
-import { createRequire } from 'module';
-import { loggers } from './logger';
+import WebTorrent from "webtorrent";
+import path from "path";
+import fs from "fs";
+import { createRequire } from "module";
+import { loggers } from "./logger";
 import { GUN_PATHS, getGunNode } from "./gun-paths";
-import { torrentConfig, relayConfig, ipfsConfig } from '../config/env-config';
-import { generateAACID, createAACRecord, generateDataFolderName, AACMetadataRecord } from './aac-utils';
-import { logMemoryUsage, performMemoryCleanup, checkAndWarnMemory } from './memory-utils';
+import { torrentConfig, relayConfig, ipfsConfig } from "../config/env-config";
+import {
+  generateAACID,
+  createAACRecord,
+  generateDataFolderName,
+  AACMetadataRecord,
+} from "./aac-utils";
+import { logMemoryUsage, performMemoryCleanup, checkAndWarnMemory } from "./memory-utils";
 
 // Create require for CJS modules
 const require = createRequire(import.meta.url);
@@ -22,7 +27,7 @@ interface TorrentPersistEntry {
   infoHash?: string;
   name?: string;
   filePaths?: string[]; // For seeded torrents - paths to original files
-  isSeeded?: boolean;   // True if this was created locally via seed
+  isSeeded?: boolean; // True if this was created locally via seed
 }
 // Catalog entry for torrents with IPFS mappings
 export interface CatalogEntry {
@@ -54,7 +59,7 @@ export interface TorrentStatus {
     uploadSpeed: number;
     peers: number;
     paused: boolean;
-    state?: 'downloading' | 'seeding' | 'paused' | 'queued' | 'checking' | 'error';
+    state?: "downloading" | "seeding" | "paused" | "queued" | "checking" | "error";
     files: number;
   }[];
 }
@@ -67,39 +72,39 @@ export class TorrentManager {
   private catalogFile: string;
   private catalog: Map<string, CatalogEntry> = new Map();
   private gun: any;
-  private relayKey: string = '';
+  private relayKey: string = "";
 
   constructor() {
     this.enabled = torrentConfig.enabled;
     this.dataDir = torrentConfig.dataDir;
-    this.catalogFile = path.join(this.dataDir, 'catalog.json');
-    
+    this.catalogFile = path.join(this.dataDir, "catalog.json");
+
     // Initialize GunDB for decentralized catalog
     if (this.enabled) {
       try {
         // Use gun/gun.js directly to avoid bullet-catcher's isValid requirement
         // This is a client Gun instance, not the main server
-        const Gun = require('gun/gun.js');
-        require('gun/lib/radix.js');
-        require('gun/lib/radisk.js');
-        require('gun/lib/store.js');
-        
+        const Gun = require("gun/gun.js");
+        require("gun/lib/radix.js");
+        require("gun/lib/radisk.js");
+        require("gun/lib/store.js");
+
         // Create an isValid function that allows all messages
         // This is needed because bullet-catcher modifies Gun globally
         const isValidAllowAll = () => true;
-        
+
         this.gun = Gun({
           peers: relayConfig.peers,
           localStorage: false,
           radisk: false,
-          isValid: isValidAllowAll // Required by bullet-catcher
+          isValid: isValidAllowAll, // Required by bullet-catcher
         });
-        
+
         // Initialize with temporary key - will be updated with real pub key via setRelayPubKey()
         this.relayKey = `relay-temp-${Date.now()}`;
-        
+
         loggers.server.info(`📚 GunDB initialized with temporary key: ${this.relayKey}`);
-        loggers.server.info(`📚 GunDB peers: ${relayConfig.peers.join(', ')}`);
+        loggers.server.info(`📚 GunDB peers: ${relayConfig.peers.join(", ")}`);
       } catch (error) {
         loggers.server.error({ err: error }, "📚 Failed to initialize GunDB");
         this.gun = null;
@@ -109,8 +114,8 @@ export class TorrentManager {
     // Default torrents (Placeholder for MVP)
     // Ideally this would fetch from torrentConfig.annasArchiveUrl
     this.torrents = [
-        // Example: Anna’s Archive: Sci-Hub torrent (just a placeholder magnet/hash)
-        // "magnet:?xt=urn:btih:..." 
+      // Example: Anna’s Archive: Sci-Hub torrent (just a placeholder magnet/hash)
+      // "magnet:?xt=urn:btih:..."
     ];
   }
 
@@ -138,7 +143,7 @@ export class TorrentManager {
     }
 
     loggers.server.info("📚 Initializing Torrent Manager...");
-    
+
     // Ensure data directory exists
     if (!fs.existsSync(this.dataDir)) {
       fs.mkdirSync(this.dataDir, { recursive: true });
@@ -146,38 +151,37 @@ export class TorrentManager {
 
     try {
       // Dynamic import for WebTorrent if needed, or just use the imported one
-       // @ts-ignore - WebTorrent types might be tricky with ESM/CommonJS mix
+      // @ts-ignore - WebTorrent types might be tricky with ESM/CommonJS mix
       this.client = new WebTorrent({
-          // @ts-ignore - Enable uTP for better compatibility with traditional clients (safe on Debian)
-          utp: true,
-          // Enable DHT for distributed peer discovery (essential for seeding)
-          dht: true,
-          // Enable Local Service Discovery for LAN peers
-          lsd: true,
-          // Enable Peer Exchange
-          webSeeds: true,
-          // Use fixed port for Docker port mapping (must match EXPOSE in Dockerfile)
-          // @ts-ignore
-          torrentPort: 6881
+        // @ts-ignore - Enable uTP for better compatibility with traditional clients (safe on Debian)
+        utp: true,
+        // Enable DHT for distributed peer discovery (essential for seeding)
+        dht: true,
+        // Enable Local Service Discovery for LAN peers
+        lsd: true,
+        // Enable Peer Exchange
+        webSeeds: true,
+        // Use fixed port for Docker port mapping (must match EXPOSE in Dockerfile)
+        // @ts-ignore
+        torrentPort: 6881,
       });
 
-      this.client.on('error', (err) => {
-          loggers.server.error({ err }, "📚 Torrent WebTorrent Error");
+      this.client.on("error", (err) => {
+        loggers.server.error({ err }, "📚 Torrent WebTorrent Error");
       });
 
       loggers.server.info(`📚 Torrent Manager started. Data dir: ${this.dataDir}`);
       // Load existing catalog
       this.loadCatalog();
-      
+
       // Subscribe to GunDB network
       this.subscribeToNetwork();
-      
+
       // Always publish catalog to GunDB so we are discoverable (even if empty)
       this.publishCatalog();
-      
+
       // Start seeding/downloading configured torrents
       await this.loadTorrents();
-
     } catch (error) {
       loggers.server.error({ err: error }, "📚 Failed to start Torrent Manager");
     }
@@ -187,80 +191,93 @@ export class TorrentManager {
    * Load and start torrents
    */
   private async loadTorrents(): Promise<void> {
-      if (!this.client) return;
+    if (!this.client) return;
 
-      let allTorrents: (string | TorrentPersistEntry)[] = [...this.torrents];
+    let allTorrents: (string | TorrentPersistEntry)[] = [...this.torrents];
 
-      // 1. Load from torrents.json
-      const torrentsFile = path.join(this.dataDir, 'torrents.json');
-      if (fs.existsSync(torrentsFile)) {
-          try {
-              const fileContent = fs.readFileSync(torrentsFile, 'utf8');
-              const data = JSON.parse(fileContent);
-              if (Array.isArray(data)) {
-                  allTorrents = [...allTorrents, ...data];
-                  loggers.server.info(`📚 Loaded ${data.length} torrents from ${torrentsFile}`);
-              }
-          } catch (error) {
-              loggers.server.error({ err: error }, `📚 Failed to parse ${torrentsFile}`);
-          }
-      } else {
-           // Initialize empty file if not exists
-           try {
-               fs.writeFileSync(torrentsFile, JSON.stringify([], null, 2));
-           } catch (error) {}
+    // 1. Load from torrents.json
+    const torrentsFile = path.join(this.dataDir, "torrents.json");
+    if (fs.existsSync(torrentsFile)) {
+      try {
+        const fileContent = fs.readFileSync(torrentsFile, "utf8");
+        const data = JSON.parse(fileContent);
+        if (Array.isArray(data)) {
+          allTorrents = [...allTorrents, ...data];
+          loggers.server.info(`📚 Loaded ${data.length} torrents from ${torrentsFile}`);
+        }
+      } catch (error) {
+        loggers.server.error({ err: error }, `📚 Failed to parse ${torrentsFile}`);
       }
+    } else {
+      // Initialize empty file if not exists
+      try {
+        fs.writeFileSync(torrentsFile, JSON.stringify([], null, 2));
+      } catch (error) {}
+    }
 
-      if (allTorrents.length === 0) {
-          loggers.server.info("📚 No torrents configured yet.");
-          return;
-      }
+    if (allTorrents.length === 0) {
+      loggers.server.info("📚 No torrents configured yet.");
+      return;
+    }
 
-      loggers.server.info(`📚 Starting ${allTorrents.length} torrents...`);
+    loggers.server.info(`📚 Starting ${allTorrents.length} torrents...`);
 
-      for (const torrentEntry of allTorrents) {
-        try {
-          // Check if it's an extended entry with file paths (seeded torrent)
-          if (typeof torrentEntry === 'object' && torrentEntry.filePaths && torrentEntry.filePaths.length > 0) {
-            // Verify files still exist
-            const existingFiles = torrentEntry.filePaths.filter(fp => fs.existsSync(fp));
-            
-            if (existingFiles.length > 0) {
-              loggers.server.info(`📚 Resuming seed for: ${torrentEntry.name || torrentEntry.infoHash} with ${existingFiles.length} files`);
-              
-              // Use seed() to resume seeding existing files
-              this.client!.seed(existingFiles, {
+    for (const torrentEntry of allTorrents) {
+      try {
+        // Check if it's an extended entry with file paths (seeded torrent)
+        if (
+          typeof torrentEntry === "object" &&
+          torrentEntry.filePaths &&
+          torrentEntry.filePaths.length > 0
+        ) {
+          // Verify files still exist
+          const existingFiles = torrentEntry.filePaths.filter((fp) => fs.existsSync(fp));
+
+          if (existingFiles.length > 0) {
+            loggers.server.info(
+              `📚 Resuming seed for: ${torrentEntry.name || torrentEntry.infoHash} with ${existingFiles.length} files`
+            );
+
+            // Use seed() to resume seeding existing files
+            this.client!.seed(
+              existingFiles,
+              {
                 announce: [
-                  'wss://tracker.openwebtorrent.com',
-                  'wss://tracker.btorrent.xyz',
-                  'wss://tracker.webtorrent.dev',
-                  'udp://tracker.opentrackr.org:1337/announce',
-                  'udp://tracker.openbittorrent.com:6969/announce'
-                ]
-              }, (torrent) => {
+                  "wss://tracker.openwebtorrent.com",
+                  "wss://tracker.btorrent.xyz",
+                  "wss://tracker.webtorrent.dev",
+                  "udp://tracker.opentrackr.org:1337/announce",
+                  "udp://tracker.openbittorrent.com:6969/announce",
+                ],
+              },
+              (torrent) => {
                 loggers.server.info(`📚 Resumed seeding: ${torrent.name} (100% complete)`);
-                
+
                 // Re-catalog the torrent
                 this.onTorrentComplete(torrent);
-              });
-            } else {
-              loggers.server.warn(`📚 Files no longer exist for torrent: ${torrentEntry.name || torrentEntry.infoHash}`);
-              // Fall back to magnet if files are missing
-              if (torrentEntry.magnetURI) {
-                this.addTorrentFromMagnet(torrentEntry.magnetURI);
               }
-            }
+            );
           } else {
-            // Regular magnet link (string or object with only magnetURI)
-            const magnetURI = typeof torrentEntry === 'string' ? torrentEntry : torrentEntry.magnetURI;
-            if (magnetURI) {
-              this.addTorrentFromMagnet(magnetURI);
+            loggers.server.warn(
+              `📚 Files no longer exist for torrent: ${torrentEntry.name || torrentEntry.infoHash}`
+            );
+            // Fall back to magnet if files are missing
+            if (torrentEntry.magnetURI) {
+              this.addTorrentFromMagnet(torrentEntry.magnetURI);
             }
           }
-        } catch (err) {
-          loggers.server.error({ err }, `📚 Error loading torrent entry`);
+        } else {
+          // Regular magnet link (string or object with only magnetURI)
+          const magnetURI =
+            typeof torrentEntry === "string" ? torrentEntry : torrentEntry.magnetURI;
+          if (magnetURI) {
+            this.addTorrentFromMagnet(magnetURI);
+          }
         }
+      } catch (err) {
+        loggers.server.error({ err }, `📚 Error loading torrent entry`);
       }
+    }
   }
 
   /**
@@ -268,11 +285,11 @@ export class TorrentManager {
    */
   private addTorrentFromMagnet(magnetURI: string): void {
     if (!this.client) return;
-    
+
     this.client.add(magnetURI, { path: this.dataDir }, (torrent) => {
       loggers.server.info(`📚 Added torrent: ${torrent.name}`);
-      
-      torrent.on('done', () => {
+
+      torrent.on("done", () => {
         loggers.server.info(`📚 Torrent download complete: ${torrent.name}`);
         this.onTorrentComplete(torrent);
       });
@@ -283,100 +300,111 @@ export class TorrentManager {
    * Fetch dynamic torrent list from Anna's Archive
    */
   private async fetchDynamicTorrents(maxTbOverride?: number): Promise<string[]> {
-      const maxTb = maxTbOverride !== undefined ? maxTbOverride : torrentConfig.maxTb;
-      const url = `${torrentConfig.annasArchiveUrl}?max_tb=${maxTb}&format=json`;
-      
-      loggers.server.info({ url, maxTb }, "📚 Fetching dynamic torrent list...");
+    const maxTb = maxTbOverride !== undefined ? maxTbOverride : torrentConfig.maxTb;
+    const url = `${torrentConfig.annasArchiveUrl}?max_tb=${maxTb}&format=json`;
 
-      try {
-          const response = await fetch(url);
-          if (!response.ok) {
-              throw new Error(`Failed to fetch: ${response.statusText}`);
-          }
+    loggers.server.info({ url, maxTb }, "📚 Fetching dynamic torrent list...");
 
-          const data: any[] = await response.json() as any[];
-          
-          if (!Array.isArray(data)) {
-              throw new Error("Invalid response format: expected array");
-          }
-
-          // Extract magnet links
-          return data
-              .map(item => item.magnet_link)
-              .filter(link => link && typeof link === 'string');
-
-      } catch (error) {
-          loggers.server.error({ err: error }, "📚 Error fetching dynamic torrents");
-          return [];
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.statusText}`);
       }
+
+      const data: any[] = (await response.json()) as any[];
+
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid response format: expected array");
+      }
+
+      // Extract magnet links
+      return data
+        .map((item) => item.magnet_link)
+        .filter((link) => link && typeof link === "string");
+    } catch (error) {
+      loggers.server.error({ err: error }, "📚 Error fetching dynamic torrents");
+      return [];
+    }
   }
 
   /**
    * Helper to persist a torrent to torrents.json
    * Supports both magnet links (string) and extended entries with file paths
    */
-  private persistTorrent(magnetOrPath: string, options?: { filePaths?: string[], infoHash?: string, name?: string, isSeeded?: boolean }): void {
-      try {
-          const torrentsFile = path.join(this.dataDir, 'torrents.json');
-          let existingTorrents: (string | TorrentPersistEntry)[] = [];
-          
-          if (fs.existsSync(torrentsFile)) {
-              const fileContent = fs.readFileSync(torrentsFile, 'utf8');
-              existingTorrents = JSON.parse(fileContent);
-          }
-          
-          // Check if already exists (by magnet or infoHash)
-          const alreadyExists = existingTorrents.some(entry => {
-            if (typeof entry === 'string') {
-              return entry === magnetOrPath;
-            }
-            return entry.magnetURI === magnetOrPath || (options?.infoHash && entry.infoHash === options.infoHash);
-          });
-          
-          if (!alreadyExists) {
-              if (options?.filePaths && options.filePaths.length > 0) {
-                // Save as extended entry with file paths for seeded torrents
-                const entry: TorrentPersistEntry = {
-                  magnetURI: magnetOrPath,
-                  infoHash: options.infoHash,
-                  name: options.name,
-                  filePaths: options.filePaths,
-                  isSeeded: options.isSeeded ?? true
-                };
-                existingTorrents.push(entry);
-                loggers.server.info(`📚 Persisted seeded torrent with file paths: ${options.name || magnetOrPath.substring(0, 50)}...`);
-              } else {
-                // Save as simple magnet link
-                existingTorrents.push(magnetOrPath);
-                loggers.server.info(`📚 Persisted torrent magnet: ${magnetOrPath.substring(0, 50)}...`);
-              }
-              fs.writeFileSync(torrentsFile, JSON.stringify(existingTorrents, null, 2));
-          }
-      } catch (error) {
-          loggers.server.error({ err: error }, "📚 Failed to persist torrent");
+  private persistTorrent(
+    magnetOrPath: string,
+    options?: { filePaths?: string[]; infoHash?: string; name?: string; isSeeded?: boolean }
+  ): void {
+    try {
+      const torrentsFile = path.join(this.dataDir, "torrents.json");
+      let existingTorrents: (string | TorrentPersistEntry)[] = [];
+
+      if (fs.existsSync(torrentsFile)) {
+        const fileContent = fs.readFileSync(torrentsFile, "utf8");
+        existingTorrents = JSON.parse(fileContent);
       }
+
+      // Check if already exists (by magnet or infoHash)
+      const alreadyExists = existingTorrents.some((entry) => {
+        if (typeof entry === "string") {
+          return entry === magnetOrPath;
+        }
+        return (
+          entry.magnetURI === magnetOrPath ||
+          (options?.infoHash && entry.infoHash === options.infoHash)
+        );
+      });
+
+      if (!alreadyExists) {
+        if (options?.filePaths && options.filePaths.length > 0) {
+          // Save as extended entry with file paths for seeded torrents
+          const entry: TorrentPersistEntry = {
+            magnetURI: magnetOrPath,
+            infoHash: options.infoHash,
+            name: options.name,
+            filePaths: options.filePaths,
+            isSeeded: options.isSeeded ?? true,
+          };
+          existingTorrents.push(entry);
+          loggers.server.info(
+            `📚 Persisted seeded torrent with file paths: ${options.name || magnetOrPath.substring(0, 50)}...`
+          );
+        } else {
+          // Save as simple magnet link
+          existingTorrents.push(magnetOrPath);
+          loggers.server.info(`📚 Persisted torrent magnet: ${magnetOrPath.substring(0, 50)}...`);
+        }
+        fs.writeFileSync(torrentsFile, JSON.stringify(existingTorrents, null, 2));
+      }
+    } catch (error) {
+      loggers.server.error({ err: error }, "📚 Failed to persist torrent");
+    }
   }
 
   /**
    * Re-fetch and add dynamic torrents from Anna's Archive
    * @param maxTb Optional: Override the max TB parameter
    */
-  public async refetchDynamicTorrents(maxTb?: number): Promise<{ added: number; skipped: number; total: number }> {
+  public async refetchDynamicTorrents(
+    maxTb?: number
+  ): Promise<{ added: number; skipped: number; total: number }> {
     if (!this.enabled || !this.client) {
       throw new Error("Torrent integration is not enabled");
     }
 
-    loggers.server.info(`📚 Refetching torrents from Anna's Archive (maxTb: ${maxTb || torrentConfig.maxTb})...`);
-    
+    loggers.server.info(
+      `📚 Refetching torrents from Anna's Archive (maxTb: ${maxTb || torrentConfig.maxTb})...`
+    );
+
     const magnets = await this.fetchDynamicTorrents(maxTb);
-    
+
     if (magnets.length === 0) {
       return { added: 0, skipped: 0, total: 0 };
     }
 
     // Get existing torrent hashes to avoid duplicates
-    const existingHashes = new Set(this.client.torrents.map(t => t.infoHash.toLowerCase()));
-    
+    const existingHashes = new Set(this.client.torrents.map((t) => t.infoHash.toLowerCase()));
+
     let added = 0;
     let skipped = 0;
 
@@ -390,24 +418,26 @@ export class TorrentManager {
           continue;
         }
       }
-      
+
       // Add the torrent
       this.client.add(magnet, { path: this.dataDir }, (torrent) => {
         loggers.server.info(`📚 Added torrent from refetch: ${torrent.name}`);
-        
-        torrent.on('done', () => {
+
+        torrent.on("done", () => {
           this.onTorrentComplete(torrent);
         });
       });
-      
+
       // Persist the torrent so it survives restarts
       this.persistTorrent(magnet);
-      
+
       added++;
     }
 
-    loggers.server.info(`📚 Refetch complete: ${added} added, ${skipped} skipped (duplicates), ${magnets.length} total from API`);
-    
+    loggers.server.info(
+      `📚 Refetch complete: ${added} added, ${skipped} skipped (duplicates), ${magnets.length} total from API`
+    );
+
     return { added, skipped, total: magnets.length };
   }
 
@@ -429,35 +459,37 @@ export class TorrentManager {
   public async verifyAndCleanupRegistry(): Promise<void> {
     if (!this.gun || !this.enabled || !this.client) return;
 
-    const thisRelay = relayConfig.endpoint || '';
+    const thisRelay = relayConfig.endpoint || "";
     if (!thisRelay) return;
 
     loggers.server.info("📚 Starting registry verification and cleanup...");
-    
+
     // Get all local info hashes
-    const localInfoHashes = new Set(
-      this.client.torrents.map(t => t.infoHash.toLowerCase())
-    );
+    const localInfoHashes = new Set(this.client.torrents.map((t) => t.infoHash.toLowerCase()));
 
     // We need to scan the registry
     // Note: This might be heavy if registry is huge, but we only process valid entries
-    getGunNode(this.gun, GUN_PATHS.TORRENTS).map().once(async (entry: any, infoHash: string) => {
-      if (!entry || !entry.magnetURI) return;
+    getGunNode(this.gun, GUN_PATHS.TORRENTS)
+      .map()
+      .once(async (entry: any, infoHash: string) => {
+        if (!entry || !entry.magnetURI) return;
 
-      const normalizedHash = infoHash.toLowerCase();
-      const addedBy = entry.addedBy || '';
-      
-      // Check if this torrent was added by THIS relay
-      if (addedBy && addedBy.includes(thisRelay.replace(/https?:\/\//, '').split('/')[0])) {
-        // If it was added by us, check if we still have it
-        if (!localInfoHashes.has(normalizedHash)) {
-          loggers.server.warn(`📚 Found orphaned torrent in registry: ${entry.name} (${normalizedHash})`);
-          loggers.server.info(`📚 Removing orphaned torrent from registry...`);
-          
-          await this.removeFromGlobalRegistry(normalizedHash, entry.name);
+        const normalizedHash = infoHash.toLowerCase();
+        const addedBy = entry.addedBy || "";
+
+        // Check if this torrent was added by THIS relay
+        if (addedBy && addedBy.includes(thisRelay.replace(/https?:\/\//, "").split("/")[0])) {
+          // If it was added by us, check if we still have it
+          if (!localInfoHashes.has(normalizedHash)) {
+            loggers.server.warn(
+              `📚 Found orphaned torrent in registry: ${entry.name} (${normalizedHash})`
+            );
+            loggers.server.info(`📚 Removing orphaned torrent from registry...`);
+
+            await this.removeFromGlobalRegistry(normalizedHash, entry.name);
+          }
         }
-      }
-    });
+      });
   }
 
   /**
@@ -470,7 +502,9 @@ export class TorrentManager {
 
     try {
       // Check if already added (simple check for magnet string in torrents)
-      const existing = this.client.torrents.find(t => t.magnetURI === magnetOrPath || t.infoHash === magnetOrPath);
+      const existing = this.client.torrents.find(
+        (t) => t.magnetURI === magnetOrPath || t.infoHash === magnetOrPath
+      );
       if (existing) {
         loggers.server.info(`📚 Torrent already active: ${existing.name}`);
         return existing;
@@ -478,31 +512,31 @@ export class TorrentManager {
 
       const torrent = this.client.add(magnetOrPath, { path: this.dataDir }, (torrent) => {
         loggers.server.info(`📚 Manually added torrent: ${torrent.name}`);
-        
+
         // Register done event to catalog torrent when complete
-        torrent.on('done', () => {
+        torrent.on("done", () => {
           loggers.server.info(`📚 Torrent download complete: ${torrent.name}`);
           // Add files to catalog
           this.onTorrentComplete(torrent);
-          
+
           // Publish to global registry for network discovery
           this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
             size: torrent.length,
             files: torrent.files?.length || 0,
-            fileList: torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || []
+            fileList: torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || [],
           });
         });
-        
+
         // If already done (e.g., seeding or instant resume), catalog immediately
         if (torrent.done) {
           loggers.server.info(`📚 Torrent already complete, cataloging: ${torrent.name}`);
           this.onTorrentComplete(torrent);
-          
+
           // Publish to global registry
           this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
             size: torrent.length,
             files: torrent.files?.length || 0,
-            fileList: torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || []
+            fileList: torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || [],
           });
         }
       });
@@ -521,7 +555,14 @@ export class TorrentManager {
    * Create a torrent from files and start seeding
    * Uses AAC (Anna's Archive Container) format for metadata
    */
-  public async createTorrent(filePaths: string[]): Promise<{magnetURI: string, infoHash: string, name: string, aacMetadata?: AACMetadataRecord[]}> {
+  public async createTorrent(
+    filePaths: string[]
+  ): Promise<{
+    magnetURI: string;
+    infoHash: string;
+    name: string;
+    aacMetadata?: AACMetadataRecord[];
+  }> {
     if (!this.enabled || !this.client) {
       throw new Error("Torrent integration is not enabled");
     }
@@ -529,112 +570,133 @@ export class TorrentManager {
     return new Promise((resolve, reject) => {
       try {
         // Seed the files - prioritize WebSocket trackers for Docker compatibility
-        this.client!.seed(filePaths, {
-          announce: [
-            // WebSocket trackers work better in Docker/NAT environments
-            'wss://tracker.openwebtorrent.com',
-            'wss://tracker.btorrent.xyz',
-            'wss://tracker.webtorrent.dev',
-            'wss://tracker.files.fm:7073/announce',
-            // UDP trackers as fallback
-            'udp://tracker.opentrackr.org:1337/announce',
-            'udp://tracker.openbittorrent.com:6969/announce',
-            'udp://open.stealth.si:80/announce',
-            'udp://exodus.desync.com:6969/announce',
-            'udp://tracker.torrent.eu.org:451/announce',
-            'udp://opentracker.i2p.rocks:6969/announce'
-          ]
-        }, (torrent) => {
-          try {
-            loggers.server.info(`📚 Seed callback fired for: ${torrent.name}`);
-            loggers.server.info(`📚 InfoHash: ${torrent.infoHash}`);
-            loggers.server.info(`📚 Magnet: ${torrent.magnetURI.substring(0, 80)}...`);
+        this.client!.seed(
+          filePaths,
+          {
+            announce: [
+              // WebSocket trackers work better in Docker/NAT environments
+              "wss://tracker.openwebtorrent.com",
+              "wss://tracker.btorrent.xyz",
+              "wss://tracker.webtorrent.dev",
+              "wss://tracker.files.fm:7073/announce",
+              // UDP trackers as fallback
+              "udp://tracker.opentrackr.org:1337/announce",
+              "udp://tracker.openbittorrent.com:6969/announce",
+              "udp://open.stealth.si:80/announce",
+              "udp://exodus.desync.com:6969/announce",
+              "udp://tracker.torrent.eu.org:451/announce",
+              "udp://opentracker.i2p.rocks:6969/announce",
+            ],
+          },
+          (torrent) => {
+            try {
+              loggers.server.info(`📚 Seed callback fired for: ${torrent.name}`);
+              loggers.server.info(`📚 InfoHash: ${torrent.infoHash}`);
+              loggers.server.info(`📚 Magnet: ${torrent.magnetURI.substring(0, 80)}...`);
 
-            // Generate AAC metadata for each file
-            const aacRecords: AACMetadataRecord[] = [];
-            torrent.files.forEach((file: any) => {
-              const record = createAACRecord(file.name, file.length, {
-                source: 'shogun_relay',
-                additionalMetadata: {
-                  torrentHash: torrent.infoHash,
-                  torrentName: torrent.name,
-                  filePath: file.path
-                }
-              });
-              aacRecords.push(record);
-              loggers.server.debug(`📚 Generated AACID for ${file.name}: ${record.aacid}`);
-            });
-
-            // Save AAC metadata to file
-            if (aacRecords.length > 0) {
-              const metadataFile = path.join(this.dataDir, `${torrent.infoHash}_aac_metadata.jsonl`);
-              const jsonlContent = aacRecords.map(r => JSON.stringify(r)).join('\n');
-              fs.writeFileSync(metadataFile, jsonlContent);
-              loggers.server.info(`📚 AAC metadata saved to: ${metadataFile}`);
-            }
-
-            // Log tracker events for debugging
-            torrent.on('warning', (warn: any) => {
-              loggers.server.warn({ warn }, `📚 Torrent warning: ${torrent.name}`);
-            });
-
-            torrent.on('noPeers', (announceType: string) => {
-              loggers.server.debug(`📚 No peers found via ${announceType} for ${torrent.name}`);
-            });
-
-            // Save to torrents.json for persistence WITH file paths for resumption
-            // This allows the torrent to be resumed at 100% after restart
-            this.persistTorrent(torrent.magnetURI, {
-              filePaths: filePaths,  // Original file paths for seed resumption
-              infoHash: torrent.infoHash,
-              name: torrent.name,
-              isSeeded: true
-            });
-
-            // For seeded torrents - add to catalog (use .then() since this is not async)
-            loggers.server.info(`📚 Adding torrent ${torrent.name} to catalog...`);
-            this.onTorrentComplete(torrent)
-              .then(async () => {
-                loggers.server.info(`📚 Catalog updated, now has ${this.catalog.size} entries`);
-                
-                // Get catalog entry (now has files with potential IPFS CIDs)
-                const catalogEntry = this.catalog.get(torrent.infoHash.toLowerCase());
-                const fileList = catalogEntry?.files.map(f => ({
-                  name: f.name,
-                  size: f.size,
-                  ipfsCid: f.ipfsCid
-                })) || torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || [];
-                
-                // Publish to global registry for network discovery
-                loggers.server.info(`📚 Publishing to global registry: ${torrent.name} with ${fileList.length} files`);
-                const result = await this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
-                  size: torrent.length,
-                  files: torrent.files?.length || 0,
-                  aacMetadata: aacRecords[0], // Include first AAC record
-                  fileList
+              // Generate AAC metadata for each file
+              const aacRecords: AACMetadataRecord[] = [];
+              torrent.files.forEach((file: any) => {
+                const record = createAACRecord(file.name, file.length, {
+                  source: "shogun_relay",
+                  additionalMetadata: {
+                    torrentHash: torrent.infoHash,
+                    torrentName: torrent.name,
+                    filePath: file.path,
+                  },
                 });
-                
-                if (result.success) {
-                  loggers.server.info(`📚 Successfully published to global registry: ${torrent.name}`);
-                } else {
-                  loggers.server.error(`📚 Failed to publish to global registry: ${torrent.name}`);
-                }
-              })
-              .catch((err) => {
-                loggers.server.error({ err }, `📚 Failed to add to catalog`);
+                aacRecords.push(record);
+                loggers.server.debug(`📚 Generated AACID for ${file.name}: ${record.aacid}`);
               });
 
-            resolve({
-              magnetURI: torrent.magnetURI,
-              infoHash: torrent.infoHash,
-              name: torrent.name,
-              aacMetadata: aacRecords
-            });
-          } catch (callbackError: any) {
-            loggers.server.error({ err: callbackError }, `📚 Error in seed callback`);
-            reject(callbackError);
+              // Save AAC metadata to file
+              if (aacRecords.length > 0) {
+                const metadataFile = path.join(
+                  this.dataDir,
+                  `${torrent.infoHash}_aac_metadata.jsonl`
+                );
+                const jsonlContent = aacRecords.map((r) => JSON.stringify(r)).join("\n");
+                fs.writeFileSync(metadataFile, jsonlContent);
+                loggers.server.info(`📚 AAC metadata saved to: ${metadataFile}`);
+              }
+
+              // Log tracker events for debugging
+              torrent.on("warning", (warn: any) => {
+                loggers.server.warn({ warn }, `📚 Torrent warning: ${torrent.name}`);
+              });
+
+              torrent.on("noPeers", (announceType: string) => {
+                loggers.server.debug(`📚 No peers found via ${announceType} for ${torrent.name}`);
+              });
+
+              // Save to torrents.json for persistence WITH file paths for resumption
+              // This allows the torrent to be resumed at 100% after restart
+              this.persistTorrent(torrent.magnetURI, {
+                filePaths: filePaths, // Original file paths for seed resumption
+                infoHash: torrent.infoHash,
+                name: torrent.name,
+                isSeeded: true,
+              });
+
+              // For seeded torrents - add to catalog (use .then() since this is not async)
+              loggers.server.info(`📚 Adding torrent ${torrent.name} to catalog...`);
+              this.onTorrentComplete(torrent)
+                .then(async () => {
+                  loggers.server.info(`📚 Catalog updated, now has ${this.catalog.size} entries`);
+
+                  // Get catalog entry (now has files with potential IPFS CIDs)
+                  const catalogEntry = this.catalog.get(torrent.infoHash.toLowerCase());
+                  const fileList =
+                    catalogEntry?.files.map((f) => ({
+                      name: f.name,
+                      size: f.size,
+                      ipfsCid: f.ipfsCid,
+                    })) ||
+                    torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) ||
+                    [];
+
+                  // Publish to global registry for network discovery
+                  loggers.server.info(
+                    `📚 Publishing to global registry: ${torrent.name} with ${fileList.length} files`
+                  );
+                  const result = await this.publishToGlobalRegistry(
+                    torrent.infoHash,
+                    torrent.magnetURI,
+                    torrent.name,
+                    {
+                      size: torrent.length,
+                      files: torrent.files?.length || 0,
+                      aacMetadata: aacRecords[0], // Include first AAC record
+                      fileList,
+                    }
+                  );
+
+                  if (result.success) {
+                    loggers.server.info(
+                      `📚 Successfully published to global registry: ${torrent.name}`
+                    );
+                  } else {
+                    loggers.server.error(
+                      `📚 Failed to publish to global registry: ${torrent.name}`
+                    );
+                  }
+                })
+                .catch((err) => {
+                  loggers.server.error({ err }, `📚 Failed to add to catalog`);
+                });
+
+              resolve({
+                magnetURI: torrent.magnetURI,
+                infoHash: torrent.infoHash,
+                name: torrent.name,
+                aacMetadata: aacRecords,
+              });
+            } catch (callbackError: any) {
+              loggers.server.error({ err: callbackError }, `📚 Error in seed callback`);
+              reject(callbackError);
+            }
           }
-        });
+        );
       } catch (error) {
         loggers.server.error({ err: error }, `📚 Error calling seed()`);
         reject(error);
@@ -648,10 +710,10 @@ export class TorrentManager {
   private loadCatalog(): void {
     try {
       if (fs.existsSync(this.catalogFile)) {
-        const data = fs.readFileSync(this.catalogFile, 'utf8');
+        const data = fs.readFileSync(this.catalogFile, "utf8");
         const entries: CatalogEntry[] = JSON.parse(data);
         this.catalog.clear();
-        entries.forEach(entry => {
+        entries.forEach((entry) => {
           this.catalog.set(entry.torrentHash, entry);
         });
         loggers.server.info(`📚 Loaded ${entries.length} entries from catalog`);
@@ -668,13 +730,13 @@ export class TorrentManager {
     try {
       const entries = Array.from(this.catalog.values());
       fs.writeFileSync(this.catalogFile, JSON.stringify(entries, null, 2));
-      
+
       // Publish to GunDB network
       this.publishCatalog();
-      
+
       loggers.server.debug(`📚 Saved ${entries.length} entries locally and to network`);
     } catch (error) {
-              loggers.server.error({ err: error }, "📚 Failed to save catalog");
+      loggers.server.error({ err: error }, "📚 Failed to save catalog");
     }
   }
 
@@ -688,29 +750,31 @@ export class TorrentManager {
     try {
       // Build public relay URL from endpoint config
       // Strip /gun suffix if present (RELAY_ENDPOINT is for GunDB, not HTTP)
-      let relayEndpoint = relayConfig.endpoint || process.env.PUBLIC_URL || 'http://localhost:3000';
-      if (relayEndpoint.endsWith('/gun')) {
+      let relayEndpoint = relayConfig.endpoint || process.env.PUBLIC_URL || "http://localhost:3000";
+      if (relayEndpoint.endsWith("/gun")) {
         relayEndpoint = relayEndpoint.slice(0, -4);
       }
       // Ensure URL has protocol
-      const relayUrl = relayEndpoint.startsWith('http') ? relayEndpoint : `https://${relayEndpoint}`;
-      
+      const relayUrl = relayEndpoint.startsWith("http")
+        ? relayEndpoint
+        : `https://${relayEndpoint}`;
+
       // Build IPFS gateway URL - use configured gateway or derive from relay URL
       const ipfsGateway = ipfsConfig.gatewayUrl || `${relayUrl}/ipfs`;
-      
+
       // Only publish relay metadata for discovery - catalog fetched via HTTP
       const relayInfo = {
         relayUrl: relayUrl,
         ipfsGateway: ipfsGateway,
         lastUpdated: Date.now(),
         torrentCount: this.catalog.size,
-        annasArchiveEnabled: true
+        annasArchiveEnabled: true,
       };
 
       // Publish to both paths for discovery
       // Publish to unified path for discovery
       getGunNode(this.gun, GUN_PATHS.RELAYS).get(this.relayKey).put(relayInfo);
-      
+
       // Legacy paths for backward compatibility (optional, can be removed if all nodes update)
       // this.gun.get('relays').get(this.relayKey).get('annasArchive').put(relayInfo);
       // this.gun.get('annas-archive').get('catalog').get(this.relayKey).put(relayInfo);
@@ -733,7 +797,9 @@ export class TorrentManager {
    * Syncs the catalog with active torrents in the client and publishes to GunDB
    * @param force Force republishing to global registry even if already exists
    */
-  public async refreshCatalog(force: boolean = false): Promise<{ catalogSize: number; published: boolean; removed: number }> {
+  public async refreshCatalog(
+    force: boolean = false
+  ): Promise<{ catalogSize: number; published: boolean; removed: number }> {
     try {
       let removedCount = 0;
 
@@ -749,7 +815,9 @@ export class TorrentManager {
           const normalizedHash = hash.toLowerCase();
           if (!activeTorrentHashes.has(normalizedHash)) {
             entriesToRemove.push(hash);
-            loggers.server.info(`📚 Removing inactive torrent from catalog: ${entry.torrentName || hash}`);
+            loggers.server.info(
+              `📚 Removing inactive torrent from catalog: ${entry.torrentName || hash}`
+            );
           }
         }
 
@@ -765,25 +833,27 @@ export class TorrentManager {
 
         // If force is true, iterate all active torrents and force publish to registry
         if (force) {
-            loggers.server.info(`📚 Forcing republish of ${this.client.torrents.length} torrents to global registry...`);
-            for (const torrent of this.client.torrents) {
-                // Determine sizes/files from catalog if available, or torrent object
-                const entry = this.catalog.get(torrent.infoHash.toLowerCase());
-                const size = entry ? entry.files.reduce((acc, f) => acc + f.size, 0) : torrent.length;
-                const fileCount = entry ? entry.files.length : (torrent.files?.length || 0);
-                
-                // Include file list with IPFS CIDs from catalog
-                const fileList = entry 
-                    ? entry.files.map(f => ({ name: f.name, size: f.size, ipfsCid: f.ipfsCid }))
-                    : torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || [];
+          loggers.server.info(
+            `📚 Forcing republish of ${this.client.torrents.length} torrents to global registry...`
+          );
+          for (const torrent of this.client.torrents) {
+            // Determine sizes/files from catalog if available, or torrent object
+            const entry = this.catalog.get(torrent.infoHash.toLowerCase());
+            const size = entry ? entry.files.reduce((acc, f) => acc + f.size, 0) : torrent.length;
+            const fileCount = entry ? entry.files.length : torrent.files?.length || 0;
 
-                await this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
-                    size,
-                    files: fileCount,
-                    force: true,
-                    fileList
-                });
-            }
+            // Include file list with IPFS CIDs from catalog
+            const fileList = entry
+              ? entry.files.map((f) => ({ name: f.name, size: f.size, ipfsCid: f.ipfsCid }))
+              : torrent.files?.map((f: any) => ({ name: f.name, size: f.length })) || [];
+
+            await this.publishToGlobalRegistry(torrent.infoHash, torrent.magnetURI, torrent.name, {
+              size,
+              files: fileCount,
+              force: true,
+              fileList,
+            });
+          }
         }
       }
 
@@ -803,7 +873,7 @@ export class TorrentManager {
 
     try {
       getGunNode(this.gun, GUN_PATHS.ANNAS_ARCHIVE)
-        .get('catalog')
+        .get("catalog")
         .map()
         .on((relayData: any, relayKey: string) => {
           if (relayKey === this.relayKey) return; // Skip own data
@@ -815,7 +885,7 @@ export class TorrentManager {
 
       loggers.server.info("📚 Subscribed to GunDB network catalog");
     } catch (error) {
-      loggers.server.error({ err: error}, "📚 Failed to subscribe to GunDB");
+      loggers.server.error({ err: error }, "📚 Failed to subscribe to GunDB");
     }
   }
 
@@ -833,7 +903,7 @@ export class TorrentManager {
 
     // Step 1: Collect relay URLs from GunDB
     const relayUrls: Set<string> = new Set();
-    
+
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => resolve(), 3000);
 
@@ -842,9 +912,11 @@ export class TorrentManager {
         .map()
         .once((relayData: any, host: string) => {
           if (!relayData || host === this.relayKey) return;
-          
+
           if (relayData.host) {
-            const hostUrl = relayData.host.startsWith('http') ? relayData.host : `https://${relayData.host}`;
+            const hostUrl = relayData.host.startsWith("http")
+              ? relayData.host
+              : `https://${relayData.host}`;
             relayUrls.add(hostUrl);
           }
           if (relayData.relayUrl) {
@@ -854,7 +926,7 @@ export class TorrentManager {
 
       // Check annas-archive path for catalog relays
       getGunNode(this.gun, GUN_PATHS.ANNAS_ARCHIVE)
-        .get('catalog')
+        .get("catalog")
         .map()
         .once((relayData: any, relayKey: string) => {
           if (relayData?.relayUrl && relayKey !== this.relayKey) {
@@ -872,26 +944,26 @@ export class TorrentManager {
 
     // Step 2: Fetch actual catalog from each relay via HTTP
     const results: any[] = [];
-    
+
     for (const relayUrl of relayUrls) {
       try {
         // Skip our own relay
-        let ownUrl = relayConfig.endpoint || process.env.PUBLIC_URL || '';
-        if (ownUrl.endsWith('/gun')) ownUrl = ownUrl.slice(0, -4);
+        let ownUrl = relayConfig.endpoint || process.env.PUBLIC_URL || "";
+        if (ownUrl.endsWith("/gun")) ownUrl = ownUrl.slice(0, -4);
         if (relayUrl === ownUrl) continue;
 
         const catalogUrl = `${relayUrl}/api/v1/torrent/catalog`;
         loggers.server.info(`📚 Fetching catalog from ${catalogUrl}`);
-        
+
         const response = await fetch(catalogUrl, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          signal: AbortSignal.timeout(5000) // 5 second timeout per relay
+          method: "GET",
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(5000), // 5 second timeout per relay
         });
 
         if (response.ok) {
-          const data = await response.json() as any;
-          
+          const data = (await response.json()) as any;
+
           if (data.success && data.catalog) {
             // Convert catalog array to torrents object format expected by frontend
             const torrents: any = {};
@@ -901,7 +973,7 @@ export class TorrentManager {
                 magnetURI: entry.magnetLink,
                 completedAt: entry.completedAt,
                 fileCount: entry.files?.length || 0,
-                files: entry.files // Include full files array
+                files: entry.files, // Include full files array
               };
             });
 
@@ -911,7 +983,7 @@ export class TorrentManager {
               relayKey: data.relay?.key || null, // Capture relay key for chat
               lastUpdated: Date.now(),
               torrentCount: data.count || 0,
-              torrents: torrents
+              torrents: torrents,
             });
 
             loggers.server.info(`📚 Got ${data.count || 0} torrents from ${relayUrl}`);
@@ -928,14 +1000,13 @@ export class TorrentManager {
     return results;
   }
 
-
   /**
    * Add a file to IPFS and pin it using the IPFS HTTP API
    */
   private async addFileToIPFS(filePath: string): Promise<string | null> {
     try {
-      const { execSync } = await import('child_process');
-      
+      const { execSync } = await import("child_process");
+
       // Check if file exists
       if (!fs.existsSync(filePath)) {
         loggers.server.warn(`📚 File not found: ${filePath}`);
@@ -943,24 +1014,24 @@ export class TorrentManager {
       }
 
       // Use centralized IPFS config
-      const ipfsApiUrl = ipfsConfig.apiUrl || 'http://127.0.0.1:5001';
+      const ipfsApiUrl = ipfsConfig.apiUrl || "http://127.0.0.1:5001";
       const ipfsApiToken = ipfsConfig.apiToken;
 
       // Build curl command with optional authentication
       let curlCmd = `curl -s -X POST "${ipfsApiUrl}/api/v0/add?pin=true&quiet=true"`;
-      
+
       // Add Authorization header if token is configured
       if (ipfsApiToken) {
         curlCmd += ` -H "Authorization: Bearer ${ipfsApiToken}"`;
       }
-      
+
       curlCmd += ` -F "file=@${filePath}"`;
-      
-      loggers.server.debug(`📚 Running IPFS add: ${curlCmd.replace(ipfsApiToken || '', '***')}`);
-      
+
+      loggers.server.debug(`📚 Running IPFS add: ${curlCmd.replace(ipfsApiToken || "", "***")}`);
+
       const result = execSync(curlCmd, {
-        encoding: 'utf8',
-        timeout: 120000 // 2 minute timeout
+        encoding: "utf8",
+        timeout: 120000, // 2 minute timeout
       }).trim();
 
       // Parse JSON response to get hash
@@ -974,7 +1045,7 @@ export class TorrentManager {
       return null;
     } catch (error: any) {
       // Check if IPFS is running
-      if (error.code === 'ECONNREFUSED') {
+      if (error.code === "ECONNREFUSED") {
         loggers.server.warn(`📚 IPFS daemon not running - cannot pin ${path.basename(filePath)}`);
       } else {
         loggers.server.error({ err: error, filePath }, `📚 Failed to add file to IPFS`);
@@ -986,27 +1057,29 @@ export class TorrentManager {
   /**
    * Manually pin all files in a torrent to IPFS
    */
-  public async pinTorrent(infoHash: string): Promise<{ success: boolean; pinned: number; total: number; errors: string[] }> {
+  public async pinTorrent(
+    infoHash: string
+  ): Promise<{ success: boolean; pinned: number; total: number; errors: string[] }> {
     // Normalize infoHash to lowercase for consistent lookup
     const normalizedHash = infoHash.toLowerCase();
-    
+
     const entry = this.catalog.get(normalizedHash);
     if (!entry) {
       return { success: false, pinned: 0, total: 0, errors: [`Torrent not found in catalog`] };
     }
-    
+
     let pinned = 0;
     const errors: string[] = [];
-    
+
     loggers.server.info(`📚 Pinning all ${entry.files.length} files for torrent ${normalizedHash}`);
-    
+
     for (const file of entry.files) {
       // Skip if already pinned
       if (file.ipfsCid) {
         pinned++;
         continue;
       }
-      
+
       const result = await this.pinFile(infoHash, file.path);
       if (result.success) {
         pinned++;
@@ -1014,12 +1087,12 @@ export class TorrentManager {
         errors.push(`${file.name}: ${result.error}`);
       }
     }
-    
-    return { 
-      success: errors.length === 0, 
-      pinned, 
-      total: entry.files.length, 
-      errors 
+
+    return {
+      success: errors.length === 0,
+      pinned,
+      total: entry.files.length,
+      errors,
     };
   }
 
@@ -1027,22 +1100,32 @@ export class TorrentManager {
    * Manually pin a file from a torrent to IPFS
    * Returns the CID if successful
    */
-  public async pinFile(infoHash: string, filePath: string): Promise<{ success: boolean; cid?: string; error?: string }> {
+  public async pinFile(
+    infoHash: string,
+    filePath: string
+  ): Promise<{ success: boolean; cid?: string; error?: string }> {
     // Normalize infoHash to lowercase for consistent lookup
     const normalizedHash = infoHash.toLowerCase();
-    
-    loggers.server.info(`📚 Pin request: infoHash=${infoHash} (normalized: ${normalizedHash}), filePath=${filePath}`);
-    loggers.server.info(`📚 Catalog has ${this.catalog.size} entries: ${Array.from(this.catalog.keys()).join(', ')}`);
-    
+
+    loggers.server.info(
+      `📚 Pin request: infoHash=${infoHash} (normalized: ${normalizedHash}), filePath=${filePath}`
+    );
+    loggers.server.info(
+      `📚 Catalog has ${this.catalog.size} entries: ${Array.from(this.catalog.keys()).join(", ")}`
+    );
+
     const entry = this.catalog.get(normalizedHash);
     if (!entry) {
       loggers.server.warn(`📚 Torrent ${normalizedHash} not found in catalog`);
-      return { success: false, error: `Torrent not found in catalog. Available: ${Array.from(this.catalog.keys()).join(', ')}` };
+      return {
+        success: false,
+        error: `Torrent not found in catalog. Available: ${Array.from(this.catalog.keys()).join(", ")}`,
+      };
     }
 
-    const file = entry.files.find(f => f.path === filePath);
+    const file = entry.files.find((f) => f.path === filePath);
     if (!file) {
-      return { success: false, error: 'File not found in torrent' };
+      return { success: false, error: "File not found in torrent" };
     }
 
     if (file.ipfsCid) {
@@ -1051,12 +1134,12 @@ export class TorrentManager {
 
     // Try multiple possible locations for the file
     const possiblePaths = [
-      path.join(this.dataDir, filePath),                    // Standard WebTorrent path
-      path.join(this.dataDir, 'uploads', filePath),         // User uploads path
-      path.join(this.dataDir, path.basename(filePath)),     // Just the filename in root
-      path.join(this.dataDir, 'uploads', path.basename(filePath))  // Just filename in uploads
+      path.join(this.dataDir, filePath), // Standard WebTorrent path
+      path.join(this.dataDir, "uploads", filePath), // User uploads path
+      path.join(this.dataDir, path.basename(filePath)), // Just the filename in root
+      path.join(this.dataDir, "uploads", path.basename(filePath)), // Just filename in uploads
     ];
-    
+
     let fullPath: string | null = null;
     for (const p of possiblePaths) {
       loggers.server.debug(`📚 Checking path: ${p}`);
@@ -1066,22 +1149,25 @@ export class TorrentManager {
         break;
       }
     }
-    
+
     if (!fullPath) {
-      loggers.server.warn(`📚 File not found in any location. Tried: ${possiblePaths.join(', ')}`);
-      return { success: false, error: `File not found. Searched: ${possiblePaths.map(p => path.basename(p)).join(', ')}` };
+      loggers.server.warn(`📚 File not found in any location. Tried: ${possiblePaths.join(", ")}`);
+      return {
+        success: false,
+        error: `File not found. Searched: ${possiblePaths.map((p) => path.basename(p)).join(", ")}`,
+      };
     }
-    
+
     const cid = await this.addFileToIPFS(fullPath);
-    
+
     if (cid) {
       // Update catalog with CID
       file.ipfsCid = cid;
       this.saveCatalog();
       return { success: true, cid };
     }
-    
-    return { success: false, error: 'Failed to add to IPFS - check if daemon is running' };
+
+    return { success: false, error: "Failed to add to IPFS - check if daemon is running" };
   }
 
   /**
@@ -1097,50 +1183,52 @@ export class TorrentManager {
       // Log memory for large torrents
       if (fileCount > 200) {
         logMemoryUsage(`torrent-start-${torrent.name.substring(0, 30)}`);
-        checkAndWarnMemory('large torrent cataloging');
+        checkAndWarnMemory("large torrent cataloging");
       }
 
       // Normalize infoHash to lowercase
       const normalizedHash = torrent.infoHash.toLowerCase();
       loggers.server.info(`📚 Normalized hash: ${normalizedHash}`);
-      
+
       const entry: CatalogEntry = {
         torrentHash: normalizedHash,
         torrentName: torrent.name,
         magnetLink: torrent.magnetURI,
         completedAt: Date.now(),
-        files: []
+        files: [],
       };
 
       // Catalog each file with batch processing for large torrents
       if (torrent.files && fileCount > 0) {
         const BATCH_SIZE = 100; // Process files in batches to reduce memory pressure
         const existingEntry = this.catalog.get(normalizedHash);
-        
+
         for (let i = 0; i < fileCount; i += BATCH_SIZE) {
           const batch = torrent.files.slice(i, i + BATCH_SIZE);
-          
+
           for (const file of batch) {
             // Check if file already has IPFS CID from previous pin
-            const existingFile = existingEntry?.files.find((f: { path: string }) => f.path === file.path);
-            
+            const existingFile = existingEntry?.files.find(
+              (f: { path: string }) => f.path === file.path
+            );
+
             // Generate AACID for this file
-            const aacid = generateAACID('files', file.name);
-            
+            const aacid = generateAACID("files", file.name);
+
             entry.files.push({
               name: file.name,
               path: file.path,
               size: file.length,
               ipfsCid: existingFile?.ipfsCid, // Preserve existing CID if any
-              aacid: existingFile?.aacid || aacid // Preserve existing AACID or generate new
+              aacid: existingFile?.aacid || aacid, // Preserve existing AACID or generate new
             });
           }
-          
+
           // Trigger GC between batches for large torrents
           if (fileCount > 200 && i + BATCH_SIZE < fileCount) {
             performMemoryCleanup(`batch-${Math.floor(i / BATCH_SIZE) + 1}`);
             // Small yield to allow event loop to process
-            await new Promise(resolve => setImmediate(resolve));
+            await new Promise((resolve) => setImmediate(resolve));
           }
         }
       } else {
@@ -1148,16 +1236,18 @@ export class TorrentManager {
       }
 
       // Update catalog
-      loggers.server.info(`📚 Saving to catalog: ${normalizedHash} with ${entry.files.length} files`);
+      loggers.server.info(
+        `📚 Saving to catalog: ${normalizedHash} with ${entry.files.length} files`
+      );
       this.catalog.set(normalizedHash, entry);
       this.saveCatalog();
 
       loggers.server.info(`📚 Cataloged ${entry.files.length} files from torrent ${torrent.name}`);
       loggers.server.info(`📚 Catalog now has ${this.catalog.size} entries`);
-      
+
       // Final memory cleanup for large torrents
       if (fileCount > 200) {
-        performMemoryCleanup('torrent-complete');
+        performMemoryCleanup("torrent-complete");
         logMemoryUsage(`torrent-done-${torrent.name.substring(0, 30)}`);
       }
     } catch (error: any) {
@@ -1182,7 +1272,7 @@ export class TorrentManager {
 
     // Normalize to lowercase for consistent matching
     const normalizedHash = infoHash.toLowerCase();
-    const torrent = this.client.torrents.find(t => t.infoHash.toLowerCase() === normalizedHash);
+    const torrent = this.client.torrents.find((t) => t.infoHash.toLowerCase() === normalizedHash);
     if (!torrent) {
       throw new Error(`Torrent not found: ${infoHash}`);
     }
@@ -1201,7 +1291,7 @@ export class TorrentManager {
 
     // Normalize to lowercase for consistent matching
     const normalizedHash = infoHash.toLowerCase();
-    const torrent = this.client.torrents.find(t => t.infoHash.toLowerCase() === normalizedHash);
+    const torrent = this.client.torrents.find((t) => t.infoHash.toLowerCase() === normalizedHash);
     if (!torrent) {
       throw new Error(`Torrent not found: ${infoHash}`);
     }
@@ -1222,18 +1312,18 @@ export class TorrentManager {
 
     // Normalize to lowercase for consistent matching
     const normalizedHash = infoHash.toLowerCase();
-    const torrent = this.client.torrents.find(t => t.infoHash.toLowerCase() === normalizedHash);
+    const torrent = this.client.torrents.find((t) => t.infoHash.toLowerCase() === normalizedHash);
     if (!torrent) {
       throw new Error(`Torrent not found: ${infoHash}`);
     }
 
     const torrentName = torrent.name;
-    
+
     // normalizedHash already declared above
-    
+
     // Remove from global GunDB registry first
     await this.removeFromGlobalRegistry(normalizedHash, torrentName);
-    
+
     // Unpin files from IPFS if any
     const catalogEntry = this.catalog.get(normalizedHash);
     if (catalogEntry) {
@@ -1255,14 +1345,16 @@ export class TorrentManager {
       this.saveCatalog();
       loggers.server.info(`📚 Removed ${normalizedHash} from catalog`);
     } else {
-      loggers.server.warn(`📚 Torrent ${normalizedHash} not found in catalog, skipping catalog cleanup`);
+      loggers.server.warn(
+        `📚 Torrent ${normalizedHash} not found in catalog, skipping catalog cleanup`
+      );
     }
-    
+
     // Remove from WebTorrent
     try {
       torrent.destroy({ destroyStore: deleteFiles }, (err) => {
         if (err) {
-           loggers.server.error({ err }, `📚 Error destroying torrent ${torrentName}`);
+          loggers.server.error({ err }, `📚 Error destroying torrent ${torrentName}`);
         }
       });
       loggers.server.info(`📚 Removed torrent: ${torrentName} (deleteFiles: ${deleteFiles})`);
@@ -1272,24 +1364,24 @@ export class TorrentManager {
 
     // Remove from torrents.json persistence
     try {
-      const torrentsFile = path.join(this.dataDir, 'torrents.json');
+      const torrentsFile = path.join(this.dataDir, "torrents.json");
       if (fs.existsSync(torrentsFile)) {
-        const fileContent = fs.readFileSync(torrentsFile, 'utf8');
+        const fileContent = fs.readFileSync(torrentsFile, "utf8");
         let existingTorrents: (string | TorrentPersistEntry)[] = JSON.parse(fileContent);
-        
+
         // Filter out entries that match this infoHash (handles both string and object formats)
-        const filtered = existingTorrents.filter(entry => {
-          if (typeof entry === 'string') {
+        const filtered = existingTorrents.filter((entry) => {
+          if (typeof entry === "string") {
             // String format: check if magnet contains the infoHash
             return !entry.toLowerCase().includes(normalizedHash);
           } else {
             // Object format: check infoHash or magnetURI
-            const entryHash = entry.infoHash?.toLowerCase() || '';
+            const entryHash = entry.infoHash?.toLowerCase() || "";
             const magnetContains = entry.magnetURI?.toLowerCase().includes(normalizedHash) || false;
             return entryHash !== normalizedHash && !magnetContains;
           }
         });
-        
+
         if (filtered.length !== existingTorrents.length) {
           fs.writeFileSync(torrentsFile, JSON.stringify(filtered, null, 2));
           loggers.server.info(`📚 Removed torrent ${normalizedHash} from persistent configuration`);
@@ -1304,11 +1396,11 @@ export class TorrentManager {
    * Unpin a CID from IPFS
    */
   private async unpinFromIPFS(cid: string): Promise<void> {
-    const ipfsHost = process.env.IPFS_HOST || 'localhost';
-    const ipfsPort = process.env.IPFS_API_PORT || '5001';
+    const ipfsHost = process.env.IPFS_HOST || "localhost";
+    const ipfsPort = process.env.IPFS_API_PORT || "5001";
 
     await fetch(`http://${ipfsHost}:${ipfsPort}/api/v0/pin/rm?arg=${cid}`, {
-      method: 'POST'
+      method: "POST",
     });
   }
 
@@ -1322,9 +1414,9 @@ export class TorrentManager {
     }
 
     let torrents = this.client.torrents;
-    
+
     if (infoHash) {
-      const torrent = torrents.find(t => t.infoHash === infoHash);
+      const torrent = torrents.find((t) => t.infoHash === infoHash);
       if (!torrent) {
         throw new Error(`Torrent not found: ${infoHash}`);
       }
@@ -1332,17 +1424,17 @@ export class TorrentManager {
     }
 
     return {
-      torrents: torrents.map(t => ({
+      torrents: torrents.map((t) => ({
         infoHash: t.infoHash,
         name: t.name,
-        files: t.files.map(f => ({
+        files: t.files.map((f) => ({
           name: f.name,
           path: f.path,
           size: f.length,
           downloaded: f.downloaded,
-          progress: f.progress
-        }))
-      }))
+          progress: f.progress,
+        })),
+      })),
     };
   }
 
@@ -1374,7 +1466,7 @@ export class TorrentManager {
     let catalogBytes = 0;
     let fileCount = 0;
     const catalog = this.getCatalog();
-    
+
     for (const entry of catalog) {
       for (const file of entry.files) {
         catalogBytes += file.size || 0;
@@ -1414,18 +1506,22 @@ export class TorrentManager {
    */
   private calculateDirectorySize(dirPath: string): number {
     let totalSize = 0;
-    
+
     try {
       const items = fs.readdirSync(dirPath, { withFileTypes: true });
-      
+
       for (const item of items) {
         const fullPath = path.join(dirPath, item.name);
-        
+
         // Skip catalog.json and other metadata files
-        if (item.name === 'catalog.json' || item.name === 'torrents.json' || item.name === 'uploads') {
+        if (
+          item.name === "catalog.json" ||
+          item.name === "torrents.json" ||
+          item.name === "uploads"
+        ) {
           continue;
         }
-        
+
         if (item.isDirectory()) {
           totalSize += this.calculateDirectorySize(fullPath);
         } else if (item.isFile()) {
@@ -1440,7 +1536,7 @@ export class TorrentManager {
     } catch (error) {
       // Ignore errors reading directory
     }
-    
+
     return totalSize;
   }
 
@@ -1455,7 +1551,7 @@ export class TorrentManager {
         downloadSpeed: 0,
         uploadSpeed: 0,
         ratio: 0,
-        torrents: []
+        torrents: [],
       };
     }
 
@@ -1465,18 +1561,18 @@ export class TorrentManager {
       downloadSpeed: this.client.downloadSpeed,
       uploadSpeed: this.client.uploadSpeed,
       ratio: this.client.ratio,
-      torrents: this.client.torrents.map(t => ({
-          infoHash: t.infoHash,
-          name: t.name,
-          progress: t.progress,
-          downloadSpeed: t.downloadSpeed,
-          uploadSpeed: t.uploadSpeed,
-          peers: t.numPeers,
-          paused: t.paused,
-          files: t.files.length,
-          state: t.paused ? 'paused' : (t.progress === 1 ? 'seeding' : 'downloading'),
-          magnetURI: t.magnetURI
-      }))
+      torrents: this.client.torrents.map((t) => ({
+        infoHash: t.infoHash,
+        name: t.name,
+        progress: t.progress,
+        downloadSpeed: t.downloadSpeed,
+        uploadSpeed: t.uploadSpeed,
+        peers: t.numPeers,
+        paused: t.paused,
+        files: t.files.length,
+        state: t.paused ? "paused" : t.progress === 1 ? "seeding" : "downloading",
+        magnetURI: t.magnetURI,
+      })),
     };
   }
 
@@ -1501,61 +1597,68 @@ export class TorrentManager {
     } = {}
   ): Promise<{ success: boolean; alreadyExists?: boolean }> {
     if (!this.gun) {
-      loggers.server.warn('📚 GunDB not available, cannot publish to global registry');
+      loggers.server.warn("📚 GunDB not available, cannot publish to global registry");
       return { success: false };
     }
 
     const normalizedHash = infoHash.toLowerCase();
-    
+
     return new Promise((resolve) => {
       // Check if torrent already exists in registry
-      getGunNode(this.gun, GUN_PATHS.TORRENTS).get(normalizedHash).once((existing: any) => {
-        // If force is true, we proceed regardless of existing
-        if (existing && existing.magnetURI && !options.force) {
-          loggers.server.info(`📚 Torrent ${normalizedHash} already in global registry`);
-          resolve({ success: true, alreadyExists: true });
-          return;
-        }
-
-        // Count pinned files
-        const pinnedFiles = options.fileList?.filter(f => f.ipfsCid).length || 0;
-
-        // Build file list as JSON string (GunDB doesn't support arrays)
-        const fileListData = options.fileList?.slice(0, 20).map(f => ({
-          name: f.name,
-          size: f.size,
-          ipfsCid: f.ipfsCid || null
-        })) || [];
-
-        // Build registry entry with file info
-        const entry = {
-          magnetURI,
-          name,
-          size: options.size || 0,
-          files: options.files || 0,
-          pinnedFiles: pinnedFiles,
-          addedAt: Date.now(),
-          addedBy: relayConfig.endpoint || 'unknown',
-          aacid: options.aacMetadata?.aacid || null,
-          // Store fileList as JSON string (GunDB doesn't support arrays)
-          fileListJson: JSON.stringify(fileListData)
-        };
-
-        // Publish to registry
-        getGunNode(this.gun, GUN_PATHS.TORRENTS).get(normalizedHash).put(entry, (ack: any) => {
-          if (ack.err) {
-            loggers.server.error({ err: ack.err }, '📚 Failed to publish to global registry');
-            resolve({ success: false });
-          } else {
-            loggers.server.info(`📚 Published torrent to global registry: ${name} (${normalizedHash})`);
-            
-            // Also add to search index (keywords from name AND file names)
-            this.addToSearchIndex(normalizedHash, name, options.fileList);
-            
-            resolve({ success: true, alreadyExists: false });
+      getGunNode(this.gun, GUN_PATHS.TORRENTS)
+        .get(normalizedHash)
+        .once((existing: any) => {
+          // If force is true, we proceed regardless of existing
+          if (existing && existing.magnetURI && !options.force) {
+            loggers.server.info(`📚 Torrent ${normalizedHash} already in global registry`);
+            resolve({ success: true, alreadyExists: true });
+            return;
           }
+
+          // Count pinned files
+          const pinnedFiles = options.fileList?.filter((f) => f.ipfsCid).length || 0;
+
+          // Build file list as JSON string (GunDB doesn't support arrays)
+          const fileListData =
+            options.fileList?.slice(0, 20).map((f) => ({
+              name: f.name,
+              size: f.size,
+              ipfsCid: f.ipfsCid || null,
+            })) || [];
+
+          // Build registry entry with file info
+          const entry = {
+            magnetURI,
+            name,
+            size: options.size || 0,
+            files: options.files || 0,
+            pinnedFiles: pinnedFiles,
+            addedAt: Date.now(),
+            addedBy: relayConfig.endpoint || "unknown",
+            aacid: options.aacMetadata?.aacid || null,
+            // Store fileList as JSON string (GunDB doesn't support arrays)
+            fileListJson: JSON.stringify(fileListData),
+          };
+
+          // Publish to registry
+          getGunNode(this.gun, GUN_PATHS.TORRENTS)
+            .get(normalizedHash)
+            .put(entry, (ack: any) => {
+              if (ack.err) {
+                loggers.server.error({ err: ack.err }, "📚 Failed to publish to global registry");
+                resolve({ success: false });
+              } else {
+                loggers.server.info(
+                  `📚 Published torrent to global registry: ${name} (${normalizedHash})`
+                );
+
+                // Also add to search index (keywords from name AND file names)
+                this.addToSearchIndex(normalizedHash, name, options.fileList);
+
+                resolve({ success: true, alreadyExists: false });
+              }
+            });
         });
-      });
     });
   }
 
@@ -1568,46 +1671,58 @@ export class TorrentManager {
     name?: string
   ): Promise<{ success: boolean }> {
     if (!this.gun) {
-      loggers.server.warn('📚 GunDB not available, cannot remove from global registry');
+      loggers.server.warn("📚 GunDB not available, cannot remove from global registry");
       return { success: false };
     }
 
     const normalizedHash = infoHash.toLowerCase();
-    
+
     return new Promise((resolve) => {
       // Check if entry exists and was added by this relay
-      getGunNode(this.gun, GUN_PATHS.TORRENTS).get(normalizedHash).once((existing: any) => {
-        if (!existing || !existing.magnetURI) {
-          loggers.server.info(`📚 Torrent ${normalizedHash} not found in global registry`);
-          resolve({ success: true }); // Already not there
-          return;
-        }
-
-        // Only remove if added by this relay
-        const addedBy = existing.addedBy || '';
-        const thisRelay = relayConfig.endpoint || '';
-        
-        if (addedBy && thisRelay && !addedBy.includes(thisRelay.replace(/https?:\/\//, '').split('/')[0])) {
-          loggers.server.info(`📚 Torrent ${normalizedHash} was added by another relay (${addedBy}), not removing`);
-          resolve({ success: true });
-          return;
-        }
-
-        // Remove from registry (set to null)
-        getGunNode(this.gun, GUN_PATHS.TORRENTS).get(normalizedHash).put(null, (ack: any) => {
-          if (ack.err) {
-            loggers.server.error({ err: ack.err }, '📚 Failed to remove from global registry');
-            resolve({ success: false });
-          } else {
-            loggers.server.info(`📚 Removed torrent from global registry: ${name || normalizedHash}`);
-            
-            // Also remove from search index
-            this.removeFromSearchIndex(normalizedHash, name || '');
-            
-            resolve({ success: true });
+      getGunNode(this.gun, GUN_PATHS.TORRENTS)
+        .get(normalizedHash)
+        .once((existing: any) => {
+          if (!existing || !existing.magnetURI) {
+            loggers.server.info(`📚 Torrent ${normalizedHash} not found in global registry`);
+            resolve({ success: true }); // Already not there
+            return;
           }
+
+          // Only remove if added by this relay
+          const addedBy = existing.addedBy || "";
+          const thisRelay = relayConfig.endpoint || "";
+
+          if (
+            addedBy &&
+            thisRelay &&
+            !addedBy.includes(thisRelay.replace(/https?:\/\//, "").split("/")[0])
+          ) {
+            loggers.server.info(
+              `📚 Torrent ${normalizedHash} was added by another relay (${addedBy}), not removing`
+            );
+            resolve({ success: true });
+            return;
+          }
+
+          // Remove from registry (set to null)
+          getGunNode(this.gun, GUN_PATHS.TORRENTS)
+            .get(normalizedHash)
+            .put(null, (ack: any) => {
+              if (ack.err) {
+                loggers.server.error({ err: ack.err }, "📚 Failed to remove from global registry");
+                resolve({ success: false });
+              } else {
+                loggers.server.info(
+                  `📚 Removed torrent from global registry: ${name || normalizedHash}`
+                );
+
+                // Also remove from search index
+                this.removeFromSearchIndex(normalizedHash, name || "");
+
+                resolve({ success: true });
+              }
+            });
         });
-      });
     });
   }
 
@@ -1618,16 +1733,19 @@ export class TorrentManager {
     if (!this.gun) return;
 
     // Extract keywords from name
-    const keywords = name.toLowerCase()
+    const keywords = name
+      .toLowerCase()
       .split(/[^a-z0-9]+/)
-      .filter(k => k.length >= 3);
-    
+      .filter((k) => k.length >= 3);
+
     // Remove from each keyword index
     for (const keyword of keywords) {
       getGunNode(this.gun, GUN_PATHS.SEARCH).get(keyword).get(infoHash).put(null);
     }
-    
-    loggers.server.debug(`📚 Removed ${keywords.length} keywords from search index for ${infoHash}`);
+
+    loggers.server.debug(
+      `📚 Removed ${keywords.length} keywords from search index for ${infoHash}`
+    );
   }
 
   /**
@@ -1640,19 +1758,21 @@ export class TorrentManager {
     const allKeywords = new Set<string>();
 
     // Extract keywords from torrent name (lowercase, split by non-alphanumeric)
-    const nameKeywords = name.toLowerCase()
+    const nameKeywords = name
+      .toLowerCase()
       .split(/[^a-z0-9]+/)
-      .filter(k => k.length >= 3); // Only keywords with 3+ chars
-    
-    nameKeywords.forEach(k => allKeywords.add(k));
+      .filter((k) => k.length >= 3); // Only keywords with 3+ chars
+
+    nameKeywords.forEach((k) => allKeywords.add(k));
 
     // Also extract keywords from file names
     if (fileList && fileList.length > 0) {
       for (const file of fileList) {
-        const fileKeywords = file.name.toLowerCase()
+        const fileKeywords = file.name
+          .toLowerCase()
           .split(/[^a-z0-9]+/)
-          .filter(k => k.length >= 3);
-        fileKeywords.forEach(k => allKeywords.add(k));
+          .filter((k) => k.length >= 3);
+        fileKeywords.forEach((k) => allKeywords.add(k));
       }
     }
 
@@ -1660,7 +1780,7 @@ export class TorrentManager {
     for (const keyword of allKeywords) {
       getGunNode(this.gun, GUN_PATHS.SEARCH).get(keyword).get(infoHash).put(true);
     }
-    
+
     loggers.server.debug(`📚 Added ${allKeywords.size} keywords to search index for ${infoHash}`);
   }
 
@@ -1671,16 +1791,18 @@ export class TorrentManager {
     if (!this.gun) return null;
 
     const normalizedHash = infoHash.toLowerCase();
-    
+
     return new Promise((resolve) => {
-      getGunNode(this.gun, GUN_PATHS.TORRENTS).get(normalizedHash).once((data: any) => {
-        if (data && data.magnetURI) {
-          resolve(data);
-        } else {
-          resolve(null);
-        }
-      });
-      
+      getGunNode(this.gun, GUN_PATHS.TORRENTS)
+        .get(normalizedHash)
+        .once((data: any) => {
+          if (data && data.magnetURI) {
+            resolve(data);
+          } else {
+            resolve(null);
+          }
+        });
+
       // Timeout after 5 seconds
       setTimeout(() => resolve(null), 5000);
     });
@@ -1694,9 +1816,7 @@ export class TorrentManager {
     if (!this.gun) return [];
 
     const queryLower = query.toLowerCase();
-    const keywords = queryLower
-      .split(/[^a-z0-9]+/)
-      .filter(k => k.length >= 3);
+    const keywords = queryLower.split(/[^a-z0-9]+/).filter((k) => k.length >= 3);
 
     if (keywords.length === 0) {
       // If query is too short for keywords, do direct search
@@ -1704,26 +1824,31 @@ export class TorrentManager {
     }
 
     const results = new Map<string, any>();
-    
+
     // First try keyword index
     const indexResults = await new Promise<any[]>((resolve) => {
       let pending = keywords.length;
-      
+
       for (const keyword of keywords) {
-        getGunNode(this.gun, GUN_PATHS.SEARCH).get(keyword).map().once((val: any, hash: string) => {
-          if (val === true && !results.has(hash)) {
-            // Fetch full entry from registry
-            getGunNode(this.gun, GUN_PATHS.TORRENTS).get(hash).once((entry: any) => {
-              if (entry && entry.magnetURI) {
-                results.set(hash, {
-                  infoHash: hash,
-                  ...entry
+        getGunNode(this.gun, GUN_PATHS.SEARCH)
+          .get(keyword)
+          .map()
+          .once((val: any, hash: string) => {
+            if (val === true && !results.has(hash)) {
+              // Fetch full entry from registry
+              getGunNode(this.gun, GUN_PATHS.TORRENTS)
+                .get(hash)
+                .once((entry: any) => {
+                  if (entry && entry.magnetURI) {
+                    results.set(hash, {
+                      infoHash: hash,
+                      ...entry,
+                    });
+                  }
                 });
-              }
-            });
-          }
-        });
-        
+            }
+          });
+
         // Decrement pending count after initial scan
         setTimeout(() => {
           pending--;
@@ -1735,14 +1860,16 @@ export class TorrentManager {
           }
         }, 1000);
       }
-      
+
       // Fallback timeout
       setTimeout(() => resolve(Array.from(results.values()).slice(0, limit)), 3000);
     });
 
     // If keyword index found results, return them
     if (indexResults.length > 0) {
-      loggers.server.info(`📚 Search "${query}" returned ${indexResults.length} results from index`);
+      loggers.server.info(
+        `📚 Search "${query}" returned ${indexResults.length} results from index`
+      );
       return indexResults;
     }
 
@@ -1758,21 +1885,23 @@ export class TorrentManager {
     if (!this.gun) return [];
 
     const results: any[] = [];
-    
+
     return new Promise((resolve) => {
-      getGunNode(this.gun, GUN_PATHS.TORRENTS).map().once((entry: any, hash: string) => {
-        if (entry && entry.magnetURI && results.length < limit) {
-          // Check if name contains the query
-          const name = (entry.name || '').toLowerCase();
-          if (name.includes(query)) {
-            results.push({
-              infoHash: hash,
-              ...entry
-            });
+      getGunNode(this.gun, GUN_PATHS.TORRENTS)
+        .map()
+        .once((entry: any, hash: string) => {
+          if (entry && entry.magnetURI && results.length < limit) {
+            // Check if name contains the query
+            const name = (entry.name || "").toLowerCase();
+            if (name.includes(query)) {
+              results.push({
+                infoHash: hash,
+                ...entry,
+              });
+            }
           }
-        }
-      });
-      
+        });
+
       // Wait for results then resolve
       setTimeout(() => {
         loggers.server.info(`📚 Direct search "${query}" returned ${results.length} results`);
@@ -1788,17 +1917,19 @@ export class TorrentManager {
     if (!this.gun) return [];
 
     const results: any[] = [];
-    
+
     return new Promise((resolve) => {
-      getGunNode(this.gun, GUN_PATHS.TORRENTS).map().once((entry: any, hash: string) => {
-        if (entry && entry.magnetURI && results.length < limit) {
-          results.push({
-            infoHash: hash,
-            ...entry
-          });
-        }
-      });
-      
+      getGunNode(this.gun, GUN_PATHS.TORRENTS)
+        .map()
+        .once((entry: any, hash: string) => {
+          if (entry && entry.magnetURI && results.length < limit) {
+            results.push({
+              infoHash: hash,
+              ...entry,
+            });
+          }
+        });
+
       // Wait for results then resolve
       setTimeout(() => {
         loggers.server.info(`📚 Browse returned ${results.length} torrents from global registry`);
