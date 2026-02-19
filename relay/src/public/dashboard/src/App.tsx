@@ -7,7 +7,6 @@ import Files from './views/Files'
 import Drive from './views/Drive'
 import Explore from './views/Explore'
 import Network from './views/Network'
-import Registry from './views/Registry'
 import Torrents from './views/Torrents'
 import Settings from './views/Settings'
 import ApiKeys from './views/ApiKeys'
@@ -16,8 +15,6 @@ import RpcConsole from './views/RpcConsole'
 import ApiDocs from './views/ApiDocs'
 import VisualGraph from './views/VisualGraph'
 import GraphExplorer from './views/GraphExplorer'
-import Deals from './views/Deals'
-import X402 from './views/X402'
 import Chat from './views/Chat'
 import Users from './views/Users'
 
@@ -33,7 +30,6 @@ function App() {
         <Route path="explore" element={<Explore />} />
         <Route path="chat" element={<Chat />} />
         <Route path="network" element={<Network />} />
-        <Route path="registry" element={<Registry />} />
         <Route path="torrents" element={<Torrents />} />
         <Route path="api-keys" element={<ApiKeys />} />
         <Route path="charts" element={<Charts />} />
@@ -41,8 +37,6 @@ function App() {
         <Route path="graph-explorer" element={<GraphExplorer />} />
         <Route path="rpc-console" element={<RpcConsole />} />
         <Route path="api-docs" element={<ApiDocs />} />
-        <Route path="deals" element={<Deals />} />
-        <Route path="x402" element={<X402 />} />
         <Route path="users" element={<Users />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -23,7 +23,7 @@ function VisualGraph() {
   const { isAuthenticated, getAuthHeaders } = useAuth()
   const [graphData, setGraphData] = useState<{ nodes: GraphNode[], edges: GraphEdge[] }>({ nodes: [], edges: [] })
   const [loading, setLoading] = useState(false)
-  const [path, setPath] = useState(GUN_PATHS.SHOGUN)
+  const [path, setPath] = useState<string>(GUN_PATHS.SHOGUN)
   const [peerUrl, setPeerUrl] = useState('')
   const [nodeCount, setNodeCount] = useState(0)
 

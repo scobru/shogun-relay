@@ -92,7 +92,7 @@ function Files() {
       "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveBits", "deriveKey"]
     )
     return window.crypto.subtle.deriveKey(
-      { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+      { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" } as Pbkdf2Params,
       keyMaterial,
       { name: "AES-GCM", length: 256 },
       false,

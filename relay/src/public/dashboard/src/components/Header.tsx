@@ -10,10 +10,7 @@ const pageTitles: Record<string, { title: string; description: string }> = {
   '/drive': { title: 'Drive', description: 'Private file storage' },
   '/explore': { title: 'Explore', description: 'Graph explorer and visualization' },
   '/network': { title: 'Network', description: 'Network statistics and peers' },
-  '/registry': { title: 'Registry', description: 'On-chain registry dashboard' },
   '/torrents': { title: 'Torrents', description: 'Torrent manager and seeding' },
-  '/deals': { title: 'Deals', description: 'Storage deals management' },
-  '/x402': { title: 'x402', description: 'Payment service configuration' },
   '/settings': { title: 'Settings', description: 'API keys and configuration' },
 }
 

@@ -2,8 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 
 interface NetworkStats {
   totalRelays?: number; activeRelays?: number; totalConnections?: number
-  totalPins?: number; totalActiveDeals?: number; totalStorageBytes?: number
-  totalStorageMB?: number; totalDealStorageMB?: number
+  totalPins?: number; totalStorageBytes?: number
+  totalStorageMB?: number
 }
 
 interface ReputationEntry {
@@ -25,14 +25,13 @@ interface GunRelayEntry {
   lastSeen?: number
 }
 
-interface DealStats { totalDeals?: number; activeDeals?: number; totalSizeMB?: number; totalRevenueUSDC?: number }
+
 
 function Network() {
   const [stats, setStats] = useState<NetworkStats>({})
   const [leaderboard, setLeaderboard] = useState<ReputationEntry[]>([])
   const [gunPeers, setGunPeers] = useState<GunPeerEntry[]>([])
   const [gunRelays, setGunRelays] = useState<GunRelayEntry[]>([])
-  const [dealStats, setDealStats] = useState<DealStats>({})
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
@@ -55,12 +54,11 @@ function Network() {
     setLoading(true)
     try {
       // Execute all API calls in parallel for faster loading
-      const [statsResult, repResult, peersResult, relaysResult, dealsResult] = await Promise.allSettled([
+      const [statsResult, repResult, peersResult, relaysResult] = await Promise.allSettled([
         fetch('/api/v1/network/stats').then(r => r.json()),
         fetch('/api/v1/network/reputation?limit=20').then(r => r.json()),
         fetch('/api/v1/network/peers?maxAge=3600000').then(r => r.json()),
-        fetch('/api/v1/network/relays?maxAge=300000').then(r => r.json()),
-        fetch('/api/v1/deals/stats').then(r => r.json())
+        fetch('/api/v1/network/relays?maxAge=300000').then(r => r.json())
       ])
 
       // Process results - each call can fail independently
@@ -79,9 +77,6 @@ function Network() {
         setGunRelays(relaysResult.value.relays)
       } else {
         setGunRelays([])
-      }
-      if (dealsResult.status === 'fulfilled' && dealsResult.value.success && dealsResult.value.stats) {
-        setDealStats(dealsResult.value.stats)
       }
       
       setLastUpdated(new Date())
@@ -131,7 +126,6 @@ function Network() {
             <div className="stat"><div className="stat-title">Connections</div><div className="stat-value">{formatNumber(stats.totalConnections)}</div></div>
             <div className="stat"><div className="stat-title">Storage</div><div className="stat-value text-secondary">{storageGB >= 1 ? storageGB.toFixed(2) : Math.round(storageMB)}</div><div className="stat-desc">{storageGB >= 1 ? 'GB' : 'MB'}</div></div>
             <div className="stat"><div className="stat-title">Pins</div><div className="stat-value">{formatNumber(stats.totalPins)}</div></div>
-            <div className="stat"><div className="stat-title">Active Deals</div><div className="stat-value text-success">{formatNumber(stats.totalActiveDeals)}</div></div>
           </div>
         </div>
       </div>

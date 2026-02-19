@@ -13,8 +13,6 @@ const iconMap: Record<string, string> = {
   chat: '◆',
   users: '👥',
   registry: '▣',
-  deals: '◊',
-  x402: '▧',
   torrents: '▥',
   apiKeys: '◈',
   charts: '▦',
@@ -43,9 +41,6 @@ const navItems: NavItem[] = [
   { path: '/users', icon: iconMap.users, label: 'Users', group: 'network' },
   { path: '/chat', icon: iconMap.chat, label: 'Chat', group: 'network' },
   { path: '/torrents', icon: iconMap.torrents, label: 'Torrents', group: 'network' },
-  { path: '/deals', icon: iconMap.deals, label: 'Deals', group: 'blockchain' },
-  { path: '/x402', icon: iconMap.x402, label: 'x402', group: 'blockchain' },
-  { path: '/registry', icon: iconMap.registry, label: 'Registry', group: 'registry' },
   { path: '/api-keys', icon: iconMap.apiKeys, label: 'API Keys', group: 'tools' },
   { path: '/charts', icon: iconMap.charts, label: 'Charts', group: 'tools' },
   { path: '/visual-graph', icon: iconMap.visualGraph, label: 'Visual Graph', group: 'tools' },
@@ -59,14 +54,12 @@ const groupLabels: Record<string, string> = {
   main: 'DASHBOARD',
   storage: 'STORAGE',
   network: 'NETWORK',
-  blockchain: 'BLOCKCHAIN',
-  registry: 'REGISTRY',
   tools: 'TOOLS',
   system: 'SYSTEM'
 }
 
 function Sidebar() {
-  const groups = ['main', 'storage', 'network', 'blockchain', 'registry', 'tools', 'system']
+  const groups = ['main', 'storage', 'network', 'tools', 'system']
 
   return (
     <div className="drawer-side z-40">

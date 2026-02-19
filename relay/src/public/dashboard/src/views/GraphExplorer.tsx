@@ -8,7 +8,7 @@ interface NodeData {
 
 function GraphExplorer() {
   const { isAuthenticated, getAuthHeaders } = useAuth()
-  const [currentPath, setCurrentPath] = useState(GUN_PATHS.SHOGUN)
+  const [currentPath, setCurrentPath] = useState<string>(GUN_PATHS.SHOGUN)
   const [data, setData] = useState<NodeData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
