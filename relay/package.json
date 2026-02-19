@@ -1,6 +1,6 @@
 {
   "name": "shogun-relay",
-  "version": "1.2.1",
+  "version": "2.0.0",
   "description": "Enhanced Gun.js relay server with robust connection management and real-time sync",
   "type": "module",
   "main": "src/index.js",
