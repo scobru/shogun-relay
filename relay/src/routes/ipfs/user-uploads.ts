@@ -1,14 +1,40 @@
 import { Router, Request, Response } from "express";
 import http from "http";
 import { loggers } from "../../utils/logger";
-import { X402Merchant } from "../../utils/x402-merchant";
 import { IPFS_API_TOKEN } from "./utils";
 import type { IpfsRequestOptions } from "./types";
+import { GUN_PATHS } from "../../utils/gun-paths";
 
 const router: Router = Router();
 
 /**
- * Get user uploads list (for x402 subscription users)
+ * Helper: Get user uploads from GunDB
+ */
+async function getUserUploadsFromGun(gun: any, userAddress: string): Promise<any[]> {
+  return new Promise((resolve) => {
+    const uploads: any[] = [];
+    const timer = setTimeout(() => resolve(uploads), 3000);
+
+    gun
+      .get(GUN_PATHS.UPLOADS)
+      .get(userAddress)
+      .map()
+      .on((data: any, key: string) => {
+        if (data && key !== "_" && data.hash) {
+          uploads.push({ ...data, hash: data.hash || key });
+        }
+      });
+
+    // Also resolve faster if no data
+    setTimeout(() => {
+      clearTimeout(timer);
+      resolve(uploads);
+    }, 2000);
+  });
+}
+
+/**
+ * Get user uploads list
  */
 router.get("/user-uploads/:userAddress", async (req, res) => {
   try {
@@ -25,8 +51,7 @@ router.get("/user-uploads/:userAddress", async (req, res) => {
         .json({ success: false, error: "Server error - Gun instance not available" });
     }
 
-    const uploads = await X402Merchant.getUserUploads(gun, userAddress);
-    const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
+    const uploads = await getUserUploadsFromGun(gun, userAddress);
 
     res.json({
       success: true,
@@ -40,14 +65,6 @@ router.get("/user-uploads/:userAddress", async (req, res) => {
         uploadedAt: upload.uploadedAt,
       })),
       count: uploads.length,
-      subscription: subscription.active
-        ? {
-            tier: subscription.tier,
-            storageMB: subscription.storageMB,
-            storageUsedMB: subscription.storageUsedMB,
-            storageRemainingMB: subscription.storageRemainingMB,
-          }
-        : null,
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -57,7 +74,7 @@ router.get("/user-uploads/:userAddress", async (req, res) => {
 });
 
 /**
- * View/download user uploaded file (for x402 subscription users)
+ * View/download user uploaded file
  */
 router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
   try {
@@ -70,7 +87,7 @@ router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
         .json({ success: false, error: "Server error - Gun instance not available" });
     }
 
-    const uploads = await X402Merchant.getUserUploads(gun, userAddress);
+    const uploads = await getUserUploadsFromGun(gun, userAddress);
     const uploadRecord = uploads.find((u) => u.hash === hash);
 
     if (!uploadRecord) {
@@ -155,7 +172,7 @@ router.get("/user-uploads/:userAddress/:hash/download", async (req, res) => {
 });
 
 /**
- * Decrypt user uploaded file (for subscription files)
+ * Decrypt user uploaded file
  * Redirects to /cat/:cid/decrypt after verification
  */
 router.get("/user-uploads/:userAddress/:hash/decrypt", async (req: Request, res: Response) => {
@@ -185,7 +202,7 @@ router.get("/user-uploads/:userAddress/:hash/decrypt", async (req: Request, res:
         .json({ success: false, error: "Server error - Gun instance not available" });
     }
 
-    const uploads = await X402Merchant.getUserUploads(gun, userAddress);
+    const uploads = await getUserUploadsFromGun(gun, userAddress);
     const uploadRecord = uploads.find((u) => u.hash === hash);
 
     if (!uploadRecord) {
@@ -211,7 +228,7 @@ router.get("/user-uploads/:userAddress/:hash/decrypt", async (req: Request, res:
 });
 
 /**
- * Delete/unpin user file (for x402 subscription users)
+ * Delete/unpin user file
  */
 router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
   try {
@@ -238,12 +255,7 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
         .json({ success: false, error: "Server error - Gun instance not available" });
     }
 
-    const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
-    if (!subscription.active) {
-      return res.status(403).json({ success: false, error: "No active subscription" });
-    }
-
-    const uploads = await X402Merchant.getUserUploads(gun, userAddress);
+    const uploads = await getUserUploadsFromGun(gun, userAddress);
     const uploadRecord = uploads.find((u) => u.hash === hash);
 
     if (!uploadRecord) {
@@ -288,41 +300,28 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
       ipfsReq.end();
     });
 
-    loggers.server.info({ hash }, `🗑️ Deleting upload record`);
+    // Delete upload record from GunDB
+    loggers.server.info({ hash }, `🗑️ Deleting upload record from GunDB`);
     try {
-      await X402Merchant.deleteUploadRecord(userAddress, hash);
+      gun.get(GUN_PATHS.UPLOADS).get(userAddress).get(hash).put(null);
     } catch (e) {
       loggers.server.warn({ err: e, hash }, `⚠️ Failed to delete upload record`);
     }
 
+    // Update MB usage
     try {
-      const updateResult = await X402Merchant.updateStorageUsage(gun, userAddress, -fileSizeMB);
-      loggers.server.info(
-        {
-          storageUsedMB: updateResult.storageUsedMB,
-          storageRemainingMB: updateResult.storageRemainingMB,
-        },
-        `✅ Storage updated`
-      );
+      const { updateMBUsage } = await import("../../utils/storage-utils.js");
+      await updateMBUsage(gun, userAddress, -fileSizeMB);
+      loggers.server.info({ freedMB: fileSizeMB }, `✅ Storage updated`);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes("No active subscription"))
-        loggers.server.warn({ err: e }, `⚠️ Failed to update storage`);
+      loggers.server.warn({ err: e }, `⚠️ Failed to update storage`);
     }
-
-    const updatedSubscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
 
     res.json({
       success: true,
       message: "File unpinned and removed successfully",
       hash,
       unpin: unpinResult,
-      subscription: updatedSubscription.active
-        ? {
-            storageUsedMB: updatedSubscription.storageUsedMB,
-            storageRemainingMB: updatedSubscription.storageRemainingMB,
-          }
-        : null,
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);

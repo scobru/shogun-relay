@@ -2,8 +2,7 @@ import { Router, Response } from "express";
 import multer from "multer";
 import FormData from "form-data";
 import { loggers } from "../../utils/logger";
-import { authConfig, ipfsConfig, x402Config } from "../../config";
-import { X402Merchant } from "../../utils/x402-merchant";
+import { authConfig, ipfsConfig } from "../../config";
 import { ipfsUpload } from "../../utils/ipfs-client";
 import type { CustomRequest } from "./types";
 import { GUN_PATHS } from "../../utils/gun-paths";
@@ -47,58 +46,9 @@ router.post(
         loggers.server.info({ userAddress }, `Directory upload allowed for storage deal`);
         req.isDealUpload = true;
         next();
-      } else if (x402Config.payToAddress as string) {
-        const gun = req.app.get("gunInstance");
-        if (!gun) {
-          return res
-            .status(500)
-            .json({ success: false, error: "Server error - Gun instance not available" });
-        }
-
-        try {
-          const subscription = await X402Merchant.getSubscriptionStatus(gun, userAddress);
-
-          if (!subscription.active) {
-            loggers.server.warn(
-              { userAddress, reason: subscription.reason },
-              `Directory upload denied - No active subscription`
-            );
-            return res.status(402).json({
-              success: false,
-              error: "Payment required - No active subscription",
-              reason: subscription.reason,
-              subscriptionRequired: true,
-              endpoint: "/api/v1/x402/subscribe",
-              tiers: "/api/v1/x402/tiers",
-            });
-          }
-
-          req.subscription = subscription;
-          req.userAddress = userAddress;
-          loggers.server.info(
-            {
-              userAddress,
-              tier: subscription.tier,
-              storageRemainingMB: subscription.storageRemainingMB,
-            },
-            `User has active subscription for directory upload`
-          );
-          next();
-        } catch (error: unknown) {
-          loggers.server.error({ err: error }, "Subscription check error");
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          return res
-            .status(500)
-            .json({
-              success: false,
-              error: "Error checking subscription status",
-              details: errorMessage,
-            });
-        }
       } else {
-        loggers.server.info(
-          `Directory upload allowed - X402 not configured, treating as deal upload`
-        );
+        // X402 subscription checks moved to shogun-commerce
+        loggers.server.info({ userAddress }, `Directory upload allowed - user authenticated`);
         req.isDealUpload = true;
         next();
       }
@@ -109,8 +59,8 @@ router.post(
       );
       res.status(401).json({
         success: false,
-        error: "Unauthorized - Admin token or x402 subscription required",
-        hint: "Provide Authorization header with admin token, or X-User-Address header with a valid x402 subscription",
+        error: "Unauthorized - Admin token or wallet required",
+        hint: "Provide Authorization header with admin token, or X-User-Address header",
       });
     }
   },
@@ -136,60 +86,6 @@ router.post(
         `📁 Directory upload: ${files.length} files (${totalSizeMB.toFixed(2)} MB)`
       );
 
-      // Verify storage for subscription users
-      if (customReq.authType === "user" && customReq.subscription) {
-        const ipfsApiUrl =
-          req.app.get("IPFS_API_URL") || ipfsConfig.apiUrl || "http://127.0.0.1:5001";
-        const ipfsApiToken = req.app.get("IPFS_API_TOKEN") || ipfsConfig.apiToken;
-        const gun = req.app.get("gunInstance");
-
-        loggers.server.debug(
-          { userAddress: customReq.userAddress },
-          `Verifying real IPFS storage before directory upload`
-        );
-
-        const canUploadResult = await X402Merchant.canUploadVerified(
-          gun,
-          customReq.userAddress!,
-          totalSizeMB,
-          ipfsApiUrl,
-          ipfsApiToken
-        );
-
-        if (!canUploadResult.allowed) {
-          loggers.server.warn(
-            { userAddress: customReq.userAddress, reason: canUploadResult.reason },
-            `Directory upload denied`
-          );
-          return res.status(402).json({
-            success: false,
-            error: "Storage limit exceeded",
-            details: {
-              totalSizeMB: totalSizeMB.toFixed(2),
-              fileCount: files.length,
-              storageUsedMB: canUploadResult.storageUsedMB?.toFixed(2) || "0",
-              storageRemainingMB: canUploadResult.storageRemainingMB?.toFixed(2) || "0",
-              storageTotalMB: canUploadResult.storageTotalMB || customReq.subscription?.storageMB,
-              tier: canUploadResult.currentTier || customReq.subscription?.tier,
-              verified: canUploadResult.verified,
-            },
-            reason: canUploadResult.reason,
-            upgradeRequired: canUploadResult.requiresUpgrade,
-            endpoint: "/api/v1/x402/subscribe",
-            tiers: "/api/v1/x402/tiers",
-          });
-        }
-
-        customReq.verifiedStorage = canUploadResult;
-        loggers.server.info(
-          {
-            userAddress: customReq.userAddress,
-            storageUsedMB: canUploadResult.storageUsedMB?.toFixed(2),
-            storageTotalMB: canUploadResult.storageTotalMB,
-          },
-          `Directory upload allowed`
-        );
-      }
 
       // Create FormData with all files
       const formData = new FormData();
@@ -269,44 +165,9 @@ router.post(
           }
         })();
 
-        let subscriptionUpdatePromise: Promise<any> = Promise.resolve();
-        if (customReq.subscription) {
-          const uploadRecordPromise = X402Merchant.saveUploadRecord(
-            customReq.userAddress!,
-            directoryCid,
-            {
-              name: `Directory (${files.length} files)`,
-              size: totalSize,
-              sizeMB: totalSizeMB,
-              mimetype: "application/directory",
-              uploadedAt: Date.now(),
-            }
-          ).catch((err) => {
-            loggers.server.warn({ err }, `⚠️ Failed to save directory upload record`);
-          });
 
-          subscriptionUpdatePromise = Promise.all([
-            uploadRecordPromise,
-            X402Merchant.updateStorageUsage(gun, customReq.userAddress!, totalSizeMB),
-          ])
-            .then(([, result]) => {
-              loggers.server.info(
-                {
-                  storageUsedMB: result?.storageUsedMB,
-                  storageRemainingMB: result?.storageRemainingMB,
-                },
-                `📊 Subscription storage updated for directory`
-              );
-              return result;
-            })
-            .catch((err: unknown) => {
-              loggers.server.warn({ err }, `⚠️ Subscription storage update failed`);
-              return null;
-            });
-        }
-
-        Promise.all([saveUploadPromise, updateMBPromise, subscriptionUpdatePromise])
-          .then(([, , subscriptionResult]) => {
+        Promise.all([saveUploadPromise, updateMBPromise])
+          .then(() => {
             loggers.server.info(
               { userAddress, fileCount: files.length, totalSizeMB },
               `📊 Directory upload saved`
@@ -325,12 +186,6 @@ router.post(
                 sizeMB: Math.ceil(totalSizeMB),
                 verified: true,
               },
-              subscription: subscriptionResult
-                ? {
-                    storageUsedMB: subscriptionResult.storageUsedMB,
-                    storageRemainingMB: subscriptionResult.storageRemainingMB,
-                  }
-                : undefined,
             });
           })
           .catch((error: unknown) => {

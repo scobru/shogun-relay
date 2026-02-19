@@ -773,35 +773,5 @@ router.post("/rpc/execute", async (req, res) => {
   }
 });
 
-// Contracts endpoint
-router.get("/contracts", async (req, res) => {
-  try {
-    const { getConfigByChainId } = await import("shogun-contracts-sdk");
-
-    const chainId = config.registry.chainId;
-    const contractsConfig = getConfigByChainId(chainId);
-
-    if (!contractsConfig) {
-      return res.status(404).json({
-        success: false,
-        error: `No configuration found for chain ID ${chainId}`,
-        chainId,
-      });
-    }
-
-    res.json({
-      success: true,
-      chainId,
-      contracts: contractsConfig,
-      timestamp: Date.now(),
-    });
-  } catch (error: any) {
-    loggers.server.error({ err: error }, "❌ Contracts GET error");
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
 
 export default router;
