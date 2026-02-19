@@ -17,36 +17,9 @@ router.get("/cat/:cid/decrypt", async (req: Request, res: Response) => {
 
     loggers.server.debug({ cid, hasToken: !!token }, `🔓 IPFS Decrypt request`);
 
-    // Verify signature if userAddress is provided (for enhanced security)
-    const tokenStr = Array.isArray(token) ? token[0] : token;
-    if (
-      tokenStr &&
-      userAddress &&
-      typeof tokenStr === "string" &&
-      tokenStr.startsWith("0x") &&
-      tokenStr.length > 100
-    ) {
-      try {
-        const { ethers } = await import("ethers");
-        const expectedMessage = "I Love Shogun";
-        const recoveredAddress = ethers.verifyMessage(expectedMessage, tokenStr);
-
-        const userAddressStr = Array.isArray(userAddress) ? userAddress[0] : userAddress;
-        if (
-          userAddressStr &&
-          typeof userAddressStr === "string" &&
-          recoveredAddress.toLowerCase() !== userAddressStr.toLowerCase()
-        ) {
-          loggers.server.warn(
-            { userAddress, recoveredAddress },
-            `⚠️ Signature verification failed`
-          );
-        } else {
-          loggers.server.debug({ userAddress }, `✅ Signature verified`);
-        }
-      } catch (verifyError) {
-        loggers.server.warn({ err: verifyError }, `⚠️ Signature verification skipped`);
-      }
+    // Signature verification removed (Blockchain features disabled)
+    if (userAddress && token && typeof token === "string" && token.startsWith("0x")) {
+      loggers.server.debug("Signature verification skipped (Blockchain features disabled)");
     }
 
     // Parse token if it's a JSON string (not a hex string)

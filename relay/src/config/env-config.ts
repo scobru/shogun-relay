@@ -6,9 +6,6 @@
  *
  * Priority: Environment variables > Default values
  *
- * Multi-Chain Support:
- * - X402_NETWORKS, X402_DEFAULT_NETWORK, X402_<NETWORK>_RPC
- * - DEALS_NETWORKS, DEALS_DEFAULT_NETWORK, DEALS_<NETWORK>_RPC
  */
 
 import dotenv from "dotenv";

@@ -59,15 +59,8 @@ export async function verifyWalletSignature(addr: string, sig: string): Promise<
   if (!sig || !sig.startsWith("0x") || sig.length < 100) {
     return false;
   }
-  try {
-    const { ethers } = await import("ethers");
-    const expectedMessage = "I Love Shogun";
-    const recoveredAddress = ethers.verifyMessage(expectedMessage, sig);
-    return recoveredAddress.toLowerCase() === addr.toLowerCase();
-  } catch (error) {
-    loggers.server.warn({ error }, "Wallet signature verification failed");
-    return false;
-  }
+  loggers.server.warn("Wallet signature verification disabled (Blockchain features removed)");
+  return false;
 }
 
 /**

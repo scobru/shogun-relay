@@ -18,7 +18,6 @@ const iconMap: Record<string, string> = {
   charts: "▦",
   visualGraph: "◬",
   graphExplorer: "◎",
-  rpcConsole: "▩",
   apiDocs: "▤",
   settings: "◎",
 };
@@ -45,7 +44,6 @@ const navItems: NavItem[] = [
   { path: "/charts", icon: iconMap.charts, label: "Charts", group: "tools" },
   { path: "/visual-graph", icon: iconMap.visualGraph, label: "Visual Graph", group: "tools" },
   { path: "/graph-explorer", icon: iconMap.graphExplorer, label: "Graph Explorer", group: "tools" },
-  { path: "/rpc-console", icon: iconMap.rpcConsole, label: "RPC Console", group: "tools" },
   { path: "/api-docs", icon: iconMap.apiDocs, label: "API Docs", group: "tools" },
   { path: "/settings", icon: iconMap.settings, label: "Settings", group: "system" },
 ];

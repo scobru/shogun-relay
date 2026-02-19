@@ -215,8 +215,6 @@ async function initializeServer() {
       "X-Requested-With",
       "X-Session-Token",
       "X-User-Address",
-      "X-Wallet-Signature",
-      "X-Deal-Upload",
     ],
     exposedHeaders: ["X-Session-Token"],
     maxAge: 86400, // 24 hours

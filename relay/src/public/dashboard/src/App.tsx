@@ -11,7 +11,6 @@ import Network from "./views/Network";
 import Settings from "./views/Settings";
 import ApiKeys from "./views/ApiKeys";
 import Charts from "./views/Charts";
-import RpcConsole from "./views/RpcConsole";
 import ApiDocs from "./views/ApiDocs";
 import VisualGraph from "./views/VisualGraph";
 import GraphExplorer from "./views/GraphExplorer";
@@ -35,7 +34,6 @@ function App() {
         <Route path="charts" element={<Charts />} />
         <Route path="visual-graph" element={<VisualGraph />} />
         <Route path="graph-explorer" element={<GraphExplorer />} />
-        <Route path="rpc-console" element={<RpcConsole />} />
         <Route path="api-docs" element={<ApiDocs />} />
         <Route path="users" element={<Users />} />
         <Route path="settings" element={<Settings />} />
