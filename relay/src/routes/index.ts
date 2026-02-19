@@ -67,10 +67,7 @@ import systemRouter from "./system";
 import debugRouter from "./debug";
 import servicesRouter from "./services";
 import visualGraphRouter from "./visualGraph";
-import x402Router from "./x402";
 import networkRouter from "./network";
-import dealsRouter from "./deals";
-import registryRouter from "./registry";
 import chatRouter from "./chat";
 import torrentRouter from "./torrent";
 import driveRouter from "./drive";
@@ -79,7 +76,7 @@ import apiKeysRouter from "./api-keys";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import { authConfig, ipfsConfig, registryConfig, packageConfig, x402Config, dealsConfig, torrentConfig, holsterConfig } from "../config";
+import { authConfig, ipfsConfig, packageConfig, torrentConfig, holsterConfig } from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -595,41 +592,9 @@ export default (app: express.Application) => {
   // Route per il grafico visivo (always enabled)
   app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
 
-  // Route per x402 payments e subscriptions (conditional)
-  if (x402Config.enabled) {
-    app.use(`${baseRoute}/x402`, x402Router);
-    loggers.server.info(`✅ X402 routes registered`);
-  } else {
-    loggers.server.info(`⏭️ X402 routes disabled (X402_ENABLED=false)`);
-    app.use(`${baseRoute}/x402/*`, (req, res) => {
-      res.status(503).json({ success: false, error: "X402 module is disabled" });
-    });
-  }
-
   // Route per network federation, discovery e storage proofs (always enabled)
   app.use(`${baseRoute}/network`, networkRouter);
 
-  // Route per storage deals (conditional)
-  if (dealsConfig.enabled) {
-    app.use(`${baseRoute}/deals`, dealsRouter);
-    loggers.server.info(`✅ Deals routes registered`);
-  } else {
-    loggers.server.info(`⏭️ Deals routes disabled (DEALS_ENABLED=false)`);
-    app.use(`${baseRoute}/deals/*`, (req, res) => {
-      res.status(503).json({ success: false, error: "Deals module is disabled" });
-    });
-  }
-
-  // Route per on-chain registry management (conditional)
-  if (registryConfig.enabled) {
-    app.use(`${baseRoute}/registry`, registryRouter);
-    loggers.server.info(`✅ Registry routes registered`);
-  } else {
-    loggers.server.info(`⏭️ Registry routes disabled (REGISTRY_ENABLED=false)`);
-    app.use(`${baseRoute}/registry/*`, (req, res) => {
-      res.status(503).json({ success: false, error: "Registry module is disabled" });
-    });
-  }
 
 
 
@@ -825,9 +790,6 @@ export default (app: express.Application) => {
         modules: {
           ipfs: ipfsConfig.enabled,
           holster: holsterConfig.enabled,
-          x402: x402Config.enabled,
-          deals: dealsConfig.enabled,
-          registry: registryConfig.enabled,
           torrent: torrentConfig.enabled,
         },
       },

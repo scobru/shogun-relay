@@ -14,7 +14,6 @@
 import dotenv from "dotenv";
 import path from "path";
 import ip from "ip";
-import { parseNetworkList, getRpcForNetwork, getChainIdForNetwork, type NetworkId } from "./chains";
 
 dotenv.config();
 
@@ -154,155 +153,9 @@ export const config = {
     seaKeypairPath: process.env.RELAY_SEA_KEYPAIR_PATH,
   },
 
-  // ============================================================================
-  // REGISTRY CONFIGURATION (Multi-Chain)
-  // ============================================================================
 
-  registry: {
-    enabled: process.env.REGISTRY_ENABLED === "true" || false,
-    // Multi-chain configuration
-    networks: parseNetworkList(process.env.REGISTRY_NETWORKS, ["base-sepolia"]),
-    defaultNetwork: (process.env.REGISTRY_DEFAULT_NETWORK || "base-sepolia") as NetworkId,
 
-    // Get RPC URL for specific network (or default)
-    getRpcUrl: (network?: NetworkId): string => {
-      const targetNetwork =
-        network || ((process.env.REGISTRY_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
-      return getRpcForNetwork(targetNetwork, undefined); // No service-specific override for registry
-    },
 
-    // Get chain ID for specific network (or default)
-    getChainId: (network?: NetworkId): number => {
-      const targetNetwork =
-        network || ((process.env.REGISTRY_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
-      return getChainIdForNetwork(targetNetwork);
-    },
-
-    // RPC URLs map for all configured networks
-    rpcUrls: (() => {
-      const networks = parseNetworkList(process.env.REGISTRY_NETWORKS, ["base-sepolia"]);
-      const urls: Record<string, string> = {};
-      for (const network of networks) {
-        urls[network] = getRpcForNetwork(network);
-      }
-      return urls;
-    })(),
-
-    // Default chain ID (for backward compatibility)
-    chainId: getChainIdForNetwork(
-      (process.env.REGISTRY_DEFAULT_NETWORK || "base-sepolia") as NetworkId
-    ),
-
-    // Dynamic getter for relay private key to avoid caching issues
-    // Priority: RELAY_PRIVATE_KEY > PRIVATE_KEY (fallback)
-    // IMPORTANT: Always use this getter instead of a cached property
-    getRelayPrivateKey: (): string | undefined => {
-      return process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY;
-    },
-
-    // Deprecated: Use getRelayPrivateKey() instead - this getter ensures no caching
-    get relayPrivateKey(): string | undefined {
-      return process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY;
-    },
-  },
-
-  // ============================================================================
-  // X402 PAYMENT CONFIGURATION (Multi-Chain)
-  // ============================================================================
-
-  x402: {
-    enabled: process.env.X402_ENABLED === "true" || false,
-    // Multi-chain configuration
-    networks: parseNetworkList(process.env.X402_NETWORKS, ["base-sepolia"]),
-    defaultNetwork: (process.env.X402_DEFAULT_NETWORK || "base-sepolia") as NetworkId,
-
-    // Get RPC URL for specific network (or default)
-    getRpcUrl: (network?: NetworkId): string => {
-      const targetNetwork =
-        network || ((process.env.X402_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
-      return getRpcForNetwork(targetNetwork, "x402");
-    },
-
-    // Get chain ID for specific network (or default)
-    getChainId: (network?: NetworkId): number => {
-      const targetNetwork =
-        network || ((process.env.X402_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
-      return getChainIdForNetwork(targetNetwork);
-    },
-
-    // RPC URLs map for all configured networks
-    rpcUrls: (() => {
-      const networks = parseNetworkList(process.env.X402_NETWORKS, ["base-sepolia"]);
-      const urls: Record<string, string> = {};
-      for (const network of networks) {
-        urls[network] = getRpcForNetwork(network, "x402");
-      }
-      return urls;
-    })(),
-
-    // Default chain ID (for backward compatibility)
-    chainId: getChainIdForNetwork(
-      (process.env.X402_DEFAULT_NETWORK || "base-sepolia") as NetworkId
-    ),
-
-    // Payment configuration
-    payToAddress: process.env.X402_PAY_TO_ADDRESS,
-    privateKey: process.env.X402_PRIVATE_KEY,
-    facilitatorUrl: process.env.X402_FACILITATOR_URL,
-    facilitatorApiKey: process.env.X402_FACILITATOR_API_KEY,
-    settlementMode: process.env.X402_SETTLEMENT_MODE as "facilitator" | "direct" | undefined,
-  },
-
-  // ============================================================================
-  // DEALS CONFIGURATION (Multi-Chain)
-  // ============================================================================
-
-  deals: {
-    enabled: process.env.DEALS_ENABLED === "true" || false,
-    // Multi-chain configuration
-    networks: parseNetworkList(process.env.DEALS_NETWORKS, ["base-sepolia"]),
-    defaultNetwork: (process.env.DEALS_DEFAULT_NETWORK || "base-sepolia") as NetworkId,
-
-    // Get RPC URL for specific network (or default)
-    getRpcUrl: (network?: NetworkId): string => {
-      const targetNetwork =
-        network || ((process.env.DEALS_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
-      return getRpcForNetwork(targetNetwork, "deals");
-    },
-
-    // Get chain ID for specific network (or default)
-    getChainId: (network?: NetworkId): number => {
-      const targetNetwork =
-        network || ((process.env.DEALS_DEFAULT_NETWORK || "base-sepolia") as NetworkId);
-      return getChainIdForNetwork(targetNetwork);
-    },
-
-    // RPC URLs map for all configured networks
-    rpcUrls: (() => {
-      const networks = parseNetworkList(process.env.DEALS_NETWORKS, ["base-sepolia"]);
-      const urls: Record<string, string> = {};
-      for (const network of networks) {
-        urls[network] = getRpcForNetwork(network, "deals");
-      }
-      return urls;
-    })(),
-
-    // Default chain ID (for backward compatibility)
-    chainId: getChainIdForNetwork(
-      (process.env.DEALS_DEFAULT_NETWORK || "base-sepolia") as NetworkId
-    ),
-  },
-
-  // ============================================================================
-  // DEAL SYNC CONFIGURATION
-  // ============================================================================
-
-  dealSync: {
-    enabled: process.env.DEAL_SYNC_ENABLED === "true" || false,
-    intervalMs: parseInt(process.env.DEAL_SYNC_INTERVAL_MS || "300000") || 5 * 60 * 1000,
-    fastIntervalMs: parseInt(process.env.DEAL_SYNC_FAST_INTERVAL_MS || "120000") || 2 * 60 * 1000,
-    initialDelayMs: parseInt(process.env.DEAL_SYNC_INITIAL_DELAY_MS || "30000") || 30 * 1000,
-  },
 
   // ============================================================================
   // WORMHOLE CLEANUP CONFIGURATION
@@ -335,31 +188,7 @@ export const config = {
     debug: process.env.DEBUG === "true" || !!process.env.DEBUG,
   },
 
-  // ============================================================================
-  // PRICING CONFIGURATION
-  // ============================================================================
 
-  pricing: {
-    // Deal Pricing
-    dealPriceStandard: parseFloat(process.env.DEAL_PRICE_STANDARD || "0.0001"),
-    dealPricePremium: parseFloat(process.env.DEAL_PRICE_PREMIUM || "0.0002"),
-    dealPriceEnterprise: parseFloat(process.env.DEAL_PRICE_ENTERPRISE || "0.0005"),
-    dealMinSizeMB: parseFloat(process.env.DEAL_MIN_SIZE_MB || "0.001"),
-    dealMaxSizeMB: parseFloat(process.env.DEAL_MAX_SIZE_MB || "1000"),
-    dealMinDurationDays: parseInt(process.env.DEAL_MIN_DURATION_DAYS || "7"),
-    dealMaxDurationDays: parseInt(process.env.DEAL_MAX_DURATION_DAYS || "365"),
-    dealPremiumReplication: parseInt(process.env.DEAL_PREMIUM_REPLICATION || "3"),
-    dealEnterpriseReplication: parseInt(process.env.DEAL_ENTERPRISE_REPLICATION || "5"),
-
-    // Subscription Pricing
-    subBasicStorageMB: parseInt(process.env.SUB_BASIC_STORAGE_MB || "100"),
-    subBasicPrice: parseFloat(process.env.SUB_BASIC_PRICE || "0.001"),
-    subStandardStorageMB: parseInt(process.env.SUB_STANDARD_STORAGE_MB || "500"),
-    subStandardPrice: parseFloat(process.env.SUB_STANDARD_PRICE || "0.004"),
-    subPremiumStorageMB: parseInt(process.env.SUB_PREMIUM_STORAGE_MB || "2000"),
-    subPremiumPrice: parseFloat(process.env.SUB_PREMIUM_PRICE || "0.01"),
-    subDurationDays: parseInt(process.env.SUB_DURATION_DAYS || "30"),
-  },
 
   // ============================================================================
   // PACKAGE METADATA
@@ -422,14 +251,9 @@ export const authConfig = config.auth;
 export const holsterConfig = config.holster;
 export const storageConfig = config.storage;
 export const relayKeysConfig = config.relayKeys;
-export const registryConfig = config.registry;
-export const x402Config = config.x402;
-export const dealsConfig = config.deals;
-export const dealSyncConfig = config.dealSync;
 export const wormholeConfig = config.wormhole;
 export const replicationConfig = config.replication;
 export const loggingConfig = config.logging;
-export const pricingConfig = config.pricing;
 export const packageConfig = config.package;
 export const torrentConfig = config.torrent;
 export const driveConfig = config.drive;

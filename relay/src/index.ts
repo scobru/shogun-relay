@@ -31,9 +31,6 @@ import {
   authConfig,
   storageConfig,
   relayKeysConfig,
-  registryConfig,
-  x402Config,
-  dealSyncConfig,
   wormholeConfig,
   replicationConfig,
   loggingConfig,
@@ -44,11 +41,9 @@ import { startWormholeCleanup } from "./utils/wormhole-cleanup";
 import {
   secureCompare,
   hashToken,
-  isValidChainId,
-  getChainName,
   createProductionErrorHandler,
 } from "./utils/security";
-import { startPeriodicPeerSync, announceRelayPresence } from "./utils/peer-discovery";
+import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/peer-discovery";
 import { torrentManager } from "./utils/torrent";
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
 
@@ -57,15 +52,13 @@ import authRoutes from "./routes/auth";
 import apiKeysRoutes from "./routes/api-keys";
 import networkRoutes from "./routes/network";
 import uploadsRoutes from "./routes/uploads";
-import dealsRoutes from "./routes/deals/index";
 import usersRoutes from "./routes/users";
 
-import x402Routes from "./routes/x402";
 import systemRoutes from "./routes/system";
 import servicesRoutes from "./routes/services";
 import debugRoutes from "./routes/debug";
 import chatRoutes from "./routes/chat";
-import registryRoutes from "./routes/registry";
+
 import torrentRoutes from "./routes/torrent";
 import visualGraphRoutes from "./routes/visualGraph";
 import driveRoutes from "./routes/drive";
@@ -1200,14 +1193,12 @@ See docs/RELAY_KEYS.md for more information.
   app.use("/api/v1/api-keys", apiKeysRoutes);
   app.use("/api/v1/network", networkRoutes);
   app.use("/api/v1/uploads", uploadsRoutes);
-  app.use("/api/v1/deals", dealsRoutes);
 
-  app.use("/api/v1/x402", x402Routes);
   app.use("/api/v1/system", systemRoutes);
   app.use("/api/v1/services", servicesRoutes);
   app.use("/api/v1/debug", debugRoutes);
   app.use("/api/v1/chat", chatRoutes);
-  app.use("/api/v1/registry", registryRoutes);
+
   app.use("/api/v1/torrents", torrentRoutes);
   app.use("/api/v1/graph", visualGraphRoutes);
   app.use("/api/v1/drive", driveRoutes);
@@ -1376,82 +1367,7 @@ See docs/RELAY_KEYS.md for more information.
     });
   });
 
-  // Contracts configuration endpoint
-  app.get("/api/v1/contracts", async (req, res) => {
-    try {
-      const { CONTRACTS_CONFIG, getConfigByChainId } = await import("shogun-contracts-sdk");
-      const chainIdParam = req.query.chainId;
 
-      if (chainIdParam) {
-        // Get config for specific chain
-        const chainIdNum =
-          typeof chainIdParam === "string"
-            ? parseInt(chainIdParam)
-            : parseInt(String(chainIdParam));
-        if (isNaN(chainIdNum)) {
-          return res.status(400).json({
-            success: false,
-            error: "Invalid chainId parameter",
-          });
-        }
-        const config = getConfigByChainId(chainIdNum);
-
-        if (!config) {
-          return res.status(404).json({
-            success: false,
-            error: `No contracts configured for chain ID ${chainIdNum}`,
-          });
-        }
-
-        return res.json({
-          success: true,
-          chainId: chainIdNum,
-          network: Object.keys(CONTRACTS_CONFIG).find(
-            (key: string) => (CONTRACTS_CONFIG as any)[key].chainId === chainIdNum
-          ),
-          contracts: {
-            relayRegistry: config.relayRegistry,
-            storageDealRegistry: config.storageDealRegistry,
-            dataPostRegistry: config.dataPostRegistry,
-            dataSaleEscrowFactory: config.dataSaleEscrowFactory,
-            usdc: config.usdc,
-          },
-          rpc: config.rpc,
-          explorer: config.explorer,
-        });
-      }
-
-      // Return all configured networks
-      const networks: any = {};
-      for (const [networkName, config] of Object.entries(CONTRACTS_CONFIG)) {
-        networks[networkName] = {
-          chainId: config.chainId,
-          contracts: {
-            relayRegistry: config.relayRegistry,
-            storageDealRegistry: config.storageDealRegistry,
-            dataPostRegistry: config.dataPostRegistry,
-            dataSaleEscrowFactory: config.dataSaleEscrowFactory,
-            usdc: config.usdc,
-          },
-          rpc: config.rpc,
-          explorer: config.explorer,
-        };
-      }
-
-      res.json({
-        success: true,
-        networks,
-        availableChains: Object.values(CONTRACTS_CONFIG).map((c) => c.chainId),
-      });
-    } catch (error: any) {
-      loggers.server.error({ err: error }, "Error fetching contracts config");
-      res.status(500).json({
-        success: false,
-        error: "Failed to fetch contracts configuration",
-        message: error.message,
-      });
-    }
-  });
 
   // IPFS status endpoint
   app.get("/ipfs-status", async (req, res) => {
@@ -1516,142 +1432,6 @@ See docs/RELAY_KEYS.md for more information.
     }
   });
 
-  // Blockchain RPC status endpoint
-  app.get("/rpc-status", async (req, res) => {
-    try {
-      const { CONTRACTS_CONFIG, getConfigByChainId } = await import("shogun-contracts-sdk");
-      const { ethers } = await import("ethers");
-      const { RPC_URLS } = await import("./utils/registry-client");
-
-      const REGISTRY_CHAIN_ID = registryConfig.chainId;
-      const X402_NETWORK = x402Config.defaultNetwork;
-      const X402_RPC_URL = x402Config.getRpcUrl();
-
-      const rpcStatuses = [];
-
-      // Check registry chain RPC
-      const registryChainConfig = getConfigByChainId(REGISTRY_CHAIN_ID);
-      if (registryChainConfig && registryChainConfig.rpc) {
-        try {
-          const provider = new ethers.JsonRpcProvider(registryChainConfig.rpc);
-          const startTime = Date.now();
-          const blockNumber: any = await Promise.race([
-            provider.getBlockNumber(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000)),
-          ]);
-          const latency = Date.now() - startTime;
-
-          rpcStatuses.push({
-            name: `Registry Chain (${REGISTRY_CHAIN_ID})`,
-            chainId: REGISTRY_CHAIN_ID,
-            rpc: registryChainConfig.rpc,
-            status: "online",
-            latency: `${latency}ms`,
-            blockNumber: blockNumber.toString(),
-            network: (registryChainConfig as any).network || "unknown",
-          });
-        } catch (error: any) {
-          rpcStatuses.push({
-            name: `Registry Chain (${REGISTRY_CHAIN_ID})`,
-            chainId: REGISTRY_CHAIN_ID,
-            rpc: registryChainConfig.rpc,
-            status: "offline",
-            error: error.message,
-            network: (registryChainConfig as any).network || "unknown",
-          });
-        }
-      }
-
-      // Check X402 payment RPC
-      if (X402_RPC_URL) {
-        try {
-          const provider = new ethers.JsonRpcProvider(X402_RPC_URL);
-          const startTime = Date.now();
-          const blockNumber: any = await Promise.race([
-            provider.getBlockNumber(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000)),
-          ]);
-          const latency = Date.now() - startTime;
-
-          rpcStatuses.push({
-            name: `X402 Payment (${X402_NETWORK})`,
-            chainId: "custom",
-            rpc: X402_RPC_URL,
-            status: "online",
-            latency: `${latency}ms`,
-            blockNumber: blockNumber.toString(),
-            network: X402_NETWORK,
-          });
-        } catch (error: any) {
-          rpcStatuses.push({
-            name: `X402 Payment (${X402_NETWORK})`,
-            chainId: "custom",
-            rpc: X402_RPC_URL,
-            status: "offline",
-            error: error.message,
-            network: X402_NETWORK,
-          });
-        }
-      }
-
-      // Check all configured chains
-      for (const [key, config] of Object.entries(CONTRACTS_CONFIG)) {
-        if (config && (config as any).chainId && (config as any).rpc) {
-          const conf = config as any;
-          // Skip if already checked
-          if (conf.chainId === REGISTRY_CHAIN_ID) continue;
-
-          try {
-            const provider = new ethers.JsonRpcProvider(conf.rpc);
-            const startTime = Date.now();
-            const blockNumber: any = await Promise.race([
-              provider.getBlockNumber(),
-              new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000)),
-            ]);
-            const latency = Date.now() - startTime;
-
-            rpcStatuses.push({
-              name: `${key} (${conf.chainId})`,
-              chainId: conf.chainId,
-              rpc: conf.rpc,
-              status: "online",
-              latency: `${latency}ms`,
-              blockNumber: blockNumber.toString(),
-              network: conf.network || key,
-            });
-          } catch (error: any) {
-            rpcStatuses.push({
-              name: `${key} (${conf.chainId})`,
-              chainId: conf.chainId,
-              rpc: conf.rpc,
-              status: "offline",
-              error: error.message,
-              network: conf.network || key,
-            });
-          }
-        }
-      }
-
-      const onlineCount = rpcStatuses.filter((r: any) => r.status === "online").length;
-      const totalCount = rpcStatuses.length;
-
-      res.json({
-        success: true,
-        rpcs: rpcStatuses,
-        summary: {
-          total: totalCount,
-          online: onlineCount,
-          offline: totalCount - onlineCount,
-        },
-      });
-    } catch (error: any) {
-      loggers.server.error({ err: error }, "❌ RPC Status Error");
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  });
 
   // Importa e configura le route modulari
   try {
@@ -1925,155 +1705,22 @@ See docs/RELAY_KEYS.md for more information.
     }
   }, 30000); // 30 seconds
 
-  // Real-time deal synchronization with IPFS pins
-  // Syncs active on-chain deals to ensure their CIDs are pinned
-  // Uses two-tier sync: fast sync (every 2 min) + full sync (every 5 min)
-  const DEAL_SYNC_ENABLED = dealSyncConfig.enabled;
-  const DEAL_SYNC_INTERVAL_MS = dealSyncConfig.intervalMs;
-  const DEAL_SYNC_FAST_INTERVAL_MS = dealSyncConfig.fastIntervalMs;
-  const DEAL_SYNC_INITIAL_DELAY_MS = dealSyncConfig.initialDelayMs;
-  const RELAY_PRIVATE_KEY = registryConfig.getRelayPrivateKey();
-  const REGISTRY_CHAIN_ID = registryConfig.chainId?.toString();
 
-  // Store interval/timeout references for cleanup
-  let dealSyncInitialTimeout: any = null;
-  let dealSyncFastInterval: any = null; // Fast sync for near real-time updates
-  let dealSyncFullInterval: any = null; // Full sync for complete synchronization
-
-  if (DEAL_SYNC_ENABLED && RELAY_PRIVATE_KEY && REGISTRY_CHAIN_ID) {
-    loggers.server.info(
-      {
-        fastSyncInterval: DEAL_SYNC_FAST_INTERVAL_MS / 1000,
-        fullSyncInterval: DEAL_SYNC_INTERVAL_MS / 1000 / 60,
-      },
-      `🔄 Real-time deal sync enabled`
-    );
-
-    // Initial sync after short delay (give IPFS time to start)
-    dealSyncInitialTimeout = setTimeout(async () => {
-      try {
-        const { createRegistryClientWithSigner } = await import("./utils/registry-client");
-        const DealSync = await import("./utils/deal-sync");
-        const { getRelayUser } = await import("./utils/relay-user");
-
-        const registryClient = createRegistryClientWithSigner(
-          RELAY_PRIVATE_KEY!,
-          registryConfig.chainId
-        );
-        const relayAddress = registryClient.wallet.address;
-
-        // Get relay user for GunDB sync
-        const relayUser = getRelayUser();
-        const relayKeyPair = (relayUser as any)?._?.sea || null;
-
-        loggers.server.info({ relayAddress }, `🔄 Starting initial deal sync`);
-        await DealSync.syncDealsWithIPFS(relayAddress, registryConfig.chainId, {
-          onlyActive: true,
-          dryRun: false,
-          gun: gun,
-          relayKeyPair: relayKeyPair,
-        });
-        loggers.server.info(`✅ Initial deal sync completed`);
-      } catch (error: any) {
-        loggers.server.warn({ err: error }, `⚠️ Initial deal sync failed`);
-      }
-    }, DEAL_SYNC_INITIAL_DELAY_MS);
-
-    // Fast sync: frequent lightweight sync for near real-time updates
-    // This checks for new deals and syncs them quickly
-    dealSyncFastInterval = setInterval(async () => {
-      try {
-        const { createRegistryClientWithSigner } = await import("./utils/registry-client");
-        const DealSync = await import("./utils/deal-sync");
-        const { getRelayUser } = await import("./utils/relay-user");
-
-        const registryClient = createRegistryClientWithSigner(
-          RELAY_PRIVATE_KEY!,
-          registryConfig.chainId
-        );
-        const relayAddress = registryClient.wallet.address;
-
-        // Get relay user for GunDB sync
-        const relayUser = getRelayUser();
-        const relayKeyPair = (relayUser as any)?._?.sea || null;
-
-        // Fast sync: only sync new/active deals (lightweight)
-        await DealSync.syncDealsWithIPFS(relayAddress, registryConfig.chainId, {
-          onlyActive: true,
-          dryRun: false,
-          gun: gun,
-          relayKeyPair: relayKeyPair,
-          fastSync: true, // Enable fast sync mode (skip expensive operations)
-        });
-      } catch (error: any) {
-        // Don't log fast sync errors as warnings (too noisy)
-        // Only log if it's a critical error
-        if (
-          error.message &&
-          !error.message.includes("timeout") &&
-          !error.message.includes("ECONNREFUSED")
-        ) {
-          loggers.server.warn({ err: error }, `⚠️ Fast deal sync error: ${error.message}`);
-        }
-      }
-    }, DEAL_SYNC_FAST_INTERVAL_MS);
-
-    // Full sync: complete synchronization with all checks
-    // This runs less frequently but does a thorough sync
-    dealSyncFullInterval = setInterval(async () => {
-      try {
-        const { createRegistryClientWithSigner } = await import("./utils/registry-client");
-        const DealSync = await import("./utils/deal-sync");
-        const { getRelayUser } = await import("./utils/relay-user");
-
-        const registryClient = createRegistryClientWithSigner(
-          RELAY_PRIVATE_KEY!,
-          registryConfig.chainId
-        );
-        const relayAddress = registryClient.wallet.address;
-
-        // Get relay user for GunDB sync
-        const relayUser = getRelayUser();
-        const relayKeyPair = (relayUser as any)?._?.sea || null;
-
-        loggers.server.info({ relayAddress }, `🔄 Full deal sync`);
-        await DealSync.syncDealsWithIPFS(relayAddress, registryConfig.chainId, {
-          onlyActive: true,
-          dryRun: false,
-          gun: gun,
-          relayKeyPair: relayKeyPair,
-          fastSync: false, // Full sync mode
-        });
-        loggers.server.info(`✅ Full deal sync completed`);
-      } catch (error: any) {
-        loggers.server.warn({ err: error }, `⚠️ Full deal sync failed`);
-      }
-    }, DEAL_SYNC_INTERVAL_MS);
-  } else {
-    if (!DEAL_SYNC_ENABLED) {
-      loggers.server.info(`⏭️  Deal sync disabled (set DEAL_SYNC_ENABLED=true to enable)`);
-    } else if (!RELAY_PRIVATE_KEY) {
-      loggers.server.info(`⏭️  Deal sync disabled (RELAY_PRIVATE_KEY not configured)`);
-    } else if (!REGISTRY_CHAIN_ID) {
-      loggers.server.info(`⏭️  Deal sync disabled (REGISTRY_CHAIN_ID not configured)`);
-    }
-  }
 
   // ============================================================================
-  // ON-CHAIN RELAY PEER DISCOVERY
+  // GUNDB PEER DISCOVERY
   // ============================================================================
 
-  // Syncs registered relays from ShogunRelayRegistry as Gun peers
   try {
-    const chainId = parseInt(process.env.REGISTRY_CHAIN_ID || "84532");
     const ownEndpoint = process.env.RELAY_HOST
       ? `https://${process.env.RELAY_HOST}`
       : `http://localhost:${port}`;
 
-    // Start peer sync (On-chain + GunDB)
-    const stopPeerSync = startPeriodicPeerSync(gun, chainId, ownEndpoint, 60000);
+    // Start GunDB-based peer discovery
+    syncGunDBPeers(gun, ownEndpoint);
+    syncMulePeers(gun);
 
-    // Announce presence on GunDB (GunDB-first discovery)
+    // Announce presence on GunDB
     if (relayKeyPair && relayKeyPair.pub) {
       const relayInfo = {
         endpoint: ownEndpoint,
@@ -2092,10 +1739,7 @@ See docs/RELAY_KEYS.md for more information.
       loggers.server.info({ pubKey: relayKeyPair.pub }, "📢 Relay presence announced on GunDB");
     }
 
-    loggers.server.info(
-      { chainId, excludeEndpoint: ownEndpoint },
-      "🔗 Started on-chain relay peer discovery"
-    );
+    loggers.server.info("🔗 Started GunDB peer discovery");
   } catch (error: any) {
     loggers.server.warn({ err: error }, "⚠️ Failed to start peer discovery");
   }
@@ -2104,29 +1748,7 @@ See docs/RELAY_KEYS.md for more information.
   async function shutdown() {
     loggers.server.info("🛑 Shutting down Shogun Relay...");
 
-    // Mark shutdown in progress to stop deal sync operations
-    try {
-      const DealSync = await import("./utils/deal-sync");
-      if (DealSync.markShutdownInProgress) {
-        DealSync.markShutdownInProgress();
-      }
-    } catch (err: any) {
-      // Ignore if module not loaded
-    }
 
-    // Cancel deal sync timers
-    if (dealSyncInitialTimeout) {
-      clearTimeout(dealSyncInitialTimeout);
-      dealSyncInitialTimeout = null;
-    }
-    if (dealSyncFastInterval) {
-      clearInterval(dealSyncFastInterval);
-      dealSyncFastInterval = null;
-    }
-    if (dealSyncFullInterval) {
-      clearInterval(dealSyncFullInterval);
-      dealSyncFullInterval = null;
-    }
 
     // Give a grace period for in-flight operations to complete
     // GunDB may still have pending operations, so we wait a bit longer
