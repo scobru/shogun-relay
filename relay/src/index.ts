@@ -44,7 +44,7 @@ import {
   createProductionErrorHandler,
 } from "./utils/security";
 import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/peer-discovery";
-import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/peer-discovery";
+
 // torrentManager removed
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
 
@@ -1200,7 +1200,7 @@ See docs/RELAY_KEYS.md for more information.
   app.use("/api/v1/debug", debugRoutes);
   app.use("/api/v1/chat", chatRoutes);
 
-  app.use("/api/v1/torrents", torrentRoutes);
+
   app.use("/api/v1/graph", visualGraphRoutes);
   app.use("/api/v1/drive", driveRoutes);
 
@@ -1784,12 +1784,7 @@ See docs/RELAY_KEYS.md for more information.
 
   loggers.server.info({ host, port }, `🚀 Shogun Relay Server running`);
 
-  // Initialize Torrent integration
-  try {
-    await torrentManager.start(relayPub, gun);
-  } catch (error) {
-    loggers.server.error({ err: error }, "❌ Failed to initialize Torrent integration");
-  }
+
 
   // Initialize Chat Service
   try {

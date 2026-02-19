@@ -3,7 +3,7 @@ import { Router } from "express";
 import { loggers } from "../utils/logger";
 import { chatService } from "../utils/chat-service";
 import { authConfig } from "../config/env-config";
-import { torrentManager } from "../utils/torrent";
+
 import { GUN_PATHS, getGunNode } from "../utils/gun-paths";
 
 const router = Router();
@@ -17,9 +17,9 @@ const requireAuth = (req: any, res: any, next: any) => {
     const bearerToken = authHeader && authHeader.split(" ")[1];
     const customToken = req.headers["token"];
     const token = bearerToken || customToken;
-  
+
     if (!token || token !== authConfig.adminPassword) {
-      return res.status(401).json({ success: false, error: "Unauthorized" });
+        return res.status(401).json({ success: false, error: "Unauthorized" });
     }
     next();
 };
@@ -44,7 +44,7 @@ router.get("/peers", requireAuth, async (req, res) => {
             // Helper to process peer data
             const processPeerData = (data: any, pubKey: string, type: 'relay' | 'peer') => {
                 if (!data || !data.alias && !data.endpoint) return;
-                
+
                 // Only include recently seen peers
                 if (data.lastSeen && data.lastSeen > fiveMinutesAgo) {
                     if (!peersMap.has(pubKey)) {
@@ -72,9 +72,9 @@ router.get("/peers", requireAuth, async (req, res) => {
                 resolve();
             }, 2500);
         });
-        
+
         const peers = Array.from(peersMap.values());
-        
+
         res.json({
             success: true,
             data: peers
@@ -109,13 +109,13 @@ router.get("/conversations", requireAuth, async (req, res) => {
 router.get("/messages/:pub", requireAuth, async (req, res) => {
     try {
         const { pub } = req.params;
-        
+
         // Validation: Pub key should not contain colons (implies message ID)
         if (pub.includes(':') || pub.length > 100) {
-             return res.status(400).json({ 
-                 success: false, 
-                 error: "Invalid public key format. Did you pass a message ID instead?" 
-             });
+            return res.status(400).json({
+                success: false,
+                error: "Invalid public key format. Did you pass a message ID instead?"
+            });
         }
 
         const messages = await chatService.getHistory(pub);
@@ -136,13 +136,13 @@ router.post("/messages/:pub", requireAuth, async (req, res) => {
     try {
         const { pub } = req.params;
         const { text } = req.body;
-        
+
         if (!text) {
             return res.status(400).json({ success: false, error: "Missing text" });
         }
 
         await chatService.sendMessage(pub, text);
-        
+
         res.json({
             success: true,
             message: "Message sent"
@@ -182,7 +182,7 @@ import { getRelayKeyPair } from "../utils/relay-user";
 router.post("/console", requireAuth, async (req, res) => {
     try {
         const { command } = req.body;
-        
+
         if (!command) {
             return res.status(400).json({ success: false, error: "Missing command" });
         }
@@ -200,7 +200,7 @@ router.post("/console", requireAuth, async (req, res) => {
         };
 
         const response = await chatCommands.handleCommand(command, relayKeyPair.pub, dummySend);
-        
+
         res.json({
             success: true,
             response: response || "Command executed (no output)"
@@ -240,13 +240,13 @@ router.get("/lobby", requireAuth, async (req, res) => {
 router.post("/lobby", requireAuth, async (req, res) => {
     try {
         const { text } = req.body;
-        
+
         if (!text) {
             return res.status(400).json({ success: false, error: "Missing text" });
         }
 
         await chatService.sendLobbyMessage(text);
-        
+
         res.json({
             success: true,
             message: "Message sent to lobby"

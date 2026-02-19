@@ -2,7 +2,7 @@
  * Memory Utilities for Monitoring and Garbage Collection
  * 
  * Provides tools for monitoring heap usage, triggering GC, and detecting memory pressure.
- * Used to prevent out-of-memory crashes during heavy operations like large torrent cataloging.
+ * Used to prevent out-of-memory crashes during heavy operations.
  * 
  * @module utils/memory-utils
  */
@@ -36,7 +36,7 @@ export function getMemoryUsage(): MemoryStats {
   const heapTotalMB = Math.round(memUsage.heapTotal / (1024 * 1024));
   const externalMB = Math.round(memUsage.external / (1024 * 1024));
   const rssMemoryMB = Math.round(memUsage.rss / (1024 * 1024));
-  
+
   return {
     heapUsedMB,
     heapTotalMB,
@@ -95,12 +95,12 @@ export function checkMemoryPressure(warningThreshold = 80): boolean {
 export function performMemoryCleanup(label?: string): void {
   const beforeStats = getMemoryUsage();
   const gcTriggered = triggerGC();
-  
+
   if (gcTriggered) {
     // Give GC a moment to complete
     const afterStats = getMemoryUsage();
     const freedMB = beforeStats.heapUsedMB - afterStats.heapUsedMB;
-    
+
     if (freedMB > 10) { // Only log if significant memory was freed
       log.debug(
         { label, freedMB, newHeapMB: afterStats.heapUsedMB },

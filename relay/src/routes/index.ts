@@ -773,7 +773,7 @@ export default (app: express.Application) => {
         modules: {
           ipfs: ipfsConfig.enabled,
           holster: holsterConfig.enabled,
-          holster: holsterConfig.enabled,
+
           torrent: false,
         },
       },
