@@ -44,7 +44,8 @@ import {
   createProductionErrorHandler,
 } from "./utils/security";
 import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/peer-discovery";
-import { torrentManager } from "./utils/torrent";
+import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/peer-discovery";
+// torrentManager removed
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
 
 // Route Imports
@@ -59,7 +60,7 @@ import servicesRoutes from "./routes/services";
 import debugRoutes from "./routes/debug";
 import chatRoutes from "./routes/chat";
 
-import torrentRoutes from "./routes/torrent";
+// torrentRoutes removed
 import visualGraphRoutes from "./routes/visualGraph";
 import driveRoutes from "./routes/drive";
 
@@ -684,7 +685,7 @@ async function initializeServer() {
   const gun = (Gun as any)(gunConfig);
 
 
- 
+
   // Store gun instance in express app for access from routes
   app.set("gunInstance", gun);
   // Store the gun storage adapter for stats access

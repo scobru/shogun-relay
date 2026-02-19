@@ -199,16 +199,7 @@ export const config = {
   // ANNA'S ARCHIVE CONFIGURATION
   // ============================================================================
 
-  torrent: {
-    enabled: process.env.TORRENT_ENABLED === "true",
-    annasArchiveUrl:
-      process.env.TORRENT_ANNAS_ARCHIVE_URL ||
-      "https://annas-archive.li/dyn/generate_torrents",
-    dataDir:
-      process.env.TORRENT_DATA_DIR ||
-      path.join(process.cwd(), "data", "torrents"),
-    maxTb: parseFloat(process.env.TORRENT_MAX_TB || "0"),
-  },
+  // Torrent config removed
 
 
 
@@ -255,7 +246,7 @@ export const wormholeConfig = config.wormhole;
 export const replicationConfig = config.replication;
 export const loggingConfig = config.logging;
 export const packageConfig = config.package;
-export const torrentConfig = config.torrent;
+// torrentConfig removed
 export const driveConfig = config.drive;
 
 // ============================================================================

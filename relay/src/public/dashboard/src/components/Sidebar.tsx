@@ -1,65 +1,65 @@
-import { NavLink } from 'react-router-dom'
-import logoSvg from './logo.svg'
+import { NavLink } from "react-router-dom";
+import logoSvg from "./logo.svg";
 
 // Using Lucide-style icon names for professional look
 const iconMap: Record<string, string> = {
-  status: '◉',
-  stats: '▤',
-  services: '◈',
-  files: '▢',
-  drive: '◫',
-  explore: '◎',
-  network: '◇',
-  chat: '◆',
-  users: '👥',
-  registry: '▣',
-  torrents: '▥',
-  apiKeys: '◈',
-  charts: '▦',
-  visualGraph: '◬',
-  graphExplorer: '◎',
-  rpcConsole: '▩',
-  apiDocs: '▤',
-  settings: '◎',
-}
+  status: "◉",
+  stats: "▤",
+  services: "◈",
+  files: "▢",
+  drive: "◫",
+  explore: "◎",
+  network: "◇",
+  chat: "◆",
+  users: "👥",
+  registry: "▣",
+  // torrents icon removed
+  apiKeys: "◈",
+  charts: "▦",
+  visualGraph: "◬",
+  graphExplorer: "◎",
+  rpcConsole: "▩",
+  apiDocs: "▤",
+  settings: "◎",
+};
 
 interface NavItem {
-  path: string
-  icon: string
-  label: string
-  group?: string
+  path: string;
+  icon: string;
+  label: string;
+  group?: string;
 }
 
 const navItems: NavItem[] = [
-  { path: '/', icon: iconMap.status, label: 'Status', group: 'main' },
-  { path: '/stats', icon: iconMap.stats, label: 'Live Stats', group: 'main' },
-  { path: '/services', icon: iconMap.services, label: 'Services', group: 'main' },
-  { path: '/files', icon: iconMap.files, label: 'Files', group: 'storage' },
-  { path: '/drive', icon: iconMap.drive, label: 'Drive', group: 'storage' },
-  { path: '/explore', icon: iconMap.explore, label: 'Explore', group: 'storage' },
-  { path: '/network', icon: iconMap.network, label: 'Network', group: 'network' },
-  { path: '/users', icon: iconMap.users, label: 'Users', group: 'network' },
-  { path: '/chat', icon: iconMap.chat, label: 'Chat', group: 'network' },
-  { path: '/torrents', icon: iconMap.torrents, label: 'Torrents', group: 'network' },
-  { path: '/api-keys', icon: iconMap.apiKeys, label: 'API Keys', group: 'tools' },
-  { path: '/charts', icon: iconMap.charts, label: 'Charts', group: 'tools' },
-  { path: '/visual-graph', icon: iconMap.visualGraph, label: 'Visual Graph', group: 'tools' },
-  { path: '/graph-explorer', icon: iconMap.graphExplorer, label: 'Graph Explorer', group: 'tools' },
-  { path: '/rpc-console', icon: iconMap.rpcConsole, label: 'RPC Console', group: 'tools' },
-  { path: '/api-docs', icon: iconMap.apiDocs, label: 'API Docs', group: 'tools' },
-  { path: '/settings', icon: iconMap.settings, label: 'Settings', group: 'system' },
-]
+  { path: "/", icon: iconMap.status, label: "Status", group: "main" },
+  { path: "/stats", icon: iconMap.stats, label: "Live Stats", group: "main" },
+  { path: "/services", icon: iconMap.services, label: "Services", group: "main" },
+  { path: "/files", icon: iconMap.files, label: "Files", group: "storage" },
+  { path: "/drive", icon: iconMap.drive, label: "Drive", group: "storage" },
+  { path: "/explore", icon: iconMap.explore, label: "Explore", group: "storage" },
+  { path: "/network", icon: iconMap.network, label: "Network", group: "network" },
+  { path: "/users", icon: iconMap.users, label: "Users", group: "network" },
+  { path: "/chat", icon: iconMap.chat, label: "Chat", group: "network" },
+  // Torrents link removed
+  { path: "/api-keys", icon: iconMap.apiKeys, label: "API Keys", group: "tools" },
+  { path: "/charts", icon: iconMap.charts, label: "Charts", group: "tools" },
+  { path: "/visual-graph", icon: iconMap.visualGraph, label: "Visual Graph", group: "tools" },
+  { path: "/graph-explorer", icon: iconMap.graphExplorer, label: "Graph Explorer", group: "tools" },
+  { path: "/rpc-console", icon: iconMap.rpcConsole, label: "RPC Console", group: "tools" },
+  { path: "/api-docs", icon: iconMap.apiDocs, label: "API Docs", group: "tools" },
+  { path: "/settings", icon: iconMap.settings, label: "Settings", group: "system" },
+];
 
 const groupLabels: Record<string, string> = {
-  main: 'DASHBOARD',
-  storage: 'STORAGE',
-  network: 'NETWORK',
-  tools: 'TOOLS',
-  system: 'SYSTEM'
-}
+  main: "DASHBOARD",
+  storage: "STORAGE",
+  network: "NETWORK",
+  tools: "TOOLS",
+  system: "SYSTEM",
+};
 
 function Sidebar() {
-  const groups = ['main', 'storage', 'network', 'tools', 'system']
+  const groups = ["main", "storage", "network", "tools", "system"];
 
   return (
     <div className="drawer-side z-40">
@@ -88,10 +88,10 @@ function Sidebar() {
                     <li key={item.path}>
                       <NavLink
                         to={item.path}
-                        className={({ isActive }: { isActive: boolean }) => 
-                          `flex items-center gap-3 rounded-lg transition-all ${isActive ? 'bg-primary text-primary-content font-medium' : 'hover:bg-base-300'}`
+                        className={({ isActive }: { isActive: boolean }) =>
+                          `flex items-center gap-3 rounded-lg transition-all ${isActive ? "bg-primary text-primary-content font-medium" : "hover:bg-base-300"}`
                         }
-                        end={item.path === '/'}
+                        end={item.path === "/"}
                       >
                         <span className="text-sm opacity-70 w-4 text-center">{item.icon}</span>
                         <span className="text-sm">{item.label}</span>
@@ -116,7 +116,7 @@ function Sidebar() {
         </div>
       </aside>
     </div>
-  )
+  );
 }
 
-export default Sidebar
+export default Sidebar;

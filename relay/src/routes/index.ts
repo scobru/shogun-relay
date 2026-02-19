@@ -69,14 +69,14 @@ import servicesRouter from "./services";
 import visualGraphRouter from "./visualGraph";
 import networkRouter from "./network";
 import chatRouter from "./chat";
-import torrentRouter from "./torrent";
+// torrentRouter removed
 import driveRouter from "./drive";
 import apiKeysRouter from "./api-keys";
 
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import { authConfig, ipfsConfig, packageConfig, torrentConfig, holsterConfig } from "../config";
+import { authConfig, ipfsConfig, packageConfig, holsterConfig } from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -482,12 +482,6 @@ export default (app: express.Application) => {
   app.use(`${baseRoute}/chat`, chatRouter);
   loggers.server.info(`✅ Chat routes registered`);
 
-  // Deals dashboard removed - now using external @shogun-deals app
-
-  app.get("/registry-dashboard", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "registry-dashboard.html"));
-  });
 
   app.get("/network-stats", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
@@ -504,10 +498,7 @@ export default (app: express.Application) => {
     res.sendFile(path.resolve(publicPath, "endpoints.html"));
   });
 
-  app.get("/torrent.html", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "torrent.html"));
-  });
+
 
   // Route per servire i file JavaScript dalla directory lib
   app.get("/lib/:filename", (req, res) => {
@@ -599,15 +590,7 @@ export default (app: express.Application) => {
 
 
   // Route per Torrent (conditional)
-  if (torrentConfig.enabled) {
-    app.use(`${baseRoute}/torrent`, torrentRouter);
-    loggers.server.info(`✅ Torrent routes registered`);
-  } else {
-    loggers.server.info(`⏭️ Torrent routes disabled (TORRENT_ENABLED=false)`);
-    app.use(`${baseRoute}/torrent/*`, (req, res) => {
-      res.status(503).json({ success: false, error: "Torrent module is disabled" });
-    });
-  }
+  // Torrent routes removed
 
   // Route per API Keys (always enabled, admin-only)
   // Initialize API Keys Manager lazily on first request
@@ -790,7 +773,8 @@ export default (app: express.Application) => {
         modules: {
           ipfs: ipfsConfig.enabled,
           holster: holsterConfig.enabled,
-          torrent: torrentConfig.enabled,
+          holster: holsterConfig.enabled,
+          torrent: false,
         },
       },
     });

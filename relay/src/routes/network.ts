@@ -301,12 +301,8 @@ router.get("/stats", async (req, res) => {
       activeRelays: 0,
       totalConnections: 0,
       totalStorageBytes: 0,
+
       totalPins: 0,
-      // New: Deal and subscription stats
-      totalActiveDeals: 0,
-      totalActiveSubscriptions: 0,
-      totalDealStorageMB: 0,
-      totalSubscriptionStorageMB: 0,
     };
 
     const relaysFound: Array<{ host: any; hasPulse: boolean }> = [];
@@ -582,70 +578,8 @@ router.get("/stats", async (req, res) => {
       }, 4000); // Reduced from 12s to 4s for faster response
     });
 
-    // Deal stats - moved to shogun-commerce
-    stats.totalActiveDeals = 0;
-    stats.totalDealStorageMB = 0;
 
 
-    // STEP 3: Retroactive sync from subscriptions (persistent across restarts)
-    loggers.server.info(`📊 Syncing subscriptions from GunDB (retroactive)...`);
-    try {
-      const relayUser = getRelayUser();
-      if (relayUser) {
-        const subscriptions: Array<{ expiresAt?: number; storageMB?: number }> = [];
-        await new Promise<void>((resolve) => {
-          const timer = setTimeout(() => resolve(), 2000); // Reduced from 5s to 2s
-
-          relayUser
-            .get(GUN_PATHS.X402)
-            .get(GUN_PATHS.SUBSCRIPTIONS)
-            .map()
-            .once((subData: any, userAddress: any) => {
-              if (subData && typeof subData === "object") {
-                // Filter out Gun metadata
-                const cleanData: Record<string, any> = {};
-                Object.keys(subData).forEach((key) => {
-                  if (!["_", "#", ">", "<"].includes(key)) {
-                    cleanData[key] = subData[key];
-                  }
-                });
-
-                if (cleanData.expiresAt && Date.now() < cleanData.expiresAt) {
-                  subscriptions.push(cleanData as { expiresAt: number; storageMB?: number });
-                }
-              }
-            });
-
-          setTimeout(() => {
-            clearTimeout(timer);
-            resolve();
-          }, 1500); // Reduced from 4s to 1.5s
-        });
-
-        stats.totalActiveSubscriptions = subscriptions.length;
-
-        // Calculate total subscription storage
-        let totalSubStorageMB = 0;
-        for (const sub of subscriptions) {
-          totalSubStorageMB += sub.storageMB || 0;
-        }
-        stats.totalSubscriptionStorageMB = totalSubStorageMB;
-
-        // Add subscription storage to total (convert MB to bytes)
-        stats.totalStorageBytes += totalSubStorageMB * 1024 * 1024;
-
-        loggers.server.info(
-          {
-            activeSubscriptions: stats.totalActiveSubscriptions,
-            totalSizeMB: totalSubStorageMB,
-          },
-          `   ✅ Subscriptions synced: ${stats.totalActiveSubscriptions} active, ${totalSubStorageMB} MB`
-        );
-      }
-    } catch (subError) {
-      const errorMessage = subError instanceof Error ? subError.message : String(subError);
-      loggers.server.warn({ err: subError }, `   ⚠️ Error syncing subscriptions: ${errorMessage}`);
-    }
 
     // STEP 4: If pulse data is missing/old, try to sync directly from IPFS for this relay
     if (stats.totalStorageBytes === 0 && stats.totalPins === 0) {
@@ -687,10 +621,6 @@ router.get("/stats", async (req, res) => {
       totalConnections: stats.totalConnections,
       totalStorageBytes: stats.totalStorageBytes,
       totalPins: stats.totalPins,
-      totalActiveDeals: stats.totalActiveDeals,
-      totalActiveSubscriptions: stats.totalActiveSubscriptions,
-      totalDealStorageMB: stats.totalDealStorageMB,
-      totalSubscriptionStorageMB: stats.totalSubscriptionStorageMB,
     });
 
     const responseData = {
@@ -707,8 +637,6 @@ router.get("/stats", async (req, res) => {
           .length,
         sources: {
           pulse: stats.activeRelays > 0 ? "pulse data" : "missing/old",
-          deals: stats.totalActiveDeals > 0 ? "GunDB deals" : "none",
-          subscriptions: stats.totalActiveSubscriptions > 0 ? "GunDB subscriptions" : "none",
           ipfsDirect:
             stats.totalStorageBytes > 0 && stats.activeRelays === 0 ? "IPFS direct" : "not used",
         },

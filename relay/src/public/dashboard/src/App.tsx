@@ -1,22 +1,22 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import Layout from './components/Layout'
-import Status from './views/Status'
-import LiveStats from './views/LiveStats'
-import Services from './views/Services'
-import Files from './views/Files'
-import Drive from './views/Drive'
-import Explore from './views/Explore'
-import Network from './views/Network'
-import Torrents from './views/Torrents'
-import Settings from './views/Settings'
-import ApiKeys from './views/ApiKeys'
-import Charts from './views/Charts'
-import RpcConsole from './views/RpcConsole'
-import ApiDocs from './views/ApiDocs'
-import VisualGraph from './views/VisualGraph'
-import GraphExplorer from './views/GraphExplorer'
-import Chat from './views/Chat'
-import Users from './views/Users'
+import { Routes, Route, Navigate } from "react-router-dom";
+import Layout from "./components/Layout";
+import Status from "./views/Status";
+import LiveStats from "./views/LiveStats";
+import Services from "./views/Services";
+import Files from "./views/Files";
+import Drive from "./views/Drive";
+import Explore from "./views/Explore";
+import Network from "./views/Network";
+// Torrents import removed
+import Settings from "./views/Settings";
+import ApiKeys from "./views/ApiKeys";
+import Charts from "./views/Charts";
+import RpcConsole from "./views/RpcConsole";
+import ApiDocs from "./views/ApiDocs";
+import VisualGraph from "./views/VisualGraph";
+import GraphExplorer from "./views/GraphExplorer";
+import Chat from "./views/Chat";
+import Users from "./views/Users";
 
 function App() {
   return (
@@ -30,7 +30,7 @@ function App() {
         <Route path="explore" element={<Explore />} />
         <Route path="chat" element={<Chat />} />
         <Route path="network" element={<Network />} />
-        <Route path="torrents" element={<Torrents />} />
+        {/* Torrents route removed */}
         <Route path="api-keys" element={<ApiKeys />} />
         <Route path="charts" element={<Charts />} />
         <Route path="visual-graph" element={<VisualGraph />} />
@@ -42,8 +42,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
-  )
+  );
 }
 
-export default App
-
+export default App;
