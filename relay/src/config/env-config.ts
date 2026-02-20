@@ -105,22 +105,7 @@ export const config = {
     corsCredentials: process.env.CORS_CREDENTIALS === "true",
   },
 
-  // ============================================================================
-  // HOLSTER CONFIGURATION
-  // ============================================================================
 
-  holster: {
-    enabled: process.env.HOLSTER_ENABLED === "true" || false,
-    host: process.env.HOLSTER_RELAY_HOST || "0.0.0.0",
-    port: (() => {
-      const mainPort = parseInt(process.env.RELAY_PORT || process.env.PORT || "8765");
-      const holsterPort = parseInt(process.env.HOLSTER_RELAY_PORT || "0");
-      return holsterPort || mainPort + 1;
-    })(),
-    storageEnabled: process.env.HOLSTER_RELAY_STORAGE === "true" || true,
-    storagePath: process.env.HOLSTER_RELAY_STORAGE_PATH || path.join(process.cwd(), "holster-data"),
-    maxConnections: parseInt(process.env.HOLSTER_MAX_CONNECTIONS || "100") || 100,
-  },
 
   // ============================================================================
   // GUN DB / STORAGE CONFIGURATION
@@ -236,7 +221,6 @@ export const serverConfig = config.server;
 export const relayConfig = config.relay;
 export const ipfsConfig = config.ipfs;
 export const authConfig = config.auth;
-export const holsterConfig = config.holster;
 export const storageConfig = config.storage;
 export const relayKeysConfig = config.relayKeys;
 export const wormholeConfig = config.wormhole;

@@ -14,7 +14,7 @@ import "gun/lib/webrtc";
 import "gun/axe";
 import "gun/lib/wire";
 import "./utils/bullet-catcher";
-import Holster from "@mblaney/holster/src/holster.js";
+
 import multer from "multer";
 import { initRelayUser, getRelayUser } from "./utils/relay-user";
 import * as Reputation from "./utils/relay-reputation";
@@ -27,7 +27,7 @@ import {
   ipfsConfig,
   relayConfig,
   serverConfig,
-  holsterConfig,
+
   authConfig,
   storageConfig,
   relayKeysConfig,
@@ -97,7 +97,7 @@ host = host.replace(/^https?:\/\//, "").replace(/\/$/, "");
 let port = serverConfig.port;
 let path_public = serverConfig.publicPath;
 
-// Note: holsterConfig is now imported directly from env-config
+
 
 /**
  * Main server initialization function
@@ -260,12 +260,8 @@ async function initializeServer() {
   app.get("/ready", async (req, res) => {
     try {
       // Check if essential services are ready
-      const holsterInstance = app.get("holsterInstance");
-      const gunInstance = app.get("gunInstance");
-
       const checks = {
         gun: !!gunInstance,
-        holster: !!holsterInstance,
       };
 
       const allReady = Object.values(checks).every(Boolean);
@@ -575,30 +571,7 @@ async function initializeServer() {
   const server = await startServer();
 
   // Initialize Holster Relay with built-in WebSocket server and connection management
-  let holster: any = null;
-  if (holsterConfig.enabled) {
-    try {
-      holster = Holster({
-        port: holsterConfig.port,
-        secure: true,
-        peers: [], // No peers by default
-        maxConnections: holsterConfig.maxConnections,
-        file: holsterConfig.storageEnabled ? holsterConfig.storagePath : undefined,
-      });
-      loggers.server.info(`✅ Holster Relay initialized on port ${holsterConfig.port}`);
-      loggers.server.info(
-        `📁 Holster storage: ${holsterConfig.storageEnabled ? holsterConfig.storagePath : "disabled"}`
-      );
-      // Store holster instance in app settings for health check
-      app.set("holsterInstance", holster);
-    } catch (error) {
-      loggers.server.error({ err: error }, "❌ Error initializing Holster");
-      app.set("holsterInstance", null);
-    }
-  } else {
-    loggers.server.info(`⏭️ Holster disabled (HOLSTER_ENABLED=false)`);
-    app.set("holsterInstance", null);
-  }
+
 
   const peers = relayConfig.peers;
   loggers.server.info({ peers }, "🔍 Peers");

@@ -76,7 +76,7 @@ import apiKeysRouter from "./api-keys";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import { authConfig, ipfsConfig, packageConfig, holsterConfig } from "../config";
+import { authConfig, ipfsConfig, packageConfig } from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -772,7 +772,7 @@ export default (app: express.Application) => {
         uptime: process.uptime(),
         modules: {
           ipfs: ipfsConfig.enabled,
-          holster: holsterConfig.enabled,
+
 
           torrent: false,
         },
