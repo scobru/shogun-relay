@@ -70,27 +70,6 @@ export class NetworkModule {
     return this.client.get("/api/v1/network/best-relays", { params });
   }
 
-  // Note: On-chain endpoints are not available in the relay API
-  // Use shogun-contracts-sdk for on-chain interactions instead
-  // These methods are kept for backward compatibility but will throw an error
-  public async getOnChainRelays(chainId?: number): Promise<any> {
-    throw new Error(
-      "On-chain endpoints are not available in relay API. Use shogun-contracts-sdk for on-chain interactions."
-    );
-  }
-
-  public async getOnChainRelay(address: string, chainId?: number): Promise<any> {
-    throw new Error(
-      "On-chain endpoints are not available in relay API. Use shogun-contracts-sdk for on-chain interactions."
-    );
-  }
-
-  public async getOnChainParams(chainId?: number): Promise<any> {
-    throw new Error(
-      "On-chain endpoints are not available in relay API. Use shogun-contracts-sdk for on-chain interactions."
-    );
-  }
-
   public async getPinRequests(maxAge?: number): Promise<any> {
     const params: any = {};
     if (maxAge) params.maxAge = maxAge;

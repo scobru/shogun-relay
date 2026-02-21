@@ -15,7 +15,6 @@ export interface ReputationScoreBreakdown {
   storageCapacity?: number;
   dataQuality?: number;
   reliability?: number;
-  dealPerformance?: number;
   networkHealth?: number;
 }
 
@@ -108,16 +107,6 @@ export interface ReputationMetrics {
   peerConnections?: number;
   networkReachability?: number;
 
-  // Deal & Subscription metrics
-  dealsTotal?: number;
-  dealsActive?: number;
-  dealsCompleted?: number;
-  dealsFailed?: number;
-  dealFulfillmentRate?: number;
-  subscriptionsTotal?: number;
-  subscriptionsActive?: number;
-  subscriptionRetentionRate?: number;
-
   // API Availability
   apiRequestsTotal?: number;
   apiRequestsSuccessful?: number;
@@ -196,10 +185,6 @@ export interface NetworkStatsResponse {
     totalStorageMB: number;
     totalStorageGB: string;
     totalPins: number;
-    totalActiveDeals: number;
-    totalActiveSubscriptions: number;
-    totalDealStorageMB: number;
-    totalSubscriptionStorageMB: number;
   };
   timestamp: number;
   debug?: {
@@ -207,8 +192,6 @@ export interface NetworkStatsResponse {
     relaysWithPulse: number;
     sources: {
       pulse: string;
-      deals: string;
-      subscriptions: string;
       ipfsDirect: string;
     };
   };
