@@ -15,7 +15,6 @@ import ApiDocs from "./views/ApiDocs";
 import VisualGraph from "./views/VisualGraph";
 import GraphExplorer from "./views/GraphExplorer";
 import Chat from "./views/Chat";
-import Users from "./views/Users";
 
 function App() {
   return (
@@ -35,7 +34,7 @@ function App() {
         <Route path="visual-graph" element={<VisualGraph />} />
         <Route path="graph-explorer" element={<GraphExplorer />} />
         <Route path="api-docs" element={<ApiDocs />} />
-        <Route path="users" element={<Users />} />
+
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

@@ -46,7 +46,7 @@ export const config = {
     endpoint: process.env.RELAY_ENDPOINT || process.env.RELAY_HOST + ":" + process.env.RELAY_PORT,
     // GunDB peers - supports both RELAY_PEERS and GUN_PEERS for backward compatibility
     peers: (() => {
-      const peersEnv = process.env.RELAY_PEERS || process.env.GUN_PEERS;
+      const peersEnv = process.env.RELAY_PEERS;
       if (peersEnv) {
         return peersEnv.split(",").map(p => p.trim()).filter(p => p.length > 0);
       }
@@ -71,7 +71,7 @@ export const config = {
   ipfs: {
     enabled: process.env.IPFS_ENABLED === "true" || false,
     apiUrl: process.env.IPFS_API_URL || "http://127.0.0.1:5001",
-    apiToken: process.env.IPFS_API_TOKEN || process.env.IPFS_API_KEY,
+    apiToken: process.env.IPFS_API_TOKEN,
     gatewayUrl: process.env.IPFS_GATEWAY_URL || "http://127.0.0.1:8080",
     pinTimeoutMs: parseInt(process.env.IPFS_PIN_TIMEOUT_MS || "120000") || 120000,
     // Parsed IPFS API URL components

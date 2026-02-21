@@ -11,7 +11,6 @@ const iconMap: Record<string, string> = {
   explore: "◎",
   network: "◇",
   chat: "◆",
-  users: "👥",
   registry: "▣",
   // torrents icon removed
   apiKeys: "◈",
@@ -37,7 +36,6 @@ const navItems: NavItem[] = [
   { path: "/drive", icon: iconMap.drive, label: "Drive", group: "storage" },
   { path: "/explore", icon: iconMap.explore, label: "Explore", group: "storage" },
   { path: "/network", icon: iconMap.network, label: "Network", group: "network" },
-  { path: "/users", icon: iconMap.users, label: "Users", group: "network" },
   { path: "/chat", icon: iconMap.chat, label: "Chat", group: "network" },
   // Torrents link removed
   { path: "/api-keys", icon: iconMap.apiKeys, label: "API Keys", group: "tools" },

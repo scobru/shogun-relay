@@ -52,8 +52,6 @@ import authRoutes from "./routes/auth";
 import apiKeysRoutes from "./routes/api-keys";
 import networkRoutes from "./routes/network";
 import uploadsRoutes from "./routes/uploads";
-import usersRoutes from "./routes/users";
-
 import systemRoutes from "./routes/system";
 import servicesRoutes from "./routes/services";
 import debugRoutes from "./routes/debug";
@@ -1144,7 +1142,7 @@ See docs/RELAY_KEYS.md for more information.
 
   // --- Modular Routes ---
   app.use("/api/v1/auth", authRoutes);
-  app.use("/api/v1/users", usersRoutes);
+
 
   // Initialize API Keys Manager before registering api-keys routes
   app.use("/api/v1/api-keys", async (req: any, res: any, next: any) => {
