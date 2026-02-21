@@ -141,12 +141,10 @@ Upload a single file to IPFS.
 **Authentication Options:**
 
 1. **Admin Upload** (no signature required):
-
    - `Authorization: Bearer <ADMIN_PASSWORD>`
    - Optional: `X-User-Address: <address>` (for tracking)
 
 2. **User Upload with Subscription** (requires signature):
-
    - `X-User-Address: <ethereum_address>`
    - `X-Wallet-Signature: <signature>` (EIP-191 signature of "I Love Shogun")
    - Requires active x402 subscription
@@ -639,119 +637,6 @@ Get reputation score for a relay.
 }
 ```
 
-### Torrents
-
-#### GET `/api/v1/torrent/status`
-
-List all active torrents managed by the relay.
-
-**Headers:**
-- `Authorization: Bearer <ADMIN_TOKEN>`
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "data": {
-    "activeTorrents": 2,
-    "downloadSpeed": 1024000,
-    "uploadSpeed": 512000,
-    "ratio": 1.5,
-    "torrents": [
-      {
-        "infoHash": "...",
-        "name": "Ubuntu 22.04",
-        "progress": 1.0,
-        "state": "seeding",
-        "downloadSpeed": 0,
-        "uploadSpeed": 10240,
-        "numPeers": 50,
-        "files": [
-          {
-            "name": "ubuntu.iso",
-            "path": "ubuntu.iso",
-            "length": 1000000000
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-#### POST `/api/v1/torrent/add`
-
-Add a torrent to the manager via magnet link or torrent file URL.
-
-**Headers:**
-- `Authorization: Bearer <ADMIN_TOKEN>`
-- `Content-Type: application/json`
-
-**Body:**
-
-```json
-{
-  "magnet": "magnet:?xt=urn:btih:..."
-}
-```
-
-#### POST `/api/v1/torrent/control`
-
-Control a torrent (pause, resume, remove).
-
-**Headers:**
-- `Authorization: Bearer <ADMIN_TOKEN>`
-- `Content-Type: application/json`
-
-**Body:**
-
-```json
-{
-  "infoHash": "...",
-  "action": "pause" | "resume" | "remove",
-  "deleteFiles": false
-}
-```
-
-#### GET `/api/v1/torrent/search`
-
-Search for content across configured sources (Internet Archive).
-
-**Query Parameters:**
-- `q`: Search query
-- `sources`: `internet-archive` (default)
-- `limit`: Number of results (default 25)
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "results": [
-    {
-      "source": "internet-archive",
-      "identifier": "...",
-      "title": "...",
-      "size": 1048576,
-      "seeders": 10,
-      "magnetUri": "magnet:?..."
-    }
-  ]
-}
-```
-
-#### GET `/api/v1/torrent/search/internet-archive`
-
-Direct search to Internet Archive.
-
-**Query Parameters:**
-- `q`: Search query
-- `mediaType`: Filter by media type (audio, video, texts, software, etc.)
-- `rows`: Number of results
-
----
-
 ### Chat
 
 #### GET `/api/v1/chat/peers`
@@ -759,6 +644,7 @@ Direct search to Internet Archive.
 List potential chat peers from network discovery.
 
 **Headers:**
+
 - `Authorization: Bearer <ADMIN_TOKEN>`
 
 **Response:**
@@ -781,6 +667,7 @@ List potential chat peers from network discovery.
 List active chat conversations.
 
 **Headers:**
+
 - `Authorization: Bearer <ADMIN_TOKEN>`
 
 **Response:**
@@ -797,6 +684,7 @@ List active chat conversations.
 Get message history for a peer.
 
 **Headers:**
+
 - `Authorization: Bearer <ADMIN_TOKEN>`
 
 **Response:**
@@ -813,6 +701,7 @@ Get message history for a peer.
 Send a private encrypted message.
 
 **Headers:**
+
 - `Authorization: Bearer <ADMIN_TOKEN>`
 - `Content-Type: application/json`
 
@@ -829,6 +718,7 @@ Send a private encrypted message.
 Execute a bot command.
 
 **Headers:**
+
 - `Authorization: Bearer <ADMIN_TOKEN>`
 - `Content-Type: application/json`
 
@@ -981,6 +871,7 @@ Admin-only file storage system for managing files and folders on the relay serve
 List files and folders in the specified directory. Omit path for root directory.
 
 **Parameters:**
+
 - `path` (path, optional): Directory path (omit for root)
 
 **Example:**
@@ -1022,6 +913,7 @@ curl -X GET "http://localhost:8765/api/v1/drive/list" \
 Upload one or multiple files. Use `file` field for single file, `files` field for multiple files. Omit path for root directory.
 
 **Parameters:**
+
 - `path` (path, optional): Directory path (omit for root)
 
 **Example (single file):**
@@ -1048,6 +940,7 @@ curl -X POST "http://localhost:8765/api/v1/drive/upload" \
 Download a file from the drive.
 
 **Parameters:**
+
 - `path` (path, required): File path to download
 
 **Example:**
@@ -1065,6 +958,7 @@ curl -X GET "http://localhost:8765/api/v1/drive/download/document.pdf" \
 Delete a file or directory (recursive for directories).
 
 **Parameters:**
+
 - `path` (path, required): Item path to delete
 
 **Example:**
@@ -1081,6 +975,7 @@ curl -X DELETE "http://localhost:8765/api/v1/drive/delete/document.pdf" \
 Create a new directory. Omit path for root directory.
 
 **Parameters:**
+
 - `path` (path, optional): Parent directory path (omit for root)
 
 **Request Body:**
@@ -1179,6 +1074,7 @@ curl -X GET "http://localhost:8765/api/v1/drive/stats" \
 ## API Keys
 
 Generic API key management service for programmatic access to all relay services (Drive, IPFS, etc.). API keys are more secure for automation as they:
+
 - Can be revoked individually without changing your password
 - Don't expose your main credentials
 - Can have optional expiration dates
@@ -1256,7 +1152,7 @@ curl -X POST "http://localhost:8765/api/v1/api-keys" \
 {
   "success": true,
   "keyId": "abc123...",
-      "token": "shogun-api-abc123...",
+  "token": "shogun-api-abc123...",
   "name": "My App Key",
   "createdAt": 1699123456000,
   "expiresAt": 1701715456000,
@@ -1293,12 +1189,14 @@ curl -X DELETE "http://localhost:8765/api/v1/api-keys/abc123..." \
 Once you have an API key, you can use it exactly like the admin password in the `Authorization` header. API keys work across all relay services:
 
 **Drive:**
+
 ```bash
 curl -X GET "http://localhost:8765/api/v1/drive/list" \
   -H "Authorization: Bearer shogun-api-abc123..."
 ```
 
 **IPFS:**
+
 ```bash
 curl -X POST "http://localhost:8765/api/v1/ipfs/pin/add" \
   -H "Authorization: Bearer shogun-api-abc123..." \

@@ -1,4 +1,3 @@
-// torrentManager import removed
 import { loggers } from "./logger";
 import { getRelayUser, getRelayKeyPair } from "./relay-user";
 import packageJson from "../../package.json";
@@ -38,7 +37,6 @@ export class ChatCommandHandler {
       description: "Get relay status",
       usage: "/status",
       execute: async () => {
-        // Torrent status removed
         const uptime = process.uptime();
         const uptimeString = new Date(uptime * 1000).toISOString().substr(11, 8);
 
@@ -48,7 +46,6 @@ export class ChatCommandHandler {
       },
     });
 
-    // Torrent commands (search, add, reindex, list) removed
   }
 
   private register(command: ChatCommand) {

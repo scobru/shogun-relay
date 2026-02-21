@@ -45,7 +45,6 @@ import {
 } from "./utils/security";
 import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/peer-discovery";
 
-// torrentManager removed
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
 
 // Route Imports
@@ -60,7 +59,6 @@ import servicesRoutes from "./routes/services";
 import debugRoutes from "./routes/debug";
 import chatRoutes from "./routes/chat";
 
-// torrentRoutes removed
 import visualGraphRoutes from "./routes/visualGraph";
 import driveRoutes from "./routes/drive";
 
@@ -261,7 +259,7 @@ async function initializeServer() {
     try {
       // Check if essential services are ready
       const checks = {
-        gun: !!gunInstance,
+        gun: !!app.get("gunInstance"),
       };
 
       const allReady = Object.values(checks).every(Boolean);
@@ -1322,22 +1320,6 @@ See docs/RELAY_KEYS.md for more information.
     res.json(metrics);
   });
 
-  // Holster status endpoint
-  app.get("/holster-status", (req, res) => {
-    res.json({
-      success: true,
-      status: holster ? "active" : "inactive",
-      service: "holster-relay",
-      config: {
-        port: holsterConfig.port,
-        host: holsterConfig.host,
-        storageEnabled: holsterConfig.storageEnabled,
-        storagePath: holsterConfig.storagePath,
-        maxConnections: holsterConfig.maxConnections,
-      },
-      timestamp: Date.now(),
-    });
-  });
 
 
 
@@ -1771,8 +1753,6 @@ See docs/RELAY_KEYS.md for more information.
   return {
     server,
     gun,
-    holster,
-    db,
     addSystemLog,
     addTimeSeriesPoint,
     shutdown,

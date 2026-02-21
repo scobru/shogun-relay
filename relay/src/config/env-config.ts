@@ -181,7 +181,6 @@ export const config = {
   // ANNA'S ARCHIVE CONFIGURATION
   // ============================================================================
 
-  // Torrent config removed
 
 
 
@@ -227,7 +226,6 @@ export const wormholeConfig = config.wormhole;
 export const replicationConfig = config.replication;
 export const loggingConfig = config.logging;
 export const packageConfig = config.package;
-// torrentConfig removed
 export const driveConfig = config.drive;
 
 // ============================================================================

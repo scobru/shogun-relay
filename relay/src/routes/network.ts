@@ -237,7 +237,6 @@ router.get("/peers", async (req, res) => {
       alias: string | null;
       lastSeen: number;
       type: string;
-      torrentsCount?: number;
     }[] = [];
 
     const minLastSeen = Date.now() - (parseInt(String(req.query.maxAge)) || 3600000); // Default 1 hour
@@ -257,7 +256,6 @@ router.get("/peers", async (req, res) => {
               alias: data.alias || null,
               lastSeen: data.lastSeen,
               type: data.type || 'unknown',
-              torrentsCount: data.torrentsCount
             });
           }
         });

@@ -31,6 +31,7 @@ This document provides a comprehensive reference of all environment variables th
 Shogun Relay supports modular configuration. Each module can be independently enabled or disabled via environment variables. When a module is disabled, its routes return `503 Service Unavailable`.
 
 ### `IPFS_ENABLED`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
@@ -38,6 +39,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `IPFS_ENABLED=true`
 
 ### `HOLSTER_ENABLED`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
@@ -45,6 +47,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `HOLSTER_ENABLED=true`
 
 ### `X402_ENABLED`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
@@ -52,6 +55,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `X402_ENABLED=true`
 
 ### `REGISTRY_ENABLED`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
@@ -59,6 +63,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `REGISTRY_ENABLED=true`
 
 ### `DEALS_ENABLED`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
@@ -66,36 +71,30 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEALS_ENABLED=true`
 
 ### `WORMHOLE_ENABLED`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
 - **Description**: Enable wormhole P2P file transfer and cleanup scheduler.
 - **Example**: `WORMHOLE_ENABLED=true`
 
-### `ANNAS_ARCHIVE_ENABLED`
-- **Type**: Boolean (String)
-- **Required**: No
-- **Default**: `false`
-- **Description**: Enable Anna's Archive integration (torrent/preservation). When disabled, all `/api/v1/annas-archive/*` routes return 503.
-- **Example**: `ANNAS_ARCHIVE_ENABLED=true`
-
 ### Module Dependencies
 
-| Module | Dependencies |
-|--------|-------------|
-| IPFS | None |
-| Holster | None |
-| X402 | Gun (always enabled) |
-| Registry | Gun |
-| Deals | Gun, IPFS |
-| Wormhole | Gun |
-| Anna's Archive | Gun, IPFS |
+| Module   | Dependencies         |
+| -------- | -------------------- |
+| IPFS     | None                 |
+| Holster  | None                 |
+| X402     | Gun (always enabled) |
+| Registry | Gun                  |
+| Deals    | Gun, IPFS            |
+| Wormhole | Gun                  |
 
 ---
 
 ## Required Configuration
 
 ### `ADMIN_PASSWORD`
+
 - **Type**: String
 - **Required**: Yes
 - **Default**: None
@@ -108,6 +107,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 ## Relay Identity
 
 ### `RELAY_HOST`
+
 - **Type**: String
 - **Required**: No
 - **Default**: Auto-detected IP address
@@ -115,6 +115,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `RELAY_HOST=relay.example.com` or `RELAY_HOST=192.168.1.100`
 
 ### `RELAY_ENDPOINT`
+
 - **Type**: String
 - **Required**: No
 - **Default**: `RELAY_HOST` (if set)
@@ -122,6 +123,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `RELAY_ENDPOINT=https://relay.example.com:8765`
 
 ### `RELAY_PORT`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `8765`
@@ -129,12 +131,14 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `RELAY_PORT=8765`
 
 ### `PORT`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `RELAY_PORT` (if set) or `8765`
 - **Description**: Alternative to `RELAY_PORT`. Standard port environment variable, used as fallback.
 
 ### `RELAY_NAME`
+
 - **Type**: String
 - **Required**: No
 - **Default**: `shogun-relay`
@@ -146,6 +150,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 ## IPFS Configuration
 
 ### `IPFS_API_URL`
+
 - **Type**: String (URL)
 - **Required**: No
 - **Default**: `http://127.0.0.1:5001`
@@ -153,6 +158,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `IPFS_API_URL=http://127.0.0.1:5001` or `IPFS_API_URL=https://ipfs.example.com/api/v0`
 
 ### `IPFS_GATEWAY_URL`
+
 - **Type**: String (URL)
 - **Required**: No
 - **Default**: `http://127.0.0.1:8080`
@@ -160,6 +166,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `IPFS_GATEWAY_URL=http://127.0.0.1:8080` or `IPFS_GATEWAY_URL=https://ipfs.io`
 
 ### `IPFS_API_TOKEN`
+
 - **Type**: String (JWT)
 - **Required**: No
 - **Default**: None
@@ -167,6 +174,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `IPFS_API_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
 
 ### `IPFS_API_KEY`
+
 - **Type**: String
 - **Required**: No
 - **Default**: None
@@ -174,6 +182,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `IPFS_API_KEY=your_api_key_here`
 
 ### `IPFS_PATH`
+
 - **Type**: String (Directory Path)
 - **Required**: No
 - **Default**: `/data/ipfs` (Docker) or `~/.ipfs` (manual)
@@ -181,6 +190,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `IPFS_PATH=/data/ipfs`
 
 ### `IPFS_PIN_TIMEOUT_MS`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `120000` (120 seconds / 2 minutes)
@@ -192,6 +202,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 ## GunDB Configuration
 
 ### `RELAY_SEA_KEYPAIR`
+
 - **Type**: String (JSON)
 - **Required**: Yes (unless `RELAY_SEA_KEYPAIR_PATH` is set)
 - **Default**: None
@@ -201,6 +212,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Generate**: Use `node scripts/generate-relay-keys.js` or programmatically with Gun.SEA.pair()
 
 ### `RELAY_SEA_KEYPAIR_PATH`
+
 - **Type**: String (File Path)
 - **Required**: No (alternative to `RELAY_SEA_KEYPAIR`)
 - **Default**: None
@@ -208,6 +220,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `RELAY_SEA_KEYPAIR_PATH=/path/to/relay-keypair.json` or `RELAY_SEA_KEYPAIR_PATH=./keys/relay-keypair.json`
 
 ### `RELAY_PEERS`
+
 - **Type**: String (Comma-separated URLs)
 - **Required**: No
 - **Default**: None
@@ -215,6 +228,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `RELAY_PEERS=https://relay1.example.com/gun,https://relay2.example.com/gun`
 
 ### `RELAY_PROTECTED`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `true`
@@ -223,6 +237,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `RELAY_PROTECTED=true`
 
 ### `STORAGE_TYPE`
+
 - **Type**: String
 - **Required**: No
 - **Default**: `sqlite`
@@ -231,6 +246,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `STORAGE_TYPE=sqlite`
 
 ### `DATA_DIR`
+
 - **Type**: String (Directory Path)
 - **Required**: No
 - **Default**: `./data`
@@ -238,6 +254,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DATA_DIR=./data` or `DATA_DIR=/var/lib/shogun-relay/data`
 
 ### `DISABLE_RADISK`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
@@ -246,6 +263,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DISABLE_RADISK=false`
 
 ### `CLEANUP_CORRUPTED_DATA`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
@@ -254,18 +272,21 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `CLEANUP_CORRUPTED_DATA=false`
 
 ### `RELAY_GUN_USERNAME`
+
 - **Type**: String
 - **Required**: No
 - **Default**: `shogun-relay`
 - **Description**: GunDB username for relay user (used for x402 subscriptions). Legacy option; direct keypair authentication is preferred.
 
 ### `RELAY_GUN_PASSWORD`
+
 - **Type**: String
 - **Required**: No
 - **Default**: `ADMIN_PASSWORD` (if set)
 - **Description**: GunDB password for relay user (used for x402 subscriptions). Legacy option; direct keypair authentication is preferred.
 
 ### `RELAY_QR`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
@@ -274,6 +295,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `RELAY_QR=false`
 
 ### `RELAY_STORE`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `true`
@@ -282,6 +304,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `RELAY_STORE=true`
 
 ### `RELAY_PATH`
+
 - **Type**: String (Directory Path)
 - **Required**: No
 - **Default**: `public`
@@ -293,6 +316,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 ## On-Chain Registry
 
 ### `RELAY_PRIVATE_KEY`
+
 - **Type**: String (Hex)
 - **Required**: No (required for on-chain operations)
 - **Default**: None
@@ -301,16 +325,18 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Generate**: `node -e "console.log(require('ethers').Wallet.createRandom().privateKey)"`
 
 ### `REGISTRY_CHAIN_ID`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `84532` (Base Sepolia)
 - **Description**: Chain ID for the registry contract. Determines which blockchain network to use.
-- **Values**: 
+- **Values**:
   - `84532` = Base Sepolia (testnet)
   - `8453` = Base Mainnet
 - **Example**: `REGISTRY_CHAIN_ID=84532`
 
 ### `USDC_ADDRESS`
+
 - **Type**: String (Address)
 - **Required**: No
 - **Default**: Network-specific (Base Sepolia: `0x036CbD53842c5426634e7929541eC2318f3dCF7e`)
@@ -322,6 +348,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 ## x402 Payment Configuration
 
 ### `X402_PAY_TO_ADDRESS`
+
 - **Type**: String (Address)
 - **Required**: Yes (for subscriptions/deals)
 - **Default**: None
@@ -329,6 +356,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `X402_PAY_TO_ADDRESS=0x1234567890123456789012345678901234567890`
 
 ### `X402_PRIVATE_KEY`
+
 - **Type**: String (Hex)
 - **Required**: Yes (for direct settlement mode)
 - **Default**: None
@@ -336,11 +364,12 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `X402_PRIVATE_KEY=0x1234567890abcdef...`
 
 ### `X402_NETWORK`
+
 - **Type**: String
 - **Required**: No
 - **Default**: `base-sepolia`
 - **Description**: Blockchain network for x402 payments. Determines which network to use for payment verification and settlement.
-- **Values**: 
+- **Values**:
   - `base-sepolia` (testnet)
   - `base` (mainnet)
   - `polygon`
@@ -348,16 +377,18 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `X402_NETWORK=base-sepolia`
 
 ### `X402_SETTLEMENT_MODE`
+
 - **Type**: String
 - **Required**: No
 - **Default**: `facilitator`
 - **Description**: Payment settlement mode. Determines how x402 payments are settled on-chain.
-- **Values**: 
+- **Values**:
   - `facilitator` - Uses x402.org service (no gas needed, depends on external service)
   - `direct` - Settle locally (full control, needs ETH for gas)
 - **Example**: `X402_SETTLEMENT_MODE=facilitator`
 
 ### `X402_FACILITATOR_URL`
+
 - **Type**: String (URL)
 - **Required**: No
 - **Default**: `https://x402.org/facilitator`
@@ -365,6 +396,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `X402_FACILITATOR_URL=https://x402.org/facilitator`
 
 ### `X402_FACILITATOR_API_KEY`
+
 - **Type**: String
 - **Required**: No
 - **Default**: None
@@ -372,6 +404,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `X402_FACILITATOR_API_KEY=your_api_key_here`
 
 ### `X402_RPC_URL`
+
 - **Type**: String (URL)
 - **Required**: No
 - **Default**: Public RPC (network-specific)
@@ -385,6 +418,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 ### Storage Deals Pricing
 
 #### `DEAL_PRICE_STANDARD`
+
 - **Type**: Float
 - **Required**: No
 - **Default**: `0.0001`
@@ -392,6 +426,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_PRICE_STANDARD=0.0001`
 
 #### `DEAL_PRICE_PREMIUM`
+
 - **Type**: Float
 - **Required**: No
 - **Default**: `0.0002`
@@ -399,6 +434,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_PRICE_PREMIUM=0.0002`
 
 #### `DEAL_PRICE_ENTERPRISE`
+
 - **Type**: Float
 - **Required**: No
 - **Default**: `0.0005`
@@ -406,6 +442,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_PRICE_ENTERPRISE=0.0005`
 
 #### `DEAL_MIN_SIZE_MB`
+
 - **Type**: Float
 - **Required**: No
 - **Default**: `0.001` (1 KB)
@@ -413,9 +450,10 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_MIN_SIZE_MB=0.001`
 
 #### `DEAL_MAX_SIZE_MB`
+
 - **Type**: Float
 - **Required**: No
-- **Default**: 
+- **Default**:
   - Standard: `1000`
   - Premium: `10000`
   - Enterprise: `100000`
@@ -423,6 +461,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_MAX_SIZE_MB=1000`
 
 #### `DEAL_MIN_DURATION_DAYS`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `7`
@@ -430,9 +469,10 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_MIN_DURATION_DAYS=7`
 
 #### `DEAL_MAX_DURATION_DAYS`
+
 - **Type**: Integer
 - **Required**: No
-- **Default**: 
+- **Default**:
   - Standard: `365`
   - Premium: `730`
   - Enterprise: `1825`
@@ -440,6 +480,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_MAX_DURATION_DAYS=365`
 
 #### `DEAL_PREMIUM_REPLICATION`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `3`
@@ -447,6 +488,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_PREMIUM_REPLICATION=3`
 
 #### `DEAL_ENTERPRISE_REPLICATION`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `5`
@@ -456,6 +498,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 ### Subscription Pricing
 
 #### `SUB_BASIC_PRICE`
+
 - **Type**: Float
 - **Required**: No
 - **Default**: `0.001`
@@ -463,6 +506,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `SUB_BASIC_PRICE=0.001`
 
 #### `SUB_BASIC_STORAGE_MB`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `100`
@@ -470,6 +514,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `SUB_BASIC_STORAGE_MB=100`
 
 #### `SUB_STANDARD_PRICE`
+
 - **Type**: Float
 - **Required**: No
 - **Default**: `0.004`
@@ -477,6 +522,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `SUB_STANDARD_PRICE=0.004`
 
 #### `SUB_STANDARD_STORAGE_MB`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `500`
@@ -484,6 +530,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `SUB_STANDARD_STORAGE_MB=500`
 
 #### `SUB_PREMIUM_PRICE`
+
 - **Type**: Float
 - **Required**: No
 - **Default**: `0.01`
@@ -491,6 +538,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `SUB_PREMIUM_PRICE=0.01`
 
 #### `SUB_PREMIUM_STORAGE_MB`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `2000`
@@ -498,6 +546,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `SUB_PREMIUM_STORAGE_MB=2000`
 
 #### `SUB_DURATION_DAYS`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `30`
@@ -509,6 +558,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 ## Storage Limits
 
 ### `RELAY_MAX_STORAGE_GB`
+
 - **Type**: Float
 - **Required**: No
 - **Default**: `0` (unlimited)
@@ -516,6 +566,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `RELAY_MAX_STORAGE_GB=10`
 
 ### `RELAY_STORAGE_WARNING_THRESHOLD`
+
 - **Type**: Float
 - **Required**: No
 - **Default**: `80`
@@ -527,6 +578,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 ## Network Federation
 
 ### `AUTO_REPLICATION`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `true`
@@ -535,6 +587,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `AUTO_REPLICATION=true`
 
 ### `DEAL_SYNC_ENABLED`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `true`
@@ -543,6 +596,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_SYNC_ENABLED=true`
 
 ### `DEAL_SYNC_INTERVAL_MS`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `300000` (5 minutes)
@@ -550,6 +604,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_SYNC_INTERVAL_MS=300000` (5 minutes)
 
 ### `DEAL_SYNC_FAST_INTERVAL_MS`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `120000` (2 minutes)
@@ -557,6 +612,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_SYNC_FAST_INTERVAL_MS=120000` (2 minutes)
 
 ### `DEAL_SYNC_INITIAL_DELAY_MS`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `30000` (30 seconds)
@@ -564,6 +620,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEAL_SYNC_INITIAL_DELAY_MS=30000` (30 seconds)
 
 ### `WORMHOLE_CLEANUP_ENABLED`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `true`
@@ -572,6 +629,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `WORMHOLE_CLEANUP_ENABLED=true`
 
 ### `WORMHOLE_CLEANUP_INTERVAL_MS`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `3600000` (1 hour)
@@ -579,6 +637,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `WORMHOLE_CLEANUP_INTERVAL_MS=3600000` (1 hour)
 
 ### `WORMHOLE_MAX_AGE_SECS`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `86400` (24 hours)
@@ -590,6 +649,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 ## Holster Relay
 
 ### `HOLSTER_RELAY_HOST`
+
 - **Type**: String
 - **Required**: No
 - **Default**: `0.0.0.0`
@@ -597,6 +657,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `HOLSTER_RELAY_HOST=0.0.0.0`
 
 ### `HOLSTER_RELAY_PORT`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `RELAY_PORT + 1` (e.g., `8766` if `RELAY_PORT=8765`)
@@ -604,6 +665,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `HOLSTER_RELAY_PORT=8766`
 
 ### `HOLSTER_RELAY_STORAGE`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `true`
@@ -612,6 +674,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `HOLSTER_RELAY_STORAGE=true`
 
 ### `HOLSTER_RELAY_STORAGE_PATH`
+
 - **Type**: String (Directory Path)
 - **Required**: No
 - **Default**: `./holster-data`
@@ -619,6 +682,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `HOLSTER_RELAY_STORAGE_PATH=./holster-data` or `HOLSTER_RELAY_STORAGE_PATH=/var/lib/holster`
 
 ### `HOLSTER_MAX_CONNECTIONS`
+
 - **Type**: Integer
 - **Required**: No
 - **Default**: `100`
@@ -630,6 +694,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 ## Advanced Options
 
 ### `STRICT_SESSION_IP`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `true`
@@ -638,6 +703,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `STRICT_SESSION_IP=true`
 
 ### `ENABLE_METRICS`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: Not specified (feature flag)
@@ -646,6 +712,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `ENABLE_METRICS=true`
 
 ### `DEBUG`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: Not set
@@ -654,6 +721,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `DEBUG=1` or `DEBUG=true`
 
 ### `NODE_ENV`
+
 - **Type**: String
 - **Required**: No
 - **Default**: Not set
@@ -662,6 +730,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `NODE_ENV=production`
 
 ### `WELCOME_MESSAGE`
+
 - **Type**: String
 - **Required**: No
 - **Default**: Built-in ASCII art
@@ -669,6 +738,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `WELCOME_MESSAGE="My Custom Relay Starting..."`
 
 ### `NODE_OPTIONS`
+
 - **Type**: String
 - **Required**: No
 - **Default**: None
@@ -676,6 +746,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `NODE_OPTIONS=--max-old-space-size=512` (sets max heap size to 512MB)
 
 ### `VERBOSE_LOGGING`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
@@ -684,6 +755,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `VERBOSE_LOGGING=true`
 
 ### `LOG_LEVEL`
+
 - **Type**: String
 - **Required**: No
 - **Default**: `info`
@@ -692,6 +764,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `LOG_LEVEL=debug`
 
 ### `CORS_ORIGINS`
+
 - **Type**: String (Comma-separated URLs)
 - **Required**: No
 - **Default**: `*` (allow all origins)
@@ -700,6 +773,7 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Security**: In production, always specify exact origins instead of `*`
 
 ### `CORS_CREDENTIALS`
+
 - **Type**: Boolean (String)
 - **Required**: No
 - **Default**: `false`
@@ -709,49 +783,47 @@ Shogun Relay supports modular configuration. Each module can be independently en
 
 ---
 
-
-
 ## Quick Reference Table
 
-| Variable | Required | Default | Category |
-|----------|----------|---------|----------|
-| `ADMIN_PASSWORD` | Yes | - | Required |
-| `RELAY_HOST` | No | Auto-detected | Relay Identity |
-| `RELAY_PORT` | No | `8765` | Relay Identity |
-| `RELAY_NAME` | No | `shogun-relay` | Relay Identity |
-| `IPFS_API_URL` | No | `http://127.0.0.1:5001` | IPFS |
-| `IPFS_GATEWAY_URL` | No | `http://127.0.0.1:8080` | IPFS |
-| `IPFS_API_TOKEN` | No | - | IPFS |
-| `IPFS_API_KEY` | No | - | IPFS |
-| `IPFS_PIN_TIMEOUT_MS` | No | `120000` | IPFS |
-| `RELAY_SEA_KEYPAIR` | Yes* | - | GunDB |
-| `RELAY_SEA_KEYPAIR_PATH` | Yes* | - | GunDB |
-| `STORAGE_TYPE` | No | `sqlite` | GunDB |
-| `DATA_DIR` | No | `./data` | GunDB |
-| `RELAY_PROTECTED` | No | `true` | GunDB |
-| `RELAY_PEERS` | No | - | GunDB |
-| `RELAY_PRIVATE_KEY` | No | - | On-Chain |
-| `REGISTRY_CHAIN_ID` | No | `84532` | On-Chain |
-| `X402_PAY_TO_ADDRESS` | Yes** | - | x402 |
-| `X402_NETWORK` | No | `base-sepolia` | x402 |
-| `X402_SETTLEMENT_MODE` | No | `facilitator` | x402 |
-| `RELAY_MAX_STORAGE_GB` | No | `0` (unlimited) | Storage |
-| `AUTO_REPLICATION` | No | `true` | Network |
-| `DEAL_SYNC_ENABLED` | No | `true` | Network |
-| `DEAL_SYNC_INTERVAL_MS` | No | `300000` | Network |
-| `DEAL_SYNC_FAST_INTERVAL_MS` | No | `120000` | Network |
-| `HOLSTER_RELAY_HOST` | No | `0.0.0.0` | Holster |
-| `HOLSTER_RELAY_PORT` | No | `RELAY_PORT + 1` | Holster |
-| `HOLSTER_RELAY_STORAGE` | No | `true` | Holster |
-| `NODE_ENV` | No | - | Advanced |
-| `NODE_OPTIONS` | No | - | Advanced |
-| `LOG_LEVEL` | No | `info` | Advanced |
-| `VERBOSE_LOGGING` | No | `false` | Advanced |
-| `CORS_ORIGINS` | No | `*` | Security |
-| `CORS_CREDENTIALS` | No | `false` | Security |
+| Variable                     | Required | Default                 | Category       |
+| ---------------------------- | -------- | ----------------------- | -------------- |
+| `ADMIN_PASSWORD`             | Yes      | -                       | Required       |
+| `RELAY_HOST`                 | No       | Auto-detected           | Relay Identity |
+| `RELAY_PORT`                 | No       | `8765`                  | Relay Identity |
+| `RELAY_NAME`                 | No       | `shogun-relay`          | Relay Identity |
+| `IPFS_API_URL`               | No       | `http://127.0.0.1:5001` | IPFS           |
+| `IPFS_GATEWAY_URL`           | No       | `http://127.0.0.1:8080` | IPFS           |
+| `IPFS_API_TOKEN`             | No       | -                       | IPFS           |
+| `IPFS_API_KEY`               | No       | -                       | IPFS           |
+| `IPFS_PIN_TIMEOUT_MS`        | No       | `120000`                | IPFS           |
+| `RELAY_SEA_KEYPAIR`          | Yes\*    | -                       | GunDB          |
+| `RELAY_SEA_KEYPAIR_PATH`     | Yes\*    | -                       | GunDB          |
+| `STORAGE_TYPE`               | No       | `sqlite`                | GunDB          |
+| `DATA_DIR`                   | No       | `./data`                | GunDB          |
+| `RELAY_PROTECTED`            | No       | `true`                  | GunDB          |
+| `RELAY_PEERS`                | No       | -                       | GunDB          |
+| `RELAY_PRIVATE_KEY`          | No       | -                       | On-Chain       |
+| `REGISTRY_CHAIN_ID`          | No       | `84532`                 | On-Chain       |
+| `X402_PAY_TO_ADDRESS`        | Yes\*\*  | -                       | x402           |
+| `X402_NETWORK`               | No       | `base-sepolia`          | x402           |
+| `X402_SETTLEMENT_MODE`       | No       | `facilitator`           | x402           |
+| `RELAY_MAX_STORAGE_GB`       | No       | `0` (unlimited)         | Storage        |
+| `AUTO_REPLICATION`           | No       | `true`                  | Network        |
+| `DEAL_SYNC_ENABLED`          | No       | `true`                  | Network        |
+| `DEAL_SYNC_INTERVAL_MS`      | No       | `300000`                | Network        |
+| `DEAL_SYNC_FAST_INTERVAL_MS` | No       | `120000`                | Network        |
+| `HOLSTER_RELAY_HOST`         | No       | `0.0.0.0`               | Holster        |
+| `HOLSTER_RELAY_PORT`         | No       | `RELAY_PORT + 1`        | Holster        |
+| `HOLSTER_RELAY_STORAGE`      | No       | `true`                  | Holster        |
+| `NODE_ENV`                   | No       | -                       | Advanced       |
+| `NODE_OPTIONS`               | No       | -                       | Advanced       |
+| `LOG_LEVEL`                  | No       | `info`                  | Advanced       |
+| `VERBOSE_LOGGING`            | No       | `false`                 | Advanced       |
+| `CORS_ORIGINS`               | No       | `*`                     | Security       |
+| `CORS_CREDENTIALS`           | No       | `false`                 | Security       |
 
-*At least one of `RELAY_SEA_KEYPAIR` or `RELAY_SEA_KEYPAIR_PATH` is required.  
-**Required if using x402 subscriptions or deals.
+\*At least one of `RELAY_SEA_KEYPAIR` or `RELAY_SEA_KEYPAIR_PATH` is required.  
+\*\*Required if using x402 subscriptions or deals.
 
 ---
 
@@ -776,6 +848,7 @@ docker run -e ADMIN_PASSWORD=secret -e RELAY_HOST=relay.example.com shogun-relay
 ### Docker Build-Time Variables
 
 The following variables are Docker build-time only (ARG) and not runtime environment variables:
+
 - `IPFS_VERSION` - IPFS Kubo version to install (default: 0.29.0)
 - `GENERATE_RELAY_KEYS` - Generate relay SEA keypair during build (default: false)
 - `CAPROVER_GIT_COMMIT_SHA` - Git commit SHA for CapRover deployments
@@ -785,6 +858,7 @@ These are set during `docker build` with `--build-arg`, not in `.env` or runtime
 ### Docker-Only Variables
 
 These variables are used internally by Docker scripts and typically don't need to be set manually:
+
 - `IPFS_PATH` - IPFS repository path (default: `/data/ipfs` in Docker)
 - `SKIP_VOLUME_CHECK` - Skip volume verification on container startup (default: false)
 
@@ -805,6 +879,7 @@ Missing or invalid values will log warnings but may prevent the relay from funct
 ## Security Considerations
 
 **Never commit these to version control:**
+
 - `ADMIN_PASSWORD`
 - `RELAY_PRIVATE_KEY`
 - `X402_PRIVATE_KEY`
@@ -821,4 +896,3 @@ Always use `.env` files (and add `.env` to `.gitignore`) or secure environment v
 - [API.md](./API.md) - API endpoints reference
 - [README.md](../README.md) - Main project documentation
 - [env.example](../env.example) - Example environment file with all variables
-

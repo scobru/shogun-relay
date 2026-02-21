@@ -589,9 +589,6 @@ export default (app: express.Application) => {
 
 
 
-  // Route per Torrent (conditional)
-  // Torrent routes removed
-
   // Route per API Keys (always enabled, admin-only)
   // Initialize API Keys Manager lazily on first request
   app.use(`${baseRoute}/api-keys`, async (req: Request, res: Response, next: NextFunction) => {
@@ -774,7 +771,6 @@ export default (app: express.Application) => {
           ipfs: ipfsConfig.enabled,
 
 
-          torrent: false,
         },
       },
     });
