@@ -213,7 +213,15 @@ router.get("/download/:path(*)", adminOrApiKeyAuthMiddleware, async (req: Reques
       ".md": "text/markdown",
       ".xml": "application/xml",
     };
-    const contentType = mimeTypes[ext] || "application/octet-stream";
+
+    // SECURITY: Force text/plain for dangerous types to prevent XSS when served inline
+    const dangerousExtensions = [".html", ".htm", ".svg", ".xml", ".js"];
+    let contentType = mimeTypes[ext] || "application/octet-stream";
+
+    if (dangerousExtensions.includes(ext)) {
+      contentType = "text/plain";
+      res.setHeader("X-Content-Type-Options", "nosniff");
+    }
 
     // Set headers
     res.setHeader("Content-Type", contentType);
@@ -647,7 +655,15 @@ export async function handlePublicLinkAccess(req: Request, res: Response): Promi
       ".md": "text/markdown",
       ".xml": "application/xml",
     };
-    const contentType = mimeTypes[ext] || "application/octet-stream";
+
+    // SECURITY: Force text/plain for dangerous types to prevent XSS when served inline
+    const dangerousExtensions = [".html", ".htm", ".svg", ".xml", ".js"];
+    let contentType = mimeTypes[ext] || "application/octet-stream";
+
+    if (dangerousExtensions.includes(ext)) {
+      contentType = "text/plain";
+      res.setHeader("X-Content-Type-Options", "nosniff");
+    }
 
     // Set headers
     res.setHeader("Content-Type", contentType);
