@@ -25,7 +25,7 @@ function Header() {
     <header className="navbar bg-base-100 border-b border-base-300 px-4 gap-2">
       {/* Mobile menu button */}
       <div className="flex-none lg:hidden">
-        <label htmlFor="main-drawer" className="btn btn-square btn-ghost">
+        <label htmlFor="main-drawer" aria-label="Open sidebar" className="btn btn-square btn-ghost">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="inline-block w-5 h-5 stroke-current">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
           </svg>
@@ -51,7 +51,8 @@ function Header() {
         {/* Theme toggle */}
         <label className="swap swap-rotate btn btn-ghost btn-circle">
           <input 
-            type="checkbox" 
+            type="checkbox"
+            aria-label="Toggle theme"
             className="theme-controller" 
             checked={theme === 'dark'}
             onChange={toggleTheme}
@@ -70,6 +71,7 @@ function Header() {
             className="btn btn-ghost btn-circle"
             onClick={logout} 
             title="Logout"
+            aria-label="Logout"
           >
             🔓
           </button>
