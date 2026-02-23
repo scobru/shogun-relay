@@ -1,5 +1,4 @@
 import express, { Request, Response, Router, NextFunction } from "express";
-import http from "http";
 import { loggers } from "../utils/logger";
 import { authConfig } from "../config";
 import { secureCompare, hashToken } from "../utils/security";
@@ -162,6 +161,28 @@ async function deleteUploadAndUpdateMB(
     } catch (error: any) {
       reject(error);
     }
+  });
+}
+
+/**
+ * Remove a hash from the system-wide hash registry.
+ * Encapsulates the GunDB logic to remove a hash entry.
+ * @param gun The GunDB instance
+ * @param hash The file hash to remove
+ */
+async function removeSystemHash(gun: any, hash: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const systemHashesNode = gun.get(GUN_PATHS.SYSTEM_HASH);
+
+    systemHashesNode.get(hash).put(null, (ack: any) => {
+      if (ack && ack.err) {
+        loggers.uploads.error("❌ Error removing hash from systemhash node:", ack.err);
+        reject(new Error(ack.err));
+      } else {
+        loggers.uploads.info(`✅ Hash ${hash} removed from systemhash node successfully`);
+        resolve(undefined);
+      }
+    });
   });
 }
 
@@ -505,19 +526,7 @@ router.delete(
       }
 
       // Rimuovi l'hash dal nodo systemhash
-      await new Promise((resolve, reject) => {
-        const systemHashesNode = gun.get(GUN_PATHS.SYSTEM_HASH);
-
-        systemHashesNode.get(hash).put(null, (ack: any) => {
-          if (ack && ack.err) {
-            loggers.uploads.error("❌ Error removing hash from systemhash node:", ack.err);
-            reject(new Error(ack.err));
-          } else {
-            loggers.uploads.info(`✅ Hash ${hash} removed from systemhash node successfully`);
-            resolve(undefined);
-          }
-        });
-      });
+      await removeSystemHash(gun, hash);
 
       res.json({
         success: true,
@@ -693,70 +702,11 @@ router.delete(
         // Continue even if MB update fails
       }
 
-      // Remove hash from systemhash node
+      // Remove hash from systemhash node directly
+      // REFACTOR: Use direct function call instead of internal HTTP request to prevent SSRF
       try {
-        const adminToken = authConfig.adminPassword;
-        if (!adminToken) {
-          loggers.uploads.warn(`⚠️ ADMIN_PASSWORD not set, skipping system hash removal`);
-        } else {
-          // Call the remove-system-hash endpoint with admin token
-          const postData = JSON.stringify({
-            userAddress: identifier,
-          });
-
-          const options = {
-            hostname: "localhost",
-            port: 8765,
-            path: `/api/v1/user-uploads/remove-system-hash/${hash}`,
-            method: "DELETE",
-            headers: {
-              "Content-Type": "application/json",
-              "Content-Length": Buffer.byteLength(postData),
-              Authorization: `Bearer ${adminToken}`,
-            },
-          };
-
-          await new Promise((resolve, reject) => {
-            const req = http.request(options, (res) => {
-              let data = "";
-              res.on("data", (chunk) => {
-                data += chunk;
-              });
-              res.on("end", () => {
-                try {
-                  const result = JSON.parse(data);
-                  if (result.success) {
-                    loggers.uploads.info(
-                      { hash },
-                      "Hash removed from systemhash node successfully via endpoint"
-                    );
-                    resolve(undefined);
-                  } else {
-                    loggers.uploads.error(
-                      { err: result.error },
-                      "Error removing hash from systemhash node via endpoint"
-                    );
-                    reject(new Error(result.error));
-                  }
-                } catch (parseError: any) {
-                  loggers.uploads.error(
-                    { err: parseError },
-                    "Error parsing system hash removal response"
-                  );
-                  reject(new Error(parseError.message));
-                }
-              });
-            });
-
-            req.on("error", (error) => {
-              loggers.uploads.error({ err: error }, "Error calling system hash removal endpoint");
-              reject(error);
-            });
-
-            req.write(postData);
-            req.end();
-          });
-        }
+        await removeSystemHash(gun, hash);
+        loggers.uploads.info({ hash }, "Hash removed from systemhash node successfully (direct call)");
       } catch (error: any) {
         loggers.uploads.warn({ err: error }, `Failed to remove hash ${hash} from systemhash node`);
         // Continue even if systemhash removal fails
