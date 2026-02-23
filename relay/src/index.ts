@@ -1165,7 +1165,6 @@ See docs/RELAY_KEYS.md for more information.
   app.use("/api/v1/system", systemRoutes);
   app.use("/api/v1/services", servicesRoutes);
   app.use("/api/v1/debug", debugRoutes);
-  app.use("/api/v1/chat", chatRoutes);
 
 
   app.use("/api/v1/graph", visualGraphRoutes);
@@ -1737,14 +1736,7 @@ See docs/RELAY_KEYS.md for more information.
 
 
 
-  // Initialize Chat Service
-  try {
-    const { chatService } = await import("./utils/chat-service");
-    chatService.initialize(gun);
-    loggers.server.info("💬 Chat Service initialized");
-  } catch (error) {
-    loggers.server.error({ err: error }, "❌ Failed to initialize Chat Service");
-  }
+  loggers.server.info({ host, port }, `🚀 Shogun Relay Server running`);
 
 
 

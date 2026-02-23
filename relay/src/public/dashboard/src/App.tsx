@@ -14,7 +14,6 @@ import Charts from "./views/Charts";
 import ApiDocs from "./views/ApiDocs";
 import VisualGraph from "./views/VisualGraph";
 import GraphExplorer from "./views/GraphExplorer";
-import Chat from "./views/Chat";
 
 function App() {
   return (
@@ -26,7 +25,6 @@ function App() {
         <Route path="files" element={<Files />} />
         <Route path="drive" element={<Drive />} />
         <Route path="explore" element={<Explore />} />
-        <Route path="chat" element={<Chat />} />
         <Route path="network" element={<Network />} />
         {/* Torrents route removed */}
         <Route path="api-keys" element={<ApiKeys />} />

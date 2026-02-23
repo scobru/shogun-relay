@@ -11,18 +11,15 @@ This document provides a comprehensive reference of all environment variables th
 5. [GunDB Configuration](#gundb-configuration)
 6. [On-Chain Registry](#on-chain-registry)
 7. [x402 Payment Configuration](#x402-payment-configuration)
-8. [Pricing Configuration](#pricing-configuration)
-   - [Storage Deals Pricing](#storage-deals-pricing)
-   - [Subscription Pricing](#subscription-pricing)
-9. [Storage Limits](#storage-limits)
-10. [Network Federation](#network-federation)
-11. [Holster Relay](#holster-relay)
-12. [Advanced Options](#advanced-options)
-13. [Quick Reference Table](#quick-reference-table)
-14. [Environment File Setup](#environment-file-setup)
-15. [Validation](#validation)
-16. [Security Considerations](#security-considerations)
-17. [Related Documentation](#related-documentation)
+8. [Storage Limits](#storage-limits)
+9. [Network Federation](#network-federation)
+10. [Holster Relay](#holster-relay)
+11. [Advanced Options](#advanced-options)
+12. [Quick Reference Table](#quick-reference-table)
+13. [Environment File Setup](#environment-file-setup)
+14. [Validation](#validation)
+15. [Security Considerations](#security-considerations)
+16. [Related Documentation](#related-documentation)
 
 ---
 
@@ -412,146 +409,6 @@ Shogun Relay supports modular configuration. Each module can be independently en
 - **Example**: `X402_RPC_URL=https://mainnet.base.org` or `X402_RPC_URL=https://sepolia.base.org`
 
 ---
-
-## Pricing Configuration
-
-### Storage Deals Pricing
-
-#### `DEAL_PRICE_STANDARD`
-
-- **Type**: Float
-- **Required**: No
-- **Default**: `0.0001`
-- **Description**: Standard tier price per MB per month in USDC.
-- **Example**: `DEAL_PRICE_STANDARD=0.0001`
-
-#### `DEAL_PRICE_PREMIUM`
-
-- **Type**: Float
-- **Required**: No
-- **Default**: `0.0002`
-- **Description**: Premium tier price per MB per month in USDC. Includes erasure coding and higher replication.
-- **Example**: `DEAL_PRICE_PREMIUM=0.0002`
-
-#### `DEAL_PRICE_ENTERPRISE`
-
-- **Type**: Float
-- **Required**: No
-- **Default**: `0.0005`
-- **Description**: Enterprise tier price per MB per month in USDC. Includes erasure coding, highest replication, and SLA guarantees.
-- **Example**: `DEAL_PRICE_ENTERPRISE=0.0005`
-
-#### `DEAL_MIN_SIZE_MB`
-
-- **Type**: Float
-- **Required**: No
-- **Default**: `0.001` (1 KB)
-- **Description**: Minimum file size for deals in MB.
-- **Example**: `DEAL_MIN_SIZE_MB=0.001`
-
-#### `DEAL_MAX_SIZE_MB`
-
-- **Type**: Float
-- **Required**: No
-- **Default**:
-  - Standard: `1000`
-  - Premium: `10000`
-  - Enterprise: `100000`
-- **Description**: Maximum file size for deals in MB (tier-specific).
-- **Example**: `DEAL_MAX_SIZE_MB=1000`
-
-#### `DEAL_MIN_DURATION_DAYS`
-
-- **Type**: Integer
-- **Required**: No
-- **Default**: `7`
-- **Description**: Minimum deal duration in days.
-- **Example**: `DEAL_MIN_DURATION_DAYS=7`
-
-#### `DEAL_MAX_DURATION_DAYS`
-
-- **Type**: Integer
-- **Required**: No
-- **Default**:
-  - Standard: `365`
-  - Premium: `730`
-  - Enterprise: `1825`
-- **Description**: Maximum deal duration in days (tier-specific).
-- **Example**: `DEAL_MAX_DURATION_DAYS=365`
-
-#### `DEAL_PREMIUM_REPLICATION`
-
-- **Type**: Integer
-- **Required**: No
-- **Default**: `3`
-- **Description**: Replication factor for premium tier deals. Number of relay replicas.
-- **Example**: `DEAL_PREMIUM_REPLICATION=3`
-
-#### `DEAL_ENTERPRISE_REPLICATION`
-
-- **Type**: Integer
-- **Required**: No
-- **Default**: `5`
-- **Description**: Replication factor for enterprise tier deals. Number of relay replicas.
-- **Example**: `DEAL_ENTERPRISE_REPLICATION=5`
-
-### Subscription Pricing
-
-#### `SUB_BASIC_PRICE`
-
-- **Type**: Float
-- **Required**: No
-- **Default**: `0.001`
-- **Description**: Basic subscription tier price in USDC (one-time payment).
-- **Example**: `SUB_BASIC_PRICE=0.001`
-
-#### `SUB_BASIC_STORAGE_MB`
-
-- **Type**: Integer
-- **Required**: No
-- **Default**: `100`
-- **Description**: Storage limit for basic subscription tier in MB.
-- **Example**: `SUB_BASIC_STORAGE_MB=100`
-
-#### `SUB_STANDARD_PRICE`
-
-- **Type**: Float
-- **Required**: No
-- **Default**: `0.004`
-- **Description**: Standard subscription tier price in USDC (one-time payment).
-- **Example**: `SUB_STANDARD_PRICE=0.004`
-
-#### `SUB_STANDARD_STORAGE_MB`
-
-- **Type**: Integer
-- **Required**: No
-- **Default**: `500`
-- **Description**: Storage limit for standard subscription tier in MB.
-- **Example**: `SUB_STANDARD_STORAGE_MB=500`
-
-#### `SUB_PREMIUM_PRICE`
-
-- **Type**: Float
-- **Required**: No
-- **Default**: `0.01`
-- **Description**: Premium subscription tier price in USDC (one-time payment).
-- **Example**: `SUB_PREMIUM_PRICE=0.01`
-
-#### `SUB_PREMIUM_STORAGE_MB`
-
-- **Type**: Integer
-- **Required**: No
-- **Default**: `2000`
-- **Description**: Storage limit for premium subscription tier in MB.
-- **Example**: `SUB_PREMIUM_STORAGE_MB=2000`
-
-#### `SUB_DURATION_DAYS`
-
-- **Type**: Integer
-- **Required**: No
-- **Default**: `30`
-- **Description**: Subscription duration in days (applies to all tiers).
-- **Example**: `SUB_DURATION_DAYS=30`
 
 ---
 
