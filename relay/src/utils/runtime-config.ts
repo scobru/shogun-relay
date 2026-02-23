@@ -17,47 +17,21 @@ import { loggers } from './logger';
  * Keys that can be modified at runtime without server restart
  */
 export const HOT_RELOADABLE_KEYS = [
-  // Pricing - Deals
-  'DEAL_PRICE_STANDARD',
-  'DEAL_PRICE_PREMIUM',
-  'DEAL_PRICE_ENTERPRISE',
-  'DEAL_MIN_SIZE_MB',
-  'DEAL_MAX_SIZE_MB',
-  'DEAL_MIN_DURATION_DAYS',
-  'DEAL_MAX_DURATION_DAYS',
-  'DEAL_PREMIUM_REPLICATION',
-  'DEAL_ENTERPRISE_REPLICATION',
-
-  // Pricing - Subscriptions
-  'SUB_BASIC_STORAGE_MB',
-  'SUB_BASIC_PRICE',
-  'SUB_STANDARD_STORAGE_MB',
-  'SUB_STANDARD_PRICE',
-  'SUB_PREMIUM_STORAGE_MB',
-  'SUB_PREMIUM_PRICE',
-  'SUB_DURATION_DAYS',
-
   // Logging
   'LOG_LEVEL',
   'DEBUG',
 
   // Sync Intervals
-  'DEAL_SYNC_INTERVAL_MS',
-  'DEAL_SYNC_FAST_INTERVAL_MS',
-  'DEAL_SYNC_INITIAL_DELAY_MS',
   'WORMHOLE_CLEANUP_INTERVAL_MS',
   'WORMHOLE_MAX_AGE_SECS',
 
   // Limits
   'RELAY_MAX_STORAGE_GB',
   'RELAY_STORAGE_WARNING_THRESHOLD',
-  'HOLSTER_MAX_CONNECTIONS',
   'IPFS_PIN_TIMEOUT_MS',
 
   // Replication
   'AUTO_REPLICATION',
-
-  // Torrent keys removed
 ] as const;
 
 export type HotReloadableKey = typeof HOT_RELOADABLE_KEYS[number];
@@ -80,34 +54,18 @@ export const RESTART_REQUIRED_KEYS = [
   // Keys
   'RELAY_SEA_KEYPAIR',
   'RELAY_SEA_KEYPAIR_PATH',
-  'X402_PRIVATE_KEY',
   'RELAY_PRIVATE_KEY',
   'PRIVATE_KEY',
 
   // Module Enable Flags
   'IPFS_ENABLED',
-  'X402_ENABLED',
-  'DEALS_ENABLED',
-  'REGISTRY_ENABLED',
   'HOLSTER_ENABLED',
   'WORMHOLE_ENABLED',
-
-  'DEAL_SYNC_ENABLED',
 
   // URLs / Endpoints
   'IPFS_API_URL',
   'IPFS_GATEWAY_URL',
   'IPFS_API_TOKEN',
-  'X402_PAY_TO_ADDRESS',
-  'X402_FACILITATOR_URL',
-
-  // Networks
-  'X402_NETWORKS',
-  'X402_DEFAULT_NETWORK',
-  'DEALS_NETWORKS',
-  'DEALS_DEFAULT_NETWORK',
-  'REGISTRY_NETWORKS',
-  'REGISTRY_DEFAULT_NETWORK',
 
   // Storage
   'DATA_DIR',
@@ -119,8 +77,7 @@ export const RESTART_REQUIRED_KEYS = [
   'HOLSTER_RELAY_PORT',
   'HOLSTER_RELAY_STORAGE',
   'HOLSTER_RELAY_STORAGE_PATH',
-
-  // Torrent keys removed
+  'HOLSTER_MAX_CONNECTIONS',
 
   // Drive
   'DRIVE_DATA_DIR',
@@ -320,14 +277,9 @@ export function getAllConfig(): ConfigInfo[] {
   const allKeys = [...HOT_RELOADABLE_KEYS, ...RESTART_REQUIRED_KEYS];
 
   const categorize = (key: string): string => {
-    if (key.startsWith('DEAL_PRICE') || key.startsWith('SUB_')) return 'Pricing';
-    if (key.startsWith('DEAL_SYNC') || key.includes('INTERVAL') || key.includes('TIMEOUT')) return 'Intervals';
     if (key.startsWith('LOG') || key === 'DEBUG') return 'Logging';
     if (key.startsWith('RELAY_')) return 'Relay';
     if (key.startsWith('IPFS_')) return 'IPFS';
-    if (key.startsWith('X402_')) return 'X402';
-    if (key.startsWith('DEALS_')) return 'Deals';
-    if (key.startsWith('REGISTRY_')) return 'Registry';
     if (key.startsWith('HOLSTER_')) return 'Holster';
     if (key.startsWith('WORMHOLE_')) return 'Wormhole';
 
