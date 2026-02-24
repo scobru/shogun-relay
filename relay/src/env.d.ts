@@ -22,6 +22,7 @@ declare namespace NodeJS {
     // GunDB Configuration
     RELAY_SEA_KEYPAIR?: string;
     RELAY_SEA_KEYPAIR_PATH?: string;
+    GUN_PEERS?: string;
     RELAY_PEERS?: string;
     RELAY_PROTECTED?: string;
     DISABLE_RADISK?: string;
@@ -34,15 +35,10 @@ declare namespace NodeJS {
     // Network Federation
     AUTO_REPLICATION?: string;
 
-    // Holster Relay
-    HOLSTER_RELAY_HOST?: string;
-    HOLSTER_RELAY_PORT?: string;
-    HOLSTER_RELAY_STORAGE?: string;
-    HOLSTER_RELAY_STORAGE_PATH?: string;
-    HOLSTER_MAX_CONNECTIONS?: string;
-
     // Advanced Options
     DATA_DIR?: string;
+    RELAY_PRIVATE_KEY?: string;
+    PRIVATE_KEY?: string;
     RELAY_QR?: string;
     RELAY_STORE?: string;
     RELAY_PATH?: string;

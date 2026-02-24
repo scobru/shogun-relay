@@ -120,7 +120,6 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
               type: "object",
               properties: {
                 gun: { type: "string" },
-                holster: { type: "string" },
                 ipfs: { type: "string" },
               },
             },

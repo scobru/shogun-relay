@@ -43,10 +43,9 @@ export const config = {
     name: process.env.RELAY_NAME || "shogun-relay",
     environment: process.env.NODE_ENV || "development",
     protected: process.env.RELAY_PROTECTED === "true",
-    endpoint: process.env.RELAY_ENDPOINT || process.env.RELAY_HOST + ":" + process.env.RELAY_PORT,
-    // GunDB peers - supports both RELAY_PEERS and GUN_PEERS for backward compatibility
+    // GunDB peers
     peers: (() => {
-      const peersEnv = process.env.RELAY_PEERS;
+      const peersEnv = process.env.GUN_PEERS || process.env.RELAY_PEERS;
       if (peersEnv) {
         return peersEnv.split(",").map(p => p.trim()).filter(p => p.length > 0);
       }
@@ -59,7 +58,6 @@ export const config = {
         'https://gun.defucc.me/gun',
         'https://shogun-relay.scobrudot.dev/gun',
         'https://shogun-relay-2.scobrudot.dev/gun',
-
       ];
     })(),
   },
@@ -105,8 +103,6 @@ export const config = {
     corsCredentials: process.env.CORS_CREDENTIALS === "true",
   },
 
-
-
   // ============================================================================
   // GUN DB / STORAGE CONFIGURATION
   // ============================================================================
@@ -119,7 +115,6 @@ export const config = {
     storageWarningThreshold: parseFloat(process.env.RELAY_STORAGE_WARNING_THRESHOLD || "80") || 80,
 
     // S3/MinIO configuration for Gun storage (only used when storageType is "s3")
-    // Reuses MinIO credentials from drive config, with optional separate bucket
     s3: {
       endpoint: process.env.GUN_S3_ENDPOINT || process.env.MINIO_ENDPOINT,
       accessKeyId: process.env.GUN_S3_ACCESS_KEY || process.env.MINIO_ACCESS_KEY,
@@ -133,11 +128,8 @@ export const config = {
   relayKeys: {
     seaKeypair: process.env.RELAY_SEA_KEYPAIR,
     seaKeypairPath: process.env.RELAY_SEA_KEYPAIR_PATH,
+    privateKey: process.env.RELAY_PRIVATE_KEY || process.env.PRIVATE_KEY,
   },
-
-
-
-
 
   // ============================================================================
   // WORMHOLE CLEANUP CONFIGURATION
@@ -169,20 +161,6 @@ export const config = {
       (process.env.NODE_ENV !== "production" ? "debug" : "info"),
     debug: process.env.DEBUG === "true" || !!process.env.DEBUG,
   },
-
-
-
-  // ============================================================================
-  // PACKAGE METADATA
-  // ============================================================================
-
-
-  // ============================================================================
-  // ANNA'S ARCHIVE CONFIGURATION
-  // ============================================================================
-
-
-
 
   // ============================================================================
   // ADMIN DRIVE CONFIGURATION

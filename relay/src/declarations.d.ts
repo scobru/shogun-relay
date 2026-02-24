@@ -1,4 +1,4 @@
-declare module "@mblaney/holster/src/holster.js";
+// No longer using holster
 
 declare module "self-adjusting-interval" {
   const setSelfAdjustingInterval: (callback: () => void | Promise<void>, interval: number) => any;

@@ -114,21 +114,6 @@ else
     fi
 fi
 
-# Holster data directory
-HOLSTER_DIR="${HOLSTER_RELAY_STORAGE_PATH:-/app/relay/holster-data}"
-echo "🔐 Setting permissions for Holster data volume at ${HOLSTER_DIR}..."
-if [ -d "$HOLSTER_DIR" ]; then
-    echo "✅ Holster data directory exists, preserving existing data"
-    chown -R node:node "$HOLSTER_DIR" || true
-    chmod 755 "$HOLSTER_DIR" || true
-    find "$HOLSTER_DIR" -type f -exec chmod 644 {} \; 2>/dev/null || true
-    find "$HOLSTER_DIR" -type d -exec chmod 755 {} \; 2>/dev/null || true
-else
-    echo "📁 Creating new Holster data directory"
-    mkdir -p "$HOLSTER_DIR"
-    chown -R node:node "$HOLSTER_DIR" || true
-    chmod 755 "$HOLSTER_DIR" || true
-fi
 
 # Backwards compatibility: handle legacy radata directory if it exists
 LEGACY_RADATA_DIR="/app/relay/radata"

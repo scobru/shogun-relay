@@ -44,9 +44,8 @@ export const RESTART_REQUIRED_KEYS = [
   'RELAY_HOST',
   'RELAY_PORT',
   'RELAY_NAME',
-  'RELAY_ENDPOINT',
-  'RELAY_PROTECTED',
   'RELAY_PEERS',
+  'RELAY_PROTECTED',
 
   // Authentication
   'ADMIN_PASSWORD',
@@ -59,7 +58,6 @@ export const RESTART_REQUIRED_KEYS = [
 
   // Module Enable Flags
   'IPFS_ENABLED',
-  'HOLSTER_ENABLED',
   'WORMHOLE_ENABLED',
 
   // URLs / Endpoints
@@ -71,13 +69,6 @@ export const RESTART_REQUIRED_KEYS = [
   'DATA_DIR',
   'STORAGE_TYPE',
   'DISABLE_RADISK',
-
-  // Holster
-  'HOLSTER_RELAY_HOST',
-  'HOLSTER_RELAY_PORT',
-  'HOLSTER_RELAY_STORAGE',
-  'HOLSTER_RELAY_STORAGE_PATH',
-  'HOLSTER_MAX_CONNECTIONS',
 
   // Drive
   'DRIVE_DATA_DIR',
@@ -280,7 +271,6 @@ export function getAllConfig(): ConfigInfo[] {
     if (key.startsWith('LOG') || key === 'DEBUG') return 'Logging';
     if (key.startsWith('RELAY_')) return 'Relay';
     if (key.startsWith('IPFS_')) return 'IPFS';
-    if (key.startsWith('HOLSTER_')) return 'Holster';
     if (key.startsWith('WORMHOLE_')) return 'Wormhole';
 
     if (key.startsWith('DRIVE_')) return 'Drive';

@@ -12,11 +12,6 @@ FROM node:20-slim
 ARG CAPROVER_GIT_COMMIT_SHA
 ARG IPFS_VERSION=0.29.0
 
-# --- Module Enable Flags ---
-ARG IPFS_ENABLED
-ARG WORMHOLE_ENABLED
-
-# --- Server/Relay Identity ---
 ARG RELAY_HOST
 ARG RELAY_PORT
 ARG RELAY_NAME
@@ -37,8 +32,8 @@ ARG RELAY_SEA_KEYPAIR_PATH
 ARG GENERATE_RELAY_KEYS=false
 
 # --- GunDB/Storage ---
-ARG RELAY_PEERS
 ARG GUN_PEERS
+ARG RELAY_PEERS
 ARG STORAGE_TYPE
 ARG DISABLE_RADISK
 ARG CLEANUP_CORRUPTED_DATA
@@ -51,15 +46,6 @@ ARG IPFS_API_TOKEN
 ARG IPFS_GATEWAY_URL
 ARG IPFS_PIN_TIMEOUT_MS
 ARG IPFS_PATH
-
-# --- Wormhole ---
-ARG WORMHOLE_CLEANUP_ENABLED
-ARG WORMHOLE_CLEANUP_INTERVAL_MS
-ARG WORMHOLE_MAX_AGE_SECS
-
-# --- Storage Limits ---
-ARG RELAY_MAX_STORAGE_GB
-ARG RELAY_STORAGE_WARNING_THRESHOLD
 
 # --- Drive ---
 ARG DRIVE_DATA_DIR
@@ -88,13 +74,7 @@ ARG GUN_S3_SECRET_KEY
 # =============================================================================
 
 ENV IPFS_ENABLED=${IPFS_ENABLED} \
-    HOLSTER_ENABLED=${HOLSTER_ENABLED} \
-    X402_ENABLED=${X402_ENABLED} \
-    REGISTRY_ENABLED=${REGISTRY_ENABLED} \
-    DEALS_ENABLED=${DEALS_ENABLED} \
-    DEAL_SYNC_ENABLED=${DEAL_SYNC_ENABLED} \
-    WORMHOLE_ENABLED=${WORMHOLE_ENABLED} \
-    BRIDGE_ENABLED=${BRIDGE_ENABLED}
+    WORMHOLE_ENABLED=${WORMHOLE_ENABLED}
 
 ENV RELAY_HOST=${RELAY_HOST} \
     RELAY_PORT=${RELAY_PORT} \
@@ -124,12 +104,6 @@ ENV IPFS_API_URL=${IPFS_API_URL} \
     IPFS_GATEWAY_URL=${IPFS_GATEWAY_URL} \
     IPFS_PIN_TIMEOUT_MS=${IPFS_PIN_TIMEOUT_MS}
 
-ENV HOLSTER_RELAY_HOST=${HOLSTER_RELAY_HOST} \
-    HOLSTER_RELAY_PORT=${HOLSTER_RELAY_PORT} \
-    HOLSTER_RELAY_STORAGE=${HOLSTER_RELAY_STORAGE} \
-    HOLSTER_RELAY_STORAGE_PATH=${HOLSTER_RELAY_STORAGE_PATH} \
-    HOLSTER_MAX_CONNECTIONS=${HOLSTER_MAX_CONNECTIONS}
-
 ENV RELAY_PRIVATE_KEY=${RELAY_PRIVATE_KEY} \
     PRIVATE_KEY=${PRIVATE_KEY}
 
@@ -144,26 +118,6 @@ ENV BASE_SEPOLIA_RPC=${BASE_SEPOLIA_RPC} \
     OPTIMISM_SEPOLIA_RPC=${OPTIMISM_SEPOLIA_RPC} \
     POLYGON_RPC=${POLYGON_RPC} \
     POLYGON_AMOY_RPC=${POLYGON_AMOY_RPC}
-
-ENV X402_PAY_TO_ADDRESS=${X402_PAY_TO_ADDRESS} \
-    X402_PRIVATE_KEY=${X402_PRIVATE_KEY} \
-    X402_SETTLEMENT_MODE=${X402_SETTLEMENT_MODE} \
-    X402_FACILITATOR_URL=${X402_FACILITATOR_URL} \
-    X402_FACILITATOR_API_KEY=${X402_FACILITATOR_API_KEY} \
-    X402_NETWORKS=${X402_NETWORKS} \
-    X402_DEFAULT_NETWORK=${X402_DEFAULT_NETWORK}
-
-ENV REGISTRY_CHAIN_ID=${REGISTRY_CHAIN_ID} \
-    REGISTRY_NETWORKS=${REGISTRY_NETWORKS} \
-    REGISTRY_DEFAULT_NETWORK=${REGISTRY_DEFAULT_NETWORK}
-
-ENV DEALS_NETWORKS=${DEALS_NETWORKS} \
-    DEALS_DEFAULT_NETWORK=${DEALS_DEFAULT_NETWORK} \
-    DEAL_SYNC_INTERVAL_MS=${DEAL_SYNC_INTERVAL_MS} \
-    DEAL_SYNC_FAST_INTERVAL_MS=${DEAL_SYNC_FAST_INTERVAL_MS} \
-    DEAL_SYNC_INITIAL_DELAY_MS=${DEAL_SYNC_INITIAL_DELAY_MS}
-
-
 
 ENV WORMHOLE_CLEANUP_ENABLED=${WORMHOLE_CLEANUP_ENABLED} \
     WORMHOLE_CLEANUP_INTERVAL_MS=${WORMHOLE_CLEANUP_INTERVAL_MS} \
@@ -246,7 +200,6 @@ RUN useradd -m -s /bin/bash ipfs \
     && mkdir -p /data/ipfs \
     && mkdir -p /app/relay \
     && mkdir -p /app/relay/data \
-    && mkdir -p /app/relay/holster-data \
     && mkdir -p /app/keys \
     && mkdir -p /var/log/supervisor \
     && mkdir -p /home/ipfs/.config/ipfs/denylists \
@@ -333,12 +286,10 @@ RUN if [ "$GENERATE_RELAY_KEYS" = "true" ] && [ -z "$RELAY_SEA_KEYPAIR" ] && [ -
 # Use || true to avoid failures if directories don't exist or are already mounted as volumes
 RUN chown -R node:node /app || true \
     && chown -R node:node /app/relay/data || true \
-    && chown -R node:node /app/relay/holster-data || true \
     && chown -R node:node /app/keys || true \
     && chown -R ipfs:ipfs /data/ipfs || true \
     && chmod -R 755 /app/relay/src/public || true \
     && chmod 755 /app/relay/data || true \
-    && chmod 755 /app/relay/holster-data || true \
     && chmod 755 /app/keys || true
 
 # Final verification - ensure dashboard is accessible
