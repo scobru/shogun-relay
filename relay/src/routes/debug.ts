@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from "express";
 import { loggers } from "../utils/logger";
 import { GUN_PATHS } from "../utils/gun-paths";
+import { adminAuthMiddleware } from "../middleware/admin-auth";
 
 const router: Router = express.Router();
 
@@ -243,10 +244,13 @@ router.get("/user-uploads/:identifier", async (req: Request, res: Response) => {
 });
 
 // Reset MB usage endpoint
-router.post("/user-mb-usage/:identifier/reset", async (req: Request, res: Response) => {
-  try {
-    const { identifier } = req.params;
-    const gun = getGunInstance(req);
+router.post(
+  "/user-mb-usage/:identifier/reset",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { identifier } = req.params;
+      const gun = getGunInstance(req);
 
     loggers.server.info({ identifier }, `🔄 Reset MB usage`);
 
@@ -293,7 +297,7 @@ router.post("/user-mb-usage/:identifier/reset", async (req: Request, res: Respon
 });
 
 // Test Gun operations endpoint
-router.get("/test-gun", async (req: Request, res: Response) => {
+router.get("/test-gun", adminAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const gun = getGunInstance(req);
 
@@ -363,10 +367,13 @@ router.get("/test-gun", async (req: Request, res: Response) => {
 });
 
 // Test Gun save endpoint
-router.get("/test-gun-save/:identifier/:hash", async (req: Request, res: Response) => {
-  try {
-    const { identifier, hash } = req.params;
-    const gun = getGunInstance(req);
+router.get(
+  "/test-gun-save/:identifier/:hash",
+  adminAuthMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { identifier, hash } = req.params;
+      const gun = getGunInstance(req);
 
     loggers.server.debug({ identifier, hash }, `🧪 Testing Gun save`);
 
@@ -439,19 +446,8 @@ router.get("/test-gun-save/:identifier/:hash", async (req: Request, res: Respons
 });
 
 // Cleanup duplicate aliases endpoint
-router.post("/cleanup-aliases", async (req: Request, res: Response) => {
+router.post("/cleanup-aliases", adminAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const { authConfig } = await import("../config/env-config");
-    // require admin token
-    const authHeader = req.headers["authorization"];
-    const bearerToken = authHeader && authHeader.split(" ")[1];
-    const customToken = req.headers["token"];
-    const token = bearerToken || customToken;
-
-    if (token !== authConfig.adminPassword) {
-      return res.status(401).json({ success: false, error: "Unauthorized" });
-    }
-
     loggers.server.info("🧹 Starting manual alias cleanup via API");
 
     // TODO: cleanDuplicateAliases and rebuildAliasIndex functions not yet implemented

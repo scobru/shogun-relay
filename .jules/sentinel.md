@@ -1,0 +1,9 @@
+## 2026-02-23 - Internal SSRF via Path Traversal in Admin Helper Endpoint
+**Vulnerability:** A public endpoint (`DELETE /:identifier/:hash`) was triggering an internal HTTP request to `localhost` to perform a cleanup task (`DELETE /remove-system-hash/:hash`). The `hash` parameter was user-controlled and not sanitized, allowing path traversal in the internal request URL. Furthermore, the internal request was authenticated with the admin token, allowing an attacker to craft a hash like `../../system/restart` to trigger privileged admin actions via the internal request.
+**Learning:** Internal HTTP requests to `localhost` are dangerous and fragile, especially when constructing paths from user input. They bypass network segmentation controls and can inadvertently expose privileged endpoints to SSRF.
+**Prevention:** Never make HTTP requests to your own API for internal logic. Refactor the shared logic into a function and call it directly. This eliminates the network layer, authentication round-trip, and associated vulnerabilities (SSRF, path traversal in URL).
+
+## 2026-02-23 - Unprotected Debug Endpoints and Timing Attacks
+**Vulnerability:** The `/user-mb-usage/:identifier/reset` endpoint was completely unauthenticated, allowing any user to reset storage quotas. Additionally, the `/cleanup-aliases` endpoint used a manual token check with direct string comparison (`token !== adminPassword`), vulnerable to timing attacks.
+**Learning:** "Debug" or "utility" endpoints often bypass standard security reviews and middleware application, creating backdoors. Manual authentication checks are prone to implementation errors like timing leaks.
+**Prevention:** Apply centralized authentication middleware (`adminAuthMiddleware`) to ALL administrative routes, including debug/utility endpoints. Avoid ad-hoc authentication logic. Audit route files for endpoints missing middleware.

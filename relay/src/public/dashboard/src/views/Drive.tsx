@@ -15,8 +15,9 @@ function Drive() {
   const [newFolderName, setNewFolderName] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
-  const [renameModal, setRenameModal] = useState<{open: boolean, item: DriveItem | null, newName: string}>({open: false, item: null, newName: ''})
-  const [linkModal, setLinkModal] = useState<{open: boolean, link: string | null}>({open: false, link: null})
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [renameModal, setRenameModal] = useState<{open: boolean, item: DriveItem | null, newName: string, error?: string}>({open: false, item: null, newName: ''})
+  const [linkModal, setLinkModal] = useState<{open: boolean, link: string | null, error?: string}>({open: false, link: null})
 
   const formatBytes = (bytes: number) => { if (!bytes) return '0 B'; const k = 1024; const sizes = ['B', 'KB', 'MB', 'GB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i] }
   const formatDate = (ts: number) => new Date(ts).toLocaleString()
@@ -54,10 +55,11 @@ function Drive() {
               setRenameModal({open: false, item: null, newName: ''})
               loadFiles()
           } else {
-              alert('Rename failed: ' + data.error)
+              setRenameModal(prev => ({ ...prev, error: data.error || 'Rename failed' }))
           }
       } catch (e) {
           console.error(e)
+          setRenameModal(prev => ({ ...prev, error: 'Rename failed' }))
       }
   }
 
@@ -74,18 +76,19 @@ function Drive() {
           if (data.success && data.publicUrl) {
               setLinkModal({open: true, link: data.publicUrl})
           } else {
-              alert('Could not generate public link: ' + (data.error || 'Unknown error'))
+              setLinkModal({open: true, link: null, error: data.error || 'Could not generate public link'})
           }
       } catch (e) {
           console.error(e)
-          alert('Failed to generate link')
+          setLinkModal({open: true, link: null, error: 'Failed to generate link'})
       }
   }
 
   const copyToClipboard = () => {
       if (linkModal.link) {
           navigator.clipboard.writeText(linkModal.link)
-          // Could show toast
+          setLinkCopied(true)
+          setTimeout(() => setLinkCopied(false), 2000)
       }
   }
 
@@ -213,11 +216,17 @@ function Drive() {
         <dialog className="modal modal-open">
             <div className="modal-box">
                 <h3 className="font-bold text-lg">Rename Item</h3>
+                {renameModal.error && (
+                  <div role="alert" className="alert alert-error py-2 mt-4 text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span>{renameModal.error}</span>
+                  </div>
+                )}
                 <input 
                     type="text" 
                     className="input input-bordered w-full mt-4" 
                     value={renameModal.newName} 
-                    onChange={e => setRenameModal({...renameModal, newName: e.target.value})}
+                    onChange={e => setRenameModal({...renameModal, newName: e.target.value, error: undefined})}
                     onKeyPress={e => e.key === 'Enter' && handleRename()}
                     autoFocus 
                 />
@@ -235,9 +244,23 @@ function Drive() {
         <dialog className="modal modal-open">
             <div className="modal-box">
                 <h3 className="font-bold text-lg">Public Link</h3>
+                {linkModal.error && (
+                  <div role="alert" className="alert alert-error py-2 mt-4 text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-5 w-5" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span>{linkModal.error}</span>
+                  </div>
+                )}
                 <div className="flex gap-2 mt-4">
                     <input type="text" className="input input-bordered w-full" value={linkModal.link || ''} readOnly />
-                    <button className="btn btn-square" onClick={copyToClipboard} title="Copy">📋</button>
+                    <button
+                      className={`btn btn-square ${linkCopied ? 'btn-success text-white' : ''}`}
+                      onClick={copyToClipboard}
+                      title={linkCopied ? 'Copied!' : 'Copy'}
+                      aria-label="Copy link"
+                      disabled={!linkModal.link}
+                    >
+                      {linkCopied ? '✅' : '📋'}
+                    </button>
                 </div>
                 <div className="modal-action">
                     <button className="btn" onClick={() => setLinkModal({open: false, link: null})}>Close</button>
