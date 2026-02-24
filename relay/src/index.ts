@@ -27,7 +27,6 @@ import {
   ipfsConfig,
   relayConfig,
   serverConfig,
-
   authConfig,
   storageConfig,
   relayKeysConfig,
