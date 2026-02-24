@@ -44,7 +44,7 @@ vi.mock("../utils/gun-paths", () => ({
 
 // Mock admin-auth middleware
 vi.mock("../middleware/admin-auth", () => ({
-  adminAuthMiddleware: (req, res, next) => {
+  adminAuthMiddleware: (req: any, res: any, next: any) => {
     const auth = req.headers.authorization;
     if (auth === "Bearer test-password") {
       next();
@@ -55,9 +55,9 @@ vi.mock("../middleware/admin-auth", () => ({
 }));
 
 describe("System Routes Security", () => {
-  let app;
-  let server;
-  let baseUrl;
+  let app: express.Application;
+  let server: any;
+  let baseUrl: string;
 
   beforeEach(async () => {
     app = express();
@@ -74,7 +74,7 @@ describe("System Routes Security", () => {
 
     await new Promise((resolve) => {
       server = app.listen(0, () => {
-        const addr = server.address();
+        const addr = server.address() as any;
         baseUrl = `http://localhost:${addr.port}`;
         resolve(null);
       });
@@ -88,7 +88,7 @@ describe("System Routes Security", () => {
   it("should allow public access to health check", async () => {
     const res = await fetch(`${baseUrl}/system/health`);
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.success).toBe(true);
   });
 
@@ -111,10 +111,11 @@ describe("System Routes Security", () => {
     // We need to mock fetch global for the router handler itself
     // But since we are running in the same process, we can mock it on global
     const originalFetch = global.fetch;
+    // @ts-ignore
     global.fetch = vi.fn(() => Promise.resolve({
         json: () => Promise.resolve({ result: "success" }),
         status: 200
-    }));
+    })) as any;
 
     try {
         const res = await fetch(`${baseUrl}/system/rpc/execute`, {

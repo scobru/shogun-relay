@@ -28,7 +28,7 @@ vi.mock("../utils/gun-paths", () => ({
 }));
 
 // Mock http.request
-const mockHttpRequest = vi.spyOn(http, "request").mockImplementation((options, callback) => {
+const mockHttpRequest = vi.spyOn(http, "request").mockImplementation((options: any, callback?: any) => {
   const req: any = {
     on: vi.fn(),
     write: vi.fn(),
@@ -44,7 +44,7 @@ const mockHttpRequest = vi.spyOn(http, "request").mockImplementation((options, c
       };
       callback(res);
   }
-  return req;
+  return req as any;
 });
 
 describe("Uploads Route Security", () => {
@@ -120,7 +120,7 @@ describe("Uploads Route Security", () => {
         })
     };
 
-    mockGun.get.mockImplementation((path) => {
+    mockGun.get.mockImplementation((path: any) => {
         if (path === GUN_PATHS.UPLOADS) return { get: vi.fn().mockReturnValue(userNode) };
         if (path === GUN_PATHS.SYSTEM_HASH) return systemHashNode;
         return mockGun;

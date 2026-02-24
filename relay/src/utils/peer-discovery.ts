@@ -11,7 +11,6 @@
 
 import { loggers } from "./logger";
 import { GUN_PATHS, getGunNode } from "./gun-paths";
-import { chatService } from "./chat-service";
 import type { IGunInstance } from "gun";
 
 const log = loggers.registry || console;
@@ -83,9 +82,6 @@ export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): voi
 
     // Add as peer
     gun.opt({ peers: [gunPeerUrl] });
-    
-    // Auto-subscribe to chat with this relay
-    chatService.syncMessagesFrom(pubKey);
 
     log.info({ peer: gunPeerUrl, pubKey }, "Discovered peer via GunDB");
   });
@@ -100,9 +96,6 @@ export function syncMulePeers(gun: IGunInstance): void {
   
   getGunNode(gun, GUN_PATHS.PEERS).map().on((data: any, pubKey: string) => {
     if (!data) return;
-    
-    // Auto-subscribe to chat with this peer (Mule)
-    chatService.syncMessagesFrom(pubKey);
     
     // We don't add Mules as gun.opt({peers}) because they are likely not running Gun servers (or are behind NAT)
     // But we do want to discover them for chat.

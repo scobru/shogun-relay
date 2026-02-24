@@ -48,18 +48,6 @@ import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/pe
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
 
 // Route Imports
-import authRoutes from "./routes/auth";
-import apiKeysRoutes from "./routes/api-keys";
-import networkRoutes from "./routes/network";
-import uploadsRoutes from "./routes/uploads";
-import systemRoutes from "./routes/system";
-import servicesRoutes from "./routes/services";
-import debugRoutes from "./routes/debug";
-import chatRoutes from "./routes/chat";
-
-import visualGraphRoutes from "./routes/visualGraph";
-import driveRoutes from "./routes/drive";
-
 
 // Middleware
 

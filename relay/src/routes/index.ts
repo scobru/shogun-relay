@@ -68,7 +68,6 @@ import debugRouter from "./debug";
 import servicesRouter from "./services";
 import visualGraphRouter from "./visualGraph";
 import networkRouter from "./network";
-import chatRouter from "./chat";
 // torrentRouter removed
 import driveRouter from "./drive";
 import apiKeysRouter from "./api-keys";
@@ -77,7 +76,7 @@ import authRouter from "./auth";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import { authConfig, ipfsConfig, packageConfig } from "../config";
+import { authConfig, ipfsConfig, packageConfig, relayConfig } from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -478,11 +477,6 @@ export default (app: express.Application) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "graph.html"));
   });
-
-  // Chat Route (Encrypted Relay-to-Relay)
-  app.use(`${baseRoute}/chat`, chatRouter);
-  loggers.server.info(`✅ Chat routes registered`);
-
 
   app.get("/network-stats", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
@@ -1228,16 +1222,6 @@ export default (app: express.Application) => {
           `${baseRoute}/services/:service/restart`,
           // Visual Graph
           `${baseRoute}/visualGraph`,
-          // x402 Subscriptions
-          `${baseRoute}/x402/tiers`,
-          `${baseRoute}/x402/subscription/:userAddress`,
-          `${baseRoute}/x402/subscribe`,
-          `${baseRoute}/x402/payment-requirements/:tier`,
-          `${baseRoute}/x402/can-upload/:userAddress`,
-          `${baseRoute}/x402/can-upload-verified/:userAddress`,
-          `${baseRoute}/x402/storage/:userAddress`,
-          `${baseRoute}/x402/storage/sync/:userAddress`,
-          `${baseRoute}/x402/config`,
           // Network Federation & Storage Proofs
           `${baseRoute}/network/relays`,
           `${baseRoute}/network/relay/:host`,
@@ -1258,38 +1242,6 @@ export default (app: express.Application) => {
           `${baseRoute}/network/verified/observation`,
           `${baseRoute}/network/verified/observations/:host`,
           `${baseRoute}/network/verified/entry/:namespace/:hash`,
-          // Storage Deals (per-file contracts)
-          `${baseRoute}/deals/pricing`,
-          `${baseRoute}/deals/overhead`,
-          `${baseRoute}/deals/create`,
-          `${baseRoute}/deals/:dealId`,
-          `${baseRoute}/deals/:dealId/activate`,
-          `${baseRoute}/deals/:dealId/renew`,
-          `${baseRoute}/deals/:dealId/terminate`,
-          `${baseRoute}/deals/by-cid/:cid`,
-          `${baseRoute}/deals/by-client/:address`,
-          `${baseRoute}/deals/relay/active`,
-          `${baseRoute}/deals/stats`,
-          `${baseRoute}/deals/leaderboard`,
-          // Registry (on-chain relay management)
-          `${baseRoute}/registry/status`,
-          `${baseRoute}/registry/balance`,
-          `${baseRoute}/registry/params`,
-          `${baseRoute}/registry/config`,
-          `${baseRoute}/registry/register`,
-          `${baseRoute}/registry/update`,
-          `${baseRoute}/registry/stake/increase`,
-          `${baseRoute}/registry/stake/unstake`,
-          `${baseRoute}/registry/stake/withdraw`,
-          `${baseRoute}/registry/unstake`,
-          `${baseRoute}/registry/withdraw`,
-          `${baseRoute}/registry/emergency-withdraw`,
-          `${baseRoute}/registry/deal/register`,
-          `${baseRoute}/registry/deal/complete`,
-          `${baseRoute}/registry/deal/grief`,
-          `${baseRoute}/registry/deals`,
-          `${baseRoute}/registry/grief/missed-proof`,
-          `${baseRoute}/registry/grief/data-loss`,
         ],
       },
     });
