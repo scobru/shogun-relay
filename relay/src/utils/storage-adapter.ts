@@ -337,7 +337,9 @@ export class FsStorageAdapter implements IStorageAdapter {
         const calculateStats = async (dirPath: string): Promise<void> => {
             try {
                 const items = await fsPromises.readdir(dirPath, { withFileTypes: true });
-                for (const item of items) {
+
+                // Optimize: Process items in parallel
+                await Promise.all(items.map(async (item) => {
                     const fullPath = path.join(dirPath, item.name);
                     try {
                         if (item.isDirectory()) {
@@ -351,7 +353,7 @@ export class FsStorageAdapter implements IStorageAdapter {
                     } catch {
                         // Ignore individual item errors
                     }
-                }
+                }));
             } catch {
                 // Ignore directory read errors
             }
