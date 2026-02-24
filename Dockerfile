@@ -69,6 +69,8 @@ ARG GUN_S3_BUCKET
 ARG GUN_S3_ACCESS_KEY
 ARG GUN_S3_SECRET_KEY
 
+echo "RELAY_CACHE_BUST ${RELAY_CACHE_BUST}"
+
 # =============================================================================
 # ENVIRONMENT VARIABLES (Persist ARGs to Runtime)
 # =============================================================================
