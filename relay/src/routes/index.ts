@@ -72,6 +72,7 @@ import chatRouter from "./chat";
 // torrentRouter removed
 import driveRouter from "./drive";
 import apiKeysRouter from "./api-keys";
+import authRouter from "./auth";
 
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
@@ -586,6 +587,9 @@ export default (app: express.Application) => {
   // Route per network federation, discovery e storage proofs (always enabled)
   app.use(`${baseRoute}/network`, networkRouter);
 
+  // Route di autenticazione
+  app.use(`${baseRoute}/auth`, authRouter);
+
 
 
 
@@ -758,22 +762,76 @@ export default (app: express.Application) => {
 
   // --- FINE ROUTE LEGACY ---
 
-  // Route di health check with module status
+  // Enhanced health check endpoint with detailed metrics
   app.get(`${baseRoute}/health`, (req, res) => {
-    res.json({
-      success: true,
-      message: "Shogun Relay API is running",
-      data: {
+    try {
+      const memUsage = process.memoryUsage();
+      const memUsageMB = memUsage.heapUsed / 1024 / 1024;
+      const memLimitMB = memUsage.heapTotal / 1024 / 1024;
+      const memPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
+
+      let status = "healthy";
+      const warnings = [];
+
+      if (memPercent > 90) {
+        status = "degraded";
+        warnings.push("High memory usage");
+      }
+
+      const uptimeSeconds = process.uptime();
+      const uptimeHours = uptimeSeconds / 3600;
+      if (uptimeSeconds < 30) {
+        warnings.push("Recently started (still initializing)");
+      }
+
+      const activeWires = app.get("activeWires") || 0;
+      const totalConnections = app.get("totalConnections") || 0;
+      const gunInstance = app.get("gunInstance");
+      const holsterInstance = app.get("holsterInstance");
+
+      const healthData = {
+        success: true,
+        status,
         timestamp: new Date().toISOString(),
-        version: packageConfig.version || "1.0.0",
-        uptime: process.uptime(),
-        modules: {
-          ipfs: ipfsConfig.enabled,
-
-
+        uptime: {
+          seconds: Math.floor(uptimeSeconds),
+          hours: Math.floor(uptimeHours * 10) / 10,
+          formatted: `${Math.floor(uptimeHours)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m`,
         },
-      },
-    });
+        connections: {
+          active: activeWires,
+          total: totalConnections,
+        },
+        memory: {
+          heapUsedMB: Math.round(memUsageMB * 10) / 10,
+          heapTotalMB: Math.round(memLimitMB * 10) / 10,
+          percent: Math.round(memPercent * 10) / 10,
+          rssMB: Math.round((memUsage.rss / 1024 / 1024) * 10) / 10,
+        },
+        relay: {
+          pub: app.get("relayUserPub") || null,
+          epub: (app.get("relayKeyPair") as any)?.epub || null,
+          name: relayConfig.name,
+        },
+        services: {
+          gun: gunInstance ? "active" : "inactive",
+          holster: holsterInstance ? "active" : "inactive",
+          ipfs: ipfsConfig.enabled ? "enabled" : "disabled",
+        },
+        warnings: warnings.length > 0 ? warnings : undefined,
+      };
+
+      res.status(200).json(healthData);
+    } catch (error: any) {
+      loggers.server.error({ err: error }, "Error in /health endpoint");
+      res.status(200).json({
+        success: false,
+        status: "error",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+      });
+    }
   });
 
   // ============================================================================

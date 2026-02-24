@@ -1,62 +1,62 @@
-import { useEffect, useState } from 'react'
-import { useAuth } from '../context/AuthContext'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
 
 interface HealthData {
-  status: string
-  relayName: string
-  version?: string
-  uptime?: number
+  status: string;
+  relayName: string;
+  version?: string;
+  uptime?: number;
 }
 
 interface StatsData {
-  peers?: { count: number }
-  memory?: { heapUsed: number }
+  peers?: { count: number };
+  memory?: { heapUsed: number };
 }
 
 function Status() {
-  const { isAuthenticated } = useAuth()
-  const [health, setHealth] = useState<HealthData | null>(null)
-  const [stats, setStats] = useState<StatsData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { isAuthenticated, getAuthHeaders } = useAuth();
+  const [health, setHealth] = useState<HealthData | null>(null);
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
         const [healthRes, statsRes] = await Promise.all([
-          fetch('/api/v1/health'),
-          fetch('/api/v1/system/stats.json')
-        ])
-        
-        const healthData = await healthRes.json()
-        const statsData = await statsRes.json()
-        
-        setHealth(healthData.data || healthData)
-        setStats(statsData)
+          fetch("/api/v1/health", { headers: getAuthHeaders() }),
+          fetch("/api/v1/system/stats.json", { headers: getAuthHeaders() }),
+        ]);
+
+        const healthData = await healthRes.json();
+        const statsData = await statsRes.json();
+
+        setHealth(healthData.data || healthData);
+        setStats(statsData);
       } catch (error) {
-        console.error('Failed to fetch status:', error)
+        console.error("Failed to fetch status:", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
-    fetchData()
-    const interval = setInterval(fetchData, 10000)
-    return () => clearInterval(interval)
-  }, [])
+    fetchData();
+    const interval = setInterval(fetchData, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const formatUptime = (ms: number) => {
-    const hours = Math.floor(ms / 1000 / 60 / 60)
-    const minutes = Math.floor((ms / 1000 / 60) % 60)
-    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
-  }
+    const hours = Math.floor(ms / 1000 / 60 / 60);
+    const minutes = Math.floor((ms / 1000 / 60) % 60);
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-64">
         <span className="loading loading-spinner loading-lg"></span>
       </div>
-    )
+    );
   }
 
   return (
@@ -67,7 +67,7 @@ function Status() {
           <div className="flex items-center gap-4">
             <div className="text-5xl">⚡</div>
             <div>
-              <h2 className="card-title text-2xl">{health?.relayName || 'Shogun Relay'}</h2>
+              <h2 className="card-title text-2xl">{health?.relayName || "Shogun Relay"}</h2>
               <p className="opacity-80">Decentralized infrastructure powered by GunDB & IPFS</p>
             </div>
           </div>
@@ -96,12 +96,14 @@ function Status() {
         <div className="stat">
           <div className="stat-figure text-accent text-3xl">⏱️</div>
           <div className="stat-title">Uptime</div>
-          <div className="stat-value text-accent">{health?.uptime ? formatUptime(health.uptime * 1000) : '--'}</div>
+          <div className="stat-value text-accent">
+            {health?.uptime ? formatUptime(health.uptime * 1000) : "--"}
+          </div>
         </div>
         <div className="stat">
           <div className="stat-figure text-info text-3xl">📦</div>
           <div className="stat-title">Version</div>
-          <div className="stat-value text-info text-xl">{health?.version || '--'}</div>
+          <div className="stat-value text-info text-xl">{health?.version || "--"}</div>
         </div>
       </div>
 
@@ -109,21 +111,30 @@ function Status() {
       <div>
         <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link to="/files" className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+          <Link
+            to="/files"
+            className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+          >
             <div className="card-body items-center text-center">
               <span className="text-4xl mb-2">📁</span>
               <h4 className="card-title">Upload Files</h4>
               <p className="text-base-content/60 text-sm">Pin files to IPFS</p>
             </div>
           </Link>
-          <Link to="/services" className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+          <Link
+            to="/services"
+            className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+          >
             <div className="card-body items-center text-center">
               <span className="text-4xl mb-2">⚡</span>
               <h4 className="card-title">Services</h4>
               <p className="text-base-content/60 text-sm">Manage services</p>
             </div>
           </Link>
-          <Link to="/explore" className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+          <Link
+            to="/explore"
+            className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+          >
             <div className="card-body items-center text-center">
               <span className="text-4xl mb-2">🔍</span>
               <h4 className="card-title">Explore</h4>
@@ -147,7 +158,7 @@ function Status() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default Status
+export default Status;
