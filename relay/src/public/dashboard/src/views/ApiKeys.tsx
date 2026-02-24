@@ -13,6 +13,7 @@ function ApiKeys() {
   const [newName, setNewName] = useState('')
   const [newExpires, setNewExpires] = useState('')
   const [createdToken, setCreatedToken] = useState('')
+  const [copied, setCopied] = useState(false)
   const [status, setStatus] = useState('')
 
   const loadKeys = useCallback(async () => {
@@ -98,7 +99,16 @@ function ApiKeys() {
             <code className="bg-base-300 p-2 rounded block mt-2 text-xs break-all">{createdToken}</code>
           </div>
           <div className="flex gap-2">
-            <button className="btn btn-sm" onClick={() => navigator.clipboard.writeText(createdToken)}>📋 Copy</button>
+            <button
+              className={`btn btn-sm ${copied ? 'btn-success text-white' : ''}`}
+              onClick={() => {
+                navigator.clipboard.writeText(createdToken)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+            >
+              {copied ? '✅ Copied!' : '📋 Copy'}
+            </button>
             <button className="btn btn-sm btn-primary" onClick={() => setCreatedToken('')}>Done</button>
           </div>
         </div>
