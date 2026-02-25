@@ -159,6 +159,17 @@ echo "----------------------------------"
 # Verify dashboard files exist at runtime
 DASHBOARD_DIST_DIR="/app/relay/src/public/dashboard/dist"
 DASHBOARD_PATH="$DASHBOARD_DIST_DIR/index.html"
+
+# Specific check for volume conflict (App root overridden by old volume)
+if [ ! -d "/app/relay/src" ] && [ -f "/app/relay/gun.db" ]; then
+    echo "🚨 CRITICAL WARNING: VOLUME CONFLICT DETECTED!"
+    echo "   The directory /app/relay seems to be overridden by a persistent volume"
+    echo "   containing old data (gun.db found), which is hiding the new source code."
+    echo "   Please check your CapRover/Docker volume mappings and ensure /app/relay"
+    echo "   is NOT a persistent volume. Only /app/relay/data should be persistent."
+    echo ""
+fi
+
 echo "🔍 Verifying dashboard at runtime..."
 if [ -f "$DASHBOARD_PATH" ]; then
     echo "✅ Dashboard found at $DASHBOARD_PATH"
