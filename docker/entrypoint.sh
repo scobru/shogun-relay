@@ -136,10 +136,25 @@ if [ "${SKIP_VOLUME_CHECK:-false}" != "true" ] && [ -f "/app/docker/verify-volum
     echo "🔍 Running volume verification..."
     /bin/sh /app/docker/verify-volumes.sh || {
         echo "⚠️  Volume verification found issues. Continuing anyway..."
-        echo "⚠️  Set SKIP_VOLUME_CHECK=true to skip this check."
     }
     echo ""
 fi
+
+# DEBUG: Dump all mounts and directory structure
+echo "🔍 Runtime Environment Debugging:"
+echo "----------------------------------"
+echo "📡 Active Mounts (df -h):"
+df -h | grep /app || echo "  No mounts found under /app"
+echo ""
+echo "📂 Top-level /app directory structure:"
+ls -la /app
+echo ""
+echo "📂 /app/relay directory structure:"
+ls -la /app/relay || echo "  /app/relay does not exist"
+echo ""
+echo "📂 /app/relay/src structure (if exists):"
+ls -la /app/relay/src 2>/dev/null || echo "  /app/relay/src does not exist"
+echo "----------------------------------"
 
 # Verify dashboard files exist at runtime
 DASHBOARD_DIST_DIR="/app/relay/src/public/dashboard/dist"
