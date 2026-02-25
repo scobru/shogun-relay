@@ -5,7 +5,7 @@ import logoSvg from "./logo.svg";
 const iconMap: Record<string, string> = {
   status: "◉",
   stats: "▤",
-  services: "◈",
+  services: "📜",
   files: "▢",
   drive: "◫",
   explore: "◎",
@@ -30,7 +30,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: "/", icon: iconMap.status, label: "Status", group: "main" },
   { path: "/stats", icon: iconMap.stats, label: "Live Stats", group: "main" },
-  { path: "/services", icon: iconMap.services, label: "Services", group: "main" },
+  { path: "/logs", icon: iconMap.services, label: "Console Logs", group: "main" },
   { path: "/files", icon: iconMap.files, label: "Files", group: "storage" },
   { path: "/drive", icon: iconMap.drive, label: "Drive", group: "storage" },
   { path: "/explore", icon: iconMap.explore, label: "Explore", group: "storage" },

@@ -18,7 +18,7 @@ const getGunInstance = (req: Request): any => {
 router.get("/health", (req, res) => {
   // Get relay public key from app context if available
   const relayPub = req.app.get("relayUserPub") || null;
-  
+
   res.json({
     success: true,
     message: "Shogun Relay is running",
@@ -247,7 +247,7 @@ router.get("/node/*", adminAuthMiddleware, async (req, res) => {
     const gun = getGunInstance(req);
 
     const node = getGunNode(gun, path);
-    
+
     // Promisify with timeout
     const data = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -417,16 +417,29 @@ router.get("/logs", adminAuthMiddleware, (req, res) => {
     const limit: number = parseInt(req.query.limit as string) || 100;
     const tail: number = parseInt(req.query.tail as string) || 100; // Number of lines to read from end
 
-    // Read relay log file directly
-    const logFilePath = "/var/log/supervisor/relay.log";
+    // Map of common log locations to check
+    const logLocations = [
+      "/var/log/supervisor/relay.log",
+      path.join(process.cwd(), "logs", "relay.log"),
+      path.join(process.cwd(), "relay.log"),
+      "/tmp/relay.log"
+    ];
+
+    let logFilePath = "";
+    for (const loc of logLocations) {
+      if (fs.existsSync(loc)) {
+        logFilePath = loc;
+        break;
+      }
+    }
 
     // Check if file exists
-    if (!fs.existsSync(logFilePath)) {
+    if (!logFilePath) {
       return res.json({
         success: true,
         logs: [],
         count: 0,
-        message: "Log file not found",
+        message: "Log file not found at expected locations: " + logLocations.join(", "),
         timestamp: Date.now(),
       });
     }
@@ -448,55 +461,24 @@ router.get("/logs", adminAuthMiddleware, (req, res) => {
       try {
         // Try to parse JSON log format: timestamp JSON_OBJECT
         // Format: 2025-12-12T08:21:19.939018162Z {"level":"info","time":"...","pid":85,...}
-        const jsonMatch = line.match(/^(\d{4}-\d{2}-\d{2}T[\d:\.]+Z)\s+(.+)$/);
+        const jsonMatch = line.match(/^(\d{4}-\d{2}-\d{2}T[\d:\.]+Z)?\s*(.+)$/);
         if (jsonMatch) {
-          timestamp = jsonMatch[1];
+          const matchedTimestamp = jsonMatch[1];
           const jsonStr = jsonMatch[2];
 
           try {
             logData = JSON.parse(jsonStr);
+            timestamp = logData.time || logData.timestamp || matchedTimestamp || timestamp;
             level = logData.level || "info";
             rawMessage = jsonStr;
           } catch (parseError) {
-            // If JSON parsing fails, try to extract JSON from anywhere in the line
-            const jsonStart = line.indexOf("{");
-            if (jsonStart !== -1) {
-              const jsonStr = line.substring(jsonStart);
-              try {
-                logData = JSON.parse(jsonStr);
-                level = logData.level || "info";
-                rawMessage = jsonStr;
-                // Try to extract timestamp from beginning of line
-                const tsMatch = line.substring(0, jsonStart).trim();
-                if (tsMatch) {
-                  timestamp = tsMatch;
-                }
-              } catch (e) {
-                // Keep raw message if parsing fails
-              }
-            }
-          }
-        } else {
-          // Try to find JSON object anywhere in the line
-          const jsonStart = line.indexOf("{");
-          if (jsonStart !== -1) {
-            const jsonStr = line.substring(jsonStart);
-            try {
-              logData = JSON.parse(jsonStr);
-              level = logData.level || "info";
-              rawMessage = jsonStr;
-              // Try to extract timestamp from beginning of line
-              const tsMatch = line.substring(0, jsonStart).trim();
-              if (tsMatch) {
-                timestamp = tsMatch;
-              }
-            } catch (e) {
-              // Keep raw message if parsing fails
-            }
+            // Not a JSON string, check if it's just a message after timestamp
+            rawMessage = jsonStr;
+            if (matchedTimestamp) timestamp = matchedTimestamp;
           }
         }
       } catch (error) {
-        // If all parsing fails, use raw line
+        // Fallback to raw line
       }
 
       return {
@@ -640,66 +622,66 @@ router.get("/services/:name/logs", adminAuthMiddleware, (req, res) => {
     // Map service names to log files
     // This assumes standard log locations or PM2 log naming convention
     let logFile = "";
-    
+
     // Normalize service name
     const normalizedName = serviceName.toLowerCase().replace(/%20/g, ' ').trim();
-    
+
     if (normalizedName.includes("ipfs")) {
-       // Check common IPFS log locations or PM2
-       logFile = "/var/log/supervisor/ipfs.log"; // Supervisor default
-       if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "ipfs.log"); 
+      // Check common IPFS log locations or PM2
+      logFile = "/var/log/supervisor/ipfs.log"; // Supervisor default
+      if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "ipfs.log");
     } else if (normalizedName.includes("gun") || normalizedName.includes("relay")) {
-       logFile = "/var/log/supervisor/relay.log";
-       if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "relay.log");
+      logFile = "/var/log/supervisor/relay.log";
+      if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "relay.log");
     } else {
-       // Generic fallback
-       logFile = `/var/log/supervisor/${normalizedName.replace(/\s+/g, '-')}.log`;
+      // Generic fallback
+      logFile = `/var/log/supervisor/${normalizedName.replace(/\s+/g, '-')}.log`;
     }
 
     if (!fs.existsSync(logFile)) {
-        // Try PM2 convention if Supervisor not found
-        const pm2Log = path.join(process.env.HOME || '/root', '.pm2', 'logs', `${normalizedName.replace(/\s+/g, '-')}-out.log`);
-        if (fs.existsSync(pm2Log)) {
-            logFile = pm2Log;
-        } else {
-            // Try Docker stdout logs - these are captured by Docker, not files
-            // Return helpful message instead of 404
-            return res.json({
-                success: true,
-                logs: [{
-                  id: 'info_0',
-                  timestamp: new Date().toISOString(),
-                  message: `Logs for ${serviceName} are managed by Docker/container orchestrator.`,
-                  level: 'info'
-                }, {
-                  id: 'info_1', 
-                  timestamp: new Date().toISOString(),
-                  message: `Use 'docker logs <container>' to view container logs.`,
-                  level: 'info'
-                }, {
-                  id: 'info_2',
-                  timestamp: new Date().toISOString(),
-                  message: `Checked paths: ${logFile}, ${pm2Log}`,
-                  level: 'debug'
-                }],
-                count: 3,
-                service: serviceName,
-                note: 'Log files not found at expected paths. Logs may be managed by Docker.'
-            });
-        }
+      // Try PM2 convention if Supervisor not found
+      const pm2Log = path.join(process.env.HOME || '/root', '.pm2', 'logs', `${normalizedName.replace(/\s+/g, '-')}-out.log`);
+      if (fs.existsSync(pm2Log)) {
+        logFile = pm2Log;
+      } else {
+        // Try Docker stdout logs - these are captured by Docker, not files
+        // Return helpful message instead of 404
+        return res.json({
+          success: true,
+          logs: [{
+            id: 'info_0',
+            timestamp: new Date().toISOString(),
+            message: `Logs for ${serviceName} are managed by Docker/container orchestrator.`,
+            level: 'info'
+          }, {
+            id: 'info_1',
+            timestamp: new Date().toISOString(),
+            message: `Use 'docker logs <container>' to view container logs.`,
+            level: 'info'
+          }, {
+            id: 'info_2',
+            timestamp: new Date().toISOString(),
+            message: `Checked paths: ${logFile}, ${pm2Log}`,
+            level: 'debug'
+          }],
+          count: 3,
+          service: serviceName,
+          note: 'Log files not found at expected paths. Logs may be managed by Docker.'
+        });
+      }
     }
 
     // Reuse log reading logic (simplified here)
     const logContent = fs.readFileSync(logFile, "utf8");
     const lines = logContent.split("\n").filter((line) => line.trim() !== "");
     const lastLines = lines.slice(-tail);
-    
+
     // Simple parsing - just return lines for now to fix 404
     const formattedLogs = lastLines.map((line, i) => ({
-        id: `l_${Date.now()}_${i}`,
-        timestamp: new Date().toISOString(), // Placeholder, real parsing is complex
-        message: line,
-        level: 'info'
+      id: `l_${Date.now()}_${i}`,
+      timestamp: new Date().toISOString(), // Placeholder, real parsing is complex
+      message: line,
+      level: 'info'
     }));
 
     res.json({

@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
 import Status from "./views/Status";
 import LiveStats from "./views/LiveStats";
-import Services from "./views/Services";
+import ConsoleLogs from "./views/ConsoleLogs";
 import Files from "./views/Files";
 import Drive from "./views/Drive";
 import Explore from "./views/Explore";
@@ -21,7 +21,7 @@ function App() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Status />} />
         <Route path="stats" element={<LiveStats />} />
-        <Route path="services" element={<Services />} />
+        <Route path="logs" element={<ConsoleLogs />} />
         <Route path="files" element={<Files />} />
         <Route path="drive" element={<Drive />} />
         <Route path="explore" element={<Explore />} />

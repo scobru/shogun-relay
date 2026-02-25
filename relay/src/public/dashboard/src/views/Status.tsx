@@ -122,13 +122,13 @@ function Status() {
             </div>
           </Link>
           <Link
-            to="/services"
+            to="/logs"
             className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="card-body items-center text-center">
-              <span className="text-4xl mb-2">⚡</span>
-              <h4 className="card-title">Services</h4>
-              <p className="text-base-content/60 text-sm">Manage services</p>
+              <span className="text-4xl mb-2">📜</span>
+              <h4 className="card-title">Console Logs</h4>
+              <p className="text-base-content/60 text-sm">Monitor relay logs</p>
             </div>
           </Link>
           <Link
