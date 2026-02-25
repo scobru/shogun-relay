@@ -15,10 +15,8 @@
 
 - **GunDB Relay** — WebSocket relay with SQLite/RADISK persistence and WebRTC support
 - **IPFS Integration** — Upload, pin, manage, and preview IPFS content via REST API
-- **Admin Dashboards** — Real-time monitoring, visual graph explorer, file manager, and config editor
-- **x402 Subscriptions** — Paid storage subscriptions via USDC (EIP-3009)
+- **Admin Dashboard** — Modern React-based UI for monitoring and management
 - **Network Federation** — Relay discovery, storage proofs, and reputation system
-- **On-Chain Registry** — Staking and slashing on Base blockchain
 
 ---
 
@@ -39,7 +37,7 @@ curl http://localhost:8765/health
 ```bash
 cd shogun-relay/relay
 npm install
-npm run dev
+npm run start:dev
 ```
 
 Admin dashboards: `http://localhost:8765/`
@@ -61,35 +59,21 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 
 ---
 
-## Admin Interfaces
-
-| Path                  | Description                  |
-| --------------------- | ---------------------------- |
-| `/admin`              | Main control panel           |
-| `/stats`              | Live metrics & charts        |
-| `/services-dashboard` | Service health overview      |
-| `/config`             | Runtime configuration editor |
-| `/pin-manager`        | IPFS pin manager             |
-| `/upload`             | IPFS uploads                 |
-| `/drive`              | Admin file browser           |
-| `/visualGraph`        | GunDB explorer               |
-| `/graphExplorer`      | Advanced graph navigator     |
-| `/registry-dashboard` | On-chain registry            |
-| `/endpoints`          | API documentation            |
+| Path         | Description                       |
+| ------------ | --------------------------------- |
+| `/dashboard` | New React Dashboard (Recommended) |
+| `/admin`     | Legacy entry (redirects)          |
+| `/endpoints` | API reference explorer            |
 
 ---
 
 ## Development
 
-| Document                                                     | Description                         |
-| ------------------------------------------------------------ | ----------------------------------- |
-| **[API Reference](./docs/API.md)**                           | Complete REST API documentation     |
-| **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** | All configuration options           |
-| **[Node Operator Guide](./docs/NODE_OPERATOR_GUIDE.md)**     | Run your own relay                  |
-| **[x402 Payments](./docs/X402_PAYMENTS.md)**                 | Subscription payment system         |
-| **[Storage Deals](./docs/STORAGE_DEALS.md)**                 | Per-file contracts & erasure coding |
-| **[Network Federation](./docs/NETWORK_FEDERATION.md)**       | Relay discovery & reputation        |
-| **[Relay Keys](./docs/RELAY_KEYS.md)**                       | Keypair configuration               |
+| **[API Reference](./docs/API.md)** | Complete REST API documentation |
+| **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** | All configuration options |
+| **[Node Operator Guide](./docs/NODE_OPERATOR_GUIDE.md)** | Run your own relay |
+| **[Network Federation](./docs/NETWORK_FEDERATION.md)** | Relay discovery & reputation |
+| **[Relay Keys](./docs/RELAY_KEYS.md)** | Keypair configuration |
 
 ---
 
@@ -120,14 +104,6 @@ See **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** for complete re
 | `GET /api/v1/user-uploads/system-hashes-map`          | Get complete file metadata map |
 | `POST /api/v1/user-uploads/save-system-hash`          | Save file metadata (admin)     |
 | `DELETE /api/v1/user-uploads/remove-system-hash/:cid` | Remove file metadata           |
-
-### Bridge
-
-| Endpoint                           | Description        |
-| ---------------------------------- | ------------------ |
-| `POST /api/v1/bridge/deposit`      | Record L1 deposit  |
-| `POST /api/v1/bridge/withdraw`     | Request withdrawal |
-| `GET /api/v1/bridge/balance/:user` | Get L2 balance     |
 
 Full API documentation at `/endpoints` or see **[API Reference](./docs/API.md)**.
 
