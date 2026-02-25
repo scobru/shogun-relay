@@ -786,8 +786,11 @@ export default (app: express.Application) => {
       const healthData = {
         success: true,
         status,
+        relayName: relayConfig.name,
+        version: packageConfig.version || "1.0.0",
+        uptime: Math.floor(uptimeSeconds),
         timestamp: new Date().toISOString(),
-        uptime: {
+        uptimeDetails: {
           seconds: Math.floor(uptimeSeconds),
           hours: Math.floor(uptimeHours * 10) / 10,
           formatted: `${Math.floor(uptimeHours)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m`,
