@@ -1,76 +1,88 @@
-import { useEffect, useState } from 'react'
-import { useAuth } from '../context/AuthContext'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
-
+import { useEffect, useState, useCallback } from "react";
+import { useAuth } from "../context/AuthContext";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from "recharts";
 
 interface ChartData {
-  connections?: number[]
-  requests?: number[]
-  storage?: number[]
-  labels?: string[]
+  connections?: number[];
+  requests?: number[];
+  storage?: number[];
+  labels?: string[];
 }
 
 function Charts() {
-  const { isAuthenticated, getAuthHeaders } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState<Record<string, any>>({})
-  const [history, setHistory] = useState<any[]>([])
+  const { isAuthenticated, getAuthHeaders } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<Record<string, any>>({});
+  const [history, setHistory] = useState<any[]>([]);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const response = await fetch("/api/v1/system/stats.json", { headers: getAuthHeaders() });
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+
+        setHistory((prev) => {
+          const now = new Date().toLocaleTimeString();
+          const newPoint = {
+            time: now,
+            memory: (data.memory?.heapUsed || 0) / 1024 / 1024,
+            peers: data.peers?.count || 0,
+            damIn: data.dam?.in?.count || 0,
+            damOut: data.dam?.out?.count || 0,
+          };
+          const newHistory = [...prev, newPoint];
+          return newHistory.slice(-20);
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load stats:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [getAuthHeaders]);
 
   useEffect(() => {
-    loadStats()
-    const interval = setInterval(loadStats, 5000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const loadStats = async () => {
-    try {
-        const response = await fetch('/api/v1/system/stats.json')
-        if (response.ok) {
-            const data = await response.json()
-            setStats(data)
-            
-            setHistory(prev => {
-                const now = new Date().toLocaleTimeString()
-                const newPoint = {
-                    time: now,
-                    memory: (data.memory?.heapUsed || 0) / 1024 / 1024,
-                    peers: data.peers?.count || 0,
-                    damIn: data.dam?.in?.count || 0,
-                    damOut: data.dam?.out?.count || 0
-                }
-                const newHistory = [...prev, newPoint]
-                return newHistory.slice(-20)
-            })
-        }
-    } catch (error) {
-      console.error('Failed to load stats:', error)
-    } finally {
-      setLoading(false)
+    if (isAuthenticated) {
+      loadStats();
+      const interval = setInterval(loadStats, 5000);
+      return () => clearInterval(interval);
     }
-  }
+  }, [isAuthenticated, loadStats]);
 
   const formatBytes = (bytes: number) => {
-    if (!bytes) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
+    if (!bytes) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
 
   const formatUptime = (seconds: number) => {
-    if (!seconds) return '-'
-    const days = Math.floor(seconds / 86400)
-    const hours = Math.floor((seconds % 86400) / 3600)
-    const mins = Math.floor((seconds % 3600) / 60)
-    return `${days}d ${hours}h ${mins}m`
-  }
+    if (!seconds) return "-";
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return `${days}d ${hours}h ${mins}m`;
+  };
 
   if (loading && history.length === 0) {
     return (
       <div className="flex justify-center p-8">
         <span className="loading loading-spinner loading-lg"></span>
       </div>
-    )
+    );
   }
 
   return (
@@ -101,11 +113,13 @@ function Charts() {
         </div>
         <div className="stat">
           <div className="stat-title">CPU User</div>
-          <div className="stat-value text-lg">{stats.cpu?.user ? (stats.cpu.user / 1000000).toFixed(2) + 's' : '-'}</div>
+          <div className="stat-value text-lg">
+            {stats.cpu?.user ? (stats.cpu.user / 1000000).toFixed(2) + "s" : "-"}
+          </div>
         </div>
         <div className="stat">
           <div className="stat-title">Version</div>
-          <div className="stat-value text-lg">{stats.version || '1.0.0'}</div>
+          <div className="stat-value text-lg">{stats.version || "1.0.0"}</div>
         </div>
       </div>
 
@@ -121,11 +135,21 @@ function Charts() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#444" />
                   <XAxis dataKey="time" stroke="#888" fontSize={12} />
                   <YAxis stroke="#888" fontSize={12} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#2a2a2a', border: 'none', borderRadius: '8px' }}
-                    itemStyle={{ color: '#fff' }}
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#2a2a2a",
+                      border: "none",
+                      borderRadius: "8px",
+                    }}
+                    itemStyle={{ color: "#fff" }}
                   />
-                  <Area type="monotone" dataKey="memory" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
+                  <Area
+                    type="monotone"
+                    dataKey="memory"
+                    stroke="#8884d8"
+                    fill="#8884d8"
+                    fillOpacity={0.3}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -142,9 +166,13 @@ function Charts() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#444" />
                   <XAxis dataKey="time" stroke="#888" fontSize={12} />
                   <YAxis allowDecimals={false} stroke="#888" fontSize={12} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#2a2a2a', border: 'none', borderRadius: '8px' }}
-                    itemStyle={{ color: '#fff' }}
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#2a2a2a",
+                      border: "none",
+                      borderRadius: "8px",
+                    }}
+                    itemStyle={{ color: "#fff" }}
                   />
                   <Line type="step" dataKey="peers" stroke="#82ca9d" strokeWidth={2} />
                 </LineChart>
@@ -164,20 +192,34 @@ function Charts() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#444" />
                 <XAxis dataKey="time" stroke="#888" fontSize={12} />
                 <YAxis stroke="#888" fontSize={12} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#2a2a2a', border: 'none', borderRadius: '8px' }}
-                  itemStyle={{ color: '#fff' }}
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#2a2a2a", border: "none", borderRadius: "8px" }}
+                  itemStyle={{ color: "#fff" }}
                 />
                 <Legend />
-                <Area type="monotone" dataKey="damIn" name="Incoming (In)" stroke="#ffc658" fill="#ffc658" stackId="1" />
-                <Area type="monotone" dataKey="damOut" name="Outgoing (Out)" stroke="#ff7300" fill="#ff7300" stackId="1" />
+                <Area
+                  type="monotone"
+                  dataKey="damIn"
+                  name="Incoming (In)"
+                  stroke="#ffc658"
+                  fill="#ffc658"
+                  stackId="1"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="damOut"
+                  name="Outgoing (Out)"
+                  stroke="#ff7300"
+                  fill="#ff7300"
+                  stackId="1"
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default Charts
+export default Charts;
