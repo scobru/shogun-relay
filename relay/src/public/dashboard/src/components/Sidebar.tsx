@@ -5,13 +5,9 @@ import logoSvg from "./logo.svg";
 const iconMap: Record<string, string> = {
   status: "◉",
   stats: "▤",
-  services: "📜",
   files: "▢",
   drive: "◫",
-  explore: "◎",
   network: "◇",
-  registry: "▣",
-  // torrents icon removed
   apiKeys: "◈",
   charts: "▦",
   visualGraph: "◬",
@@ -30,11 +26,9 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: "/", icon: iconMap.status, label: "Status", group: "main" },
   { path: "/stats", icon: iconMap.stats, label: "Live Stats", group: "main" },
-  { path: "/logs", icon: iconMap.services, label: "Console Logs", group: "main" },
   { path: "/files", icon: iconMap.files, label: "Files", group: "storage" },
   { path: "/drive", icon: iconMap.drive, label: "Drive", group: "storage" },
   { path: "/network", icon: iconMap.network, label: "Network", group: "network" },
-  // Torrents link removed
   { path: "/api-keys", icon: iconMap.apiKeys, label: "API Keys", group: "tools" },
   { path: "/charts", icon: iconMap.charts, label: "Charts", group: "tools" },
   { path: "/visual-graph", icon: iconMap.visualGraph, label: "Visual Graph", group: "tools" },

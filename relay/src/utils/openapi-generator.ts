@@ -629,7 +629,7 @@ The wallet signature method is deprecated.`,
               },
             },
             "402": {
-              description: "Payment required (x402 subscription) or storage limit exceeded",
+              description: "Storage limit exceeded",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/Error" },
@@ -695,7 +695,7 @@ The wallet signature method is deprecated.`,
               },
             },
             "402": {
-              description: "Payment required (x402 subscription) or storage limit exceeded",
+              description: "Storage limit exceeded",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/Error" },
@@ -1333,108 +1333,6 @@ The wallet signature method is deprecated.`,
             },
             "404": {
               description: "Entry not found",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" },
-                },
-              },
-            },
-          },
-        },
-      },
-      "/api/v1/network/onchain/deals/relay/{address}": {
-        get: {
-          tags: ["Registry"],
-          summary: "Get relay deals from registry",
-          description: "Get all storage deals for a relay from on-chain registry",
-          operationId: "getOnChainRelayDeals",
-          parameters: [
-            {
-              name: "address",
-              in: "path",
-              required: true,
-              schema: { type: "string" },
-            },
-            {
-              name: "chainId",
-              in: "query",
-              schema: { type: "integer", default: 84532 },
-            },
-          ],
-          responses: {
-            "200": {
-              description: "List of deals",
-              content: {
-                "application/json": {
-                  schema: { type: "object" },
-                },
-              },
-            },
-          },
-        },
-      },
-      "/api/v1/registry/balance": {
-        get: {
-          tags: ["Registry"],
-          summary: "Get wallet balances",
-          description: "Get wallet balances (ETH for gas, USDC for staking)",
-          operationId: "getRegistryBalance",
-          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
-          responses: {
-            "200": {
-              description: "Wallet balances",
-              content: {
-                "application/json": {
-                  schema: { type: "object" },
-                },
-              },
-            },
-            "401": {
-              description: "Unauthorized",
-              content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/Error" },
-                },
-              },
-            },
-          },
-        },
-      },
-      "/api/v1/registry/register": {
-        post: {
-          tags: ["Registry"],
-          summary: "Register relay on-chain",
-          description: "Register this relay on-chain",
-          operationId: "registerRelay",
-          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    endpoint: { type: "string" },
-                    gunPubKey: { type: "string" },
-                    stakeAmount: { type: "string" },
-                    griefingRatio: { type: "integer" },
-                  },
-                  required: ["endpoint", "gunPubKey", "stakeAmount"],
-                },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Relay registered",
-              content: {
-                "application/json": {
-                  schema: { type: "object" },
-                },
-              },
-            },
-            "401": {
-              description: "Unauthorized",
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/Error" },

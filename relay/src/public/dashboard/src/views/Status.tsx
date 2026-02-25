@@ -110,7 +110,7 @@ function Status() {
       {/* Quick Actions */}
       <div>
         <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link
             to="/files"
             className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
@@ -119,16 +119,6 @@ function Status() {
               <span className="text-4xl mb-2">📁</span>
               <h4 className="card-title">Upload Files</h4>
               <p className="text-base-content/60 text-sm">Pin files to IPFS</p>
-            </div>
-          </Link>
-          <Link
-            to="/logs"
-            className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-          >
-            <div className="card-body items-center text-center">
-              <span className="text-4xl mb-2">📜</span>
-              <h4 className="card-title">Console Logs</h4>
-              <p className="text-base-content/60 text-sm">Monitor relay logs</p>
             </div>
           </Link>
         </div>
