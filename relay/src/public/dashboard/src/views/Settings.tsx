@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 
@@ -57,15 +57,7 @@ function Settings() {
     text: string;
   } | null>(null);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchRelayKeys();
-      fetchStorageStats();
-      fetchConfig();
-    }
-  }, [isAuthenticated]);
-
-  const fetchRelayKeys = async () => {
+  const fetchRelayKeys = useCallback(async () => {
     setLoadingKeys(true);
     try {
       const res = await fetch("/api/v1/admin/relay-keys", { headers: getAuthHeaders() });
@@ -76,9 +68,9 @@ function Settings() {
     } finally {
       setLoadingKeys(false);
     }
-  };
+  }, [getAuthHeaders]);
 
-  const fetchStorageStats = async () => {
+  const fetchStorageStats = useCallback(async () => {
     setLoadingStorage(true);
     try {
       const res = await fetch("/api/v1/admin/storage-stats", { headers: getAuthHeaders() });
@@ -89,9 +81,9 @@ function Settings() {
     } finally {
       setLoadingStorage(false);
     }
-  };
+  }, [getAuthHeaders]);
 
-  const fetchConfig = async () => {
+  const fetchConfig = useCallback(async () => {
     setLoadingConfig(true);
     try {
       const res = await fetch("/api/v1/admin/config", { headers: getAuthHeaders() });
@@ -102,7 +94,15 @@ function Settings() {
     } finally {
       setLoadingConfig(false);
     }
-  };
+  }, [getAuthHeaders]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchRelayKeys();
+      fetchStorageStats();
+      fetchConfig();
+    }
+  }, [isAuthenticated, fetchRelayKeys, fetchStorageStats, fetchConfig]);
 
   const copyToClipboard = async (text: string, keyName: string) => {
     await navigator.clipboard.writeText(text);
