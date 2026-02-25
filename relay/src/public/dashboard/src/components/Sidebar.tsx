@@ -33,7 +33,6 @@ const navItems: NavItem[] = [
   { path: "/logs", icon: iconMap.services, label: "Console Logs", group: "main" },
   { path: "/files", icon: iconMap.files, label: "Files", group: "storage" },
   { path: "/drive", icon: iconMap.drive, label: "Drive", group: "storage" },
-  { path: "/explore", icon: iconMap.explore, label: "Explore", group: "storage" },
   { path: "/network", icon: iconMap.network, label: "Network", group: "network" },
   // Torrents link removed
   { path: "/api-keys", icon: iconMap.apiKeys, label: "API Keys", group: "tools" },

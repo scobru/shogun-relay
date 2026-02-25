@@ -68,8 +68,8 @@ router.get("/alldata", adminAuthMiddleware, (req, res) => {
   }
 });
 
-// Stats endpoint
-router.get("/stats", adminAuthMiddleware, (req, res) => {
+// Stats endpoint (Public)
+router.get("/stats", (req, res) => {
   try {
     const now = Date.now();
     const uptime = process.uptime() * 1000; // Convert to milliseconds
@@ -172,8 +172,8 @@ router.post("/stats/update", adminAuthMiddleware, (req, res) => {
   }
 });
 
-// Stats JSON endpoint
-router.get("/stats.json", adminAuthMiddleware, (req, res) => {
+// Stats JSON endpoint (Public)
+router.get("/stats.json", (req, res) => {
   try {
     const now = Date.now();
     const uptime = process.uptime() * 1000; // Convert to milliseconds

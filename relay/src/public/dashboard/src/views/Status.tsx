@@ -131,15 +131,6 @@ function Status() {
               <p className="text-base-content/60 text-sm">Monitor relay logs</p>
             </div>
           </Link>
-          <Link
-            to="/explore"
-            className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-          >
-            <div className="card-body items-center text-center">
-              <span className="text-4xl mb-2">🔍</span>
-              <h4 className="card-title">Explore</h4>
-              <p className="text-base-content/60 text-sm">Browse GunDB</p>
-            </div>
           </Link>
         </div>
       </div>
