@@ -131,7 +131,6 @@ function Status() {
               <p className="text-base-content/60 text-sm">Monitor relay logs</p>
             </div>
           </Link>
-          </Link>
         </div>
       </div>
 
