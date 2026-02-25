@@ -125,27 +125,7 @@ fi
 
 echo ""
 
-# Check Holster data volume
-echo "📡 Checking Holster data volume (/app/relay/holster-data)..."
-# Check if Holster storage is enabled
-if [ "$HOLSTER_RELAY_STORAGE" = "true" ] || [ "$HOLSTER_RELAY_STORAGE" = "1" ]; then
-    if [ ! -d "/app/relay/holster-data" ]; then
-        echo "ℹ️  Holster data directory does not exist (will be created on first use)"
-    else
-        echo "✅ Holster data directory exists"
-        
-        if mountpoint -q /app/relay/holster-data 2>/dev/null; then
-            echo "✅ Holster data is mounted as a volume (data will persist)"
-        else
-            echo "ℹ️  INFO: /app/relay/holster-data is not a volume mount"
-            echo "   Holster data will be lost when container is removed"
-            echo "   This is OK for development, but consider mounting a volume for production"
-        fi
-    fi
-else
-    echo "ℹ️  Holster storage is disabled (HOLSTER_RELAY_STORAGE not set to true)"
-    echo "   Volume mount check skipped"
-fi
+# Check Holster data volume removed (deprecated)
 
 echo ""
 echo "=================================="

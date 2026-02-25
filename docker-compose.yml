@@ -16,8 +16,7 @@ services:
       - relay-data:/app/relay/data
       # Persist relay keys (SEA keypair for relay user)
       - relay-keys:/app/keys
-      # Persist Holster data (if Holster is enabled)
-      - holster-data:/app/relay/holster-data
+      # Persist relay keys (SEA keypair for relay user)
       # Mount logs for debugging (optional, can be removed in production)
       - ./logs:/var/log/supervisor
     environment:
@@ -44,7 +43,6 @@ services:
       # MODULE ENABLED FLAGS (true/false to enable/disable modules)
       # ============================================================================
       - IPFS_ENABLED=${IPFS_ENABLED:-true}
-      - HOLSTER_ENABLED=${HOLSTER_ENABLED:-false}
       - X402_ENABLED=${X402_ENABLED:-false}
       - REGISTRY_ENABLED=${REGISTRY_ENABLED:-false}
       - DEALS_ENABLED=${DEALS_ENABLED:-false}
@@ -64,14 +62,7 @@ services:
       - IPFS_GATEWAY_URL=http://127.0.0.1:8080
       - IPFS_API_TOKEN=shogun2025
       - IPFS_API_KEY=shogun2025
-      # ============================================================================
-      # HOLSTER
-      # ============================================================================
-      - HOLSTER_RELAY_HOST=0.0.0.0
-      # - HOLSTER_RELAY_PORT=8766
-      - HOLSTER_RELAY_STORAGE=true
-      - HOLSTER_RELAY_STORAGE_PATH=/app/relay/holster-data
-      - HOLSTER_MAX_CONNECTIONS=100
+      # - HOLSTER_RELAY_STORAGE_PATH=/app/relay/holster-data removed
       # ============================================================================
       # BLOCKCHAIN/WALLET (shared key for on-chain operations)
       # ============================================================================
@@ -140,11 +131,7 @@ volumes:
   relay-data:
     driver: local
   # Relay keys - contains relay SEA keypair (RELAY_SEA_KEYPAIR_PATH)
-  # Important: Without this, the relay user will be recreated on each deploy
   relay-keys:
-    driver: local
-  # Holster data - contains Holster relay state (if HOLSTER_RELAY_STORAGE=true)
-  holster-data:
     driver: local
 
 networks:

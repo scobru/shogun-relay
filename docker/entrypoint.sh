@@ -142,17 +142,22 @@ if [ "${SKIP_VOLUME_CHECK:-false}" != "true" ] && [ -f "/app/docker/verify-volum
 fi
 
 # Verify dashboard files exist at runtime
-DASHBOARD_PATH="/app/relay/src/public/dashboard/dist/index.html"
+DASHBOARD_DIST_DIR="/app/relay/src/public/dashboard/dist"
+DASHBOARD_PATH="$DASHBOARD_DIST_DIR/index.html"
 echo "🔍 Verifying dashboard at runtime..."
 if [ -f "$DASHBOARD_PATH" ]; then
     echo "✅ Dashboard found at $DASHBOARD_PATH"
-    ls -la /app/relay/src/public/dashboard/dist/
+    ls -la "$DASHBOARD_DIST_DIR"
 else
     echo "❌ Dashboard NOT found at $DASHBOARD_PATH"
-    echo "📁 Checking parent directories..."
-    ls -la /app/relay/src/public/ 2>/dev/null || echo "  /app/relay/src/public/ does not exist"
-    ls -la /app/relay/src/public/dashboard/ 2>/dev/null || echo "  /app/relay/src/public/dashboard/ does not exist"
-    ls -la /app/relay/src/public/dashboard/dist/ 2>/dev/null || echo "  /app/relay/src/public/dashboard/dist/ does not exist"
+    echo "📁 Directory Analysis:"
+    echo "  - Current working directory: $(pwd)"
+    echo "  - Checking /app/relay/src/public/:"
+    ls -la /app/relay/src/public/ 2>/dev/null || echo "    ❌ /app/relay/src/public/ does not exist"
+    echo "  - Checking /app/relay/src/public/dashboard/:"
+    ls -la /app/relay/src/public/dashboard/ 2>/dev/null || echo "    ❌ /app/relay/src/public/dashboard/ does not exist"
+    echo "  - Checking /app/relay/src/public/dashboard/dist/:"
+    ls -la "$DASHBOARD_DIST_DIR" 2>/dev/null || echo "    ❌ $DASHBOARD_DIST_DIR does not exist"
 fi
 
 # Execute the main container command (supervisord)
