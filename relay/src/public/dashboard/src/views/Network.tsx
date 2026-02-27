@@ -13,8 +13,8 @@ interface ReputationEntry {
   host: string;
   calculatedScore?: { total: number };
   uptimePercent?: number;
-  proofsSuccessful?: number;
-  proofsTotal?: number;
+  storageUsedMB?: number;
+  ipfsPinsCount?: number;
 }
 
 interface GunPeerEntry {
@@ -280,7 +280,8 @@ function Network() {
                     <th>Score</th>
                     <th>Tier</th>
                     <th>Uptime</th>
-                    <th>Proofs</th>
+                    <th>Storage</th>
+                    <th>Pins</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -306,7 +307,10 @@ function Network() {
                         </td>
                         <td>{(relay.uptimePercent || 0).toFixed(1)}%</td>
                         <td>
-                          {relay.proofsSuccessful || 0}/{relay.proofsTotal || 0}
+                          {(relay.storageUsedMB || 0).toFixed(0)} MB
+                        </td>
+                        <td>
+                          {relay.ipfsPinsCount || 0}
                         </td>
                       </tr>
                     );
