@@ -168,9 +168,7 @@ You can implement **stealth address** workflows:
 
 You can set up:
 
-- **shogun-message-bridge**: Telegram, Matrix, WhatsApp, Mastodon → GunDB
 - **shogun-wormhole**: P2P file transfer with IPFS backend and human-readable codes
-- **shogun-iframechat**: Embeddable chat via postMessage API
 - **shogun-auth**: Cross-app authentication provider with credential transfer
 
 ---
@@ -190,7 +188,7 @@ You can set up:
 1. **Start with shogun-starter**: Clone the template for new projects
 2. **Configure relays**: Use `shogun-relays` for auto-discovery or point to your own `shogun-relay`
 3. **Choose auth methods**: Enable only what you need in `ShogunCore` config
-4. **Use existing components**: `shogun-button-react` for auth UI, `shogun-iframechat` for chat
+4. **Use existing components**: `shogun-button-react` for auth UI, `shogun-linda` for messaging
 5. **Deploy to Base**: Use `shogun-contracts` for any on-chain functionality
 
 ### Security Mandates

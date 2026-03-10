@@ -7,10 +7,8 @@ interface StorageStats {
   data: { formatted: string; files: number };
   radata: { formatted: string; files: number; description: string };
   breakdown: {
-    torrents: { formatted: string; files: number };
     ipfs: { formatted: string; files: number };
     gundb: { formatted: string; files: number };
-    deals: { formatted: string; files: number };
   };
 }
 
@@ -506,28 +504,10 @@ function Settings() {
                     </div>
                   </div>
                   <div className="bg-base-200 p-3 rounded-lg">
-                    <div className="text-sm font-medium">🧲 Torrents</div>
-                    <div className="text-lg font-bold">
-                      {storageStats.breakdown.torrents.formatted}
-                    </div>
-                    <div className="text-xs text-base-content/60">
-                      {storageStats.breakdown.torrents.files} files
-                    </div>
-                  </div>
-                  <div className="bg-base-200 p-3 rounded-lg">
                     <div className="text-sm font-medium">📌 IPFS</div>
                     <div className="text-lg font-bold">{storageStats.breakdown.ipfs.formatted}</div>
                     <div className="text-xs text-base-content/60">
                       {storageStats.breakdown.ipfs.files} files
-                    </div>
-                  </div>
-                  <div className="bg-base-200 p-3 rounded-lg">
-                    <div className="text-sm font-medium">💼 Deals</div>
-                    <div className="text-lg font-bold">
-                      {storageStats.breakdown.deals.formatted}
-                    </div>
-                    <div className="text-xs text-base-content/60">
-                      {storageStats.breakdown.deals.files} files
                     </div>
                   </div>
                   <div className="bg-base-200 p-3 rounded-lg">
