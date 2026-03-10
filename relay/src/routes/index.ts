@@ -930,9 +930,7 @@ export default (app: express.Application) => {
       // Calculate sizes for each directory
       const dataStats = getDirSize(dataDir);
       const radataStats = getDirSize(radataDir);
-      const torrentsStats = getDirSize(path.join(dataDir, "torrents"));
       const ipfsStats = getDirSize(path.join(dataDir, "ipfs"));
-      const dealsStats = getDirSize(path.join(dataDir, "deals"));
 
       // Get GunDB storage stats from the configured backend (sqlite, s3, or radisk)
       // Pass the store instance if available for accurate stats
@@ -957,11 +955,6 @@ export default (app: express.Application) => {
             description: "GunDB radix storage",
           },
           breakdown: {
-            torrents: {
-              ...formatSize(torrentsStats.bytes),
-              path: path.join(dataDir, "torrents"),
-              files: torrentsStats.files,
-            },
             ipfs: {
               ...formatSize(ipfsStats.bytes),
               path: path.join(dataDir, "ipfs"),
@@ -974,11 +967,6 @@ export default (app: express.Application) => {
               description: gundbStats.description,
               ...(gundbStats.path ? { path: gundbStats.path } : {}),
               ...(gundbStats.bucket ? { bucket: gundbStats.bucket, endpoint: gundbStats.endpoint } : {}),
-            },
-            deals: {
-              ...formatSize(dealsStats.bytes),
-              path: path.join(dataDir, "deals"),
-              files: dealsStats.files,
             },
           },
         },
