@@ -69,7 +69,7 @@ router.get("/alldata", adminAuthMiddleware, (req, res) => {
 });
 
 // Stats endpoint (Public)
-router.get("/stats", (req, res) => {
+router.get("/stats", adminAuthMiddleware, (req, res) => {
   try {
     const now = Date.now();
     const uptime = process.uptime() * 1000; // Convert to milliseconds
