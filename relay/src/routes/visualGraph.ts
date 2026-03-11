@@ -86,6 +86,14 @@ router.get("/*", (req: Request, res: Response): void => {
   loggers.visualGraph.info({ requestedPath }, "Visual Graph static file requested");
   loggers.visualGraph.info({ filePath }, "Resolved file path");
 
+  // Prevent path traversal attacks
+  const targetDir = path.resolve(publicPath, "visualGraph");
+  if (!filePath.startsWith(targetDir + path.sep) && filePath !== targetDir) {
+    loggers.visualGraph.warn({ requestedPath, filePath }, "Path traversal attempt blocked");
+    res.status(403).send("Forbidden");
+    return;
+  }
+
   if (fs.existsSync(filePath)) {
     loggers.visualGraph.info({ filePath }, "File found, serving");
 
