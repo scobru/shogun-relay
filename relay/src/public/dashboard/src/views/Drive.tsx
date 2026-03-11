@@ -39,7 +39,29 @@ function Drive() {
   const downloadFile = async (filePath: string) => { try { const res = await fetch(`/api/v1/drive/download/${encodeURIComponent(filePath)}`, { headers: getAuthHeaders() }); if (!res.ok) throw new Error('Download failed'); const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filePath.split('/').pop() || 'file'; document.body.appendChild(a); a.click(); document.body.removeChild(a); window.URL.revokeObjectURL(url) } catch {} }
   const deleteItem = async (itemPath: string) => { if (!confirm(`Delete "${itemPath.split('/').pop()}"?`)) return; try { const res = await fetch(`/api/v1/drive/delete/${encodeURIComponent(itemPath)}`, { method: 'DELETE', headers: getAuthHeaders() }); const data = await res.json(); if (data.success) { loadFiles(); loadStats() } } catch {} }
   const createFolder = async () => { if (!newFolderName.trim()) return; try { const path = currentPath ? `${currentPath}/${newFolderName}` : newFolderName; const res = await fetch('/api/v1/drive/mkdir', { method: 'POST', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) }); const data = await res.json(); if (data.success) { setShowFolderModal(false); setNewFolderName(''); loadFiles(); loadStats() } } catch {} }
-  const uploadFiles = async () => { if (selectedFiles.length === 0) return; setUploading(true); try { for (const file of selectedFiles) { const formData = new FormData(); formData.append('file', file); if (currentPath) formData.append('path', currentPath); await fetch('/api/v1/drive/upload', { method: 'POST', headers: getAuthHeaders(), body: formData }) }; setShowUploadModal(false); setSelectedFiles([]); loadFiles(); loadStats() } catch {} finally { setUploading(false) } }
+  const uploadFiles = async () => {
+    if (selectedFiles.length === 0) return;
+    setUploading(true);
+    try {
+      // ⚡ Bolt: Use chunked parallel uploads to speed up multi-file transfers without overwhelming browser/server
+      const CHUNK_SIZE = 5;
+      for (let i = 0; i < selectedFiles.length; i += CHUNK_SIZE) {
+        const chunk = selectedFiles.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map(async (file) => {
+          const formData = new FormData();
+          formData.append('file', file);
+          if (currentPath) formData.append('path', currentPath);
+          return fetch('/api/v1/drive/upload', { method: 'POST', headers: getAuthHeaders(), body: formData });
+        }));
+      }
+      setShowUploadModal(false);
+      setSelectedFiles([]);
+      loadFiles();
+      loadStats();
+    } catch {} finally {
+      setUploading(false);
+    }
+  }
   const getBreadcrumbs = () => { const parts = currentPath.split('/').filter((p: string) => p); const crumbs = [{ name: 'Home', path: '' }]; let path = ''; parts.forEach((part: string) => { path += (path ? '/' : '') + part; crumbs.push({ name: part, path }) }); return crumbs }
 
   const handleRename = async () => {
@@ -97,21 +119,26 @@ function Drive() {
     if (files.length === 0) return
     setUploading(true)
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        // @ts-ignore - webkitRelativePath is available for folder uploads
-        const relativePath = file.webkitRelativePath || file.name
-        const fullPath = currentPath ? `${currentPath}/${relativePath}` : relativePath
-        
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('path', fullPath.split('/').slice(0, -1).join('/')) // Directory path
-        
-        await fetch('/api/v1/drive/upload', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: formData
-        })
+      // ⚡ Bolt: Use chunked parallel uploads for folders to dramatically speed up deep directory structures
+      const CHUNK_SIZE = 5;
+      const fileArray = Array.from(files);
+      for (let i = 0; i < fileArray.length; i += CHUNK_SIZE) {
+        const chunk = fileArray.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map(async (file) => {
+          // @ts-ignore - webkitRelativePath is available for folder uploads
+          const relativePath = file.webkitRelativePath || file.name
+          const fullPath = currentPath ? `${currentPath}/${relativePath}` : relativePath
+
+          const formData = new FormData()
+          formData.append('file', file)
+          formData.append('path', fullPath.split('/').slice(0, -1).join('/')) // Directory path
+
+          return fetch('/api/v1/drive/upload', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: formData
+          })
+        }));
       }
       loadFiles()
       loadStats()
