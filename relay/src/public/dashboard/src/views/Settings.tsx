@@ -271,6 +271,7 @@ function Settings() {
                   type="password"
                   className="input input-bordered join-item flex-1"
                   placeholder="Admin password"
+                  aria-label="Admin password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && handleLogin()}
