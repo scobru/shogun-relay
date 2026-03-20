@@ -45,6 +45,7 @@ import {
 import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/peer-discovery";
 
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
+import { chatService } from "./utils/chat-service";
 
 // Route Imports
 
@@ -637,6 +638,9 @@ async function initializeServer() {
   (Gun as any).serve(app);
 
   const gun = (Gun as any)(gunConfig);
+
+  // Initialize chat service
+  chatService.initialize(gun);
 
 
 

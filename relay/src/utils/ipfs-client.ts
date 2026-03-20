@@ -53,15 +53,11 @@ async function checkIpfsReady(timeout: number = 2000): Promise<boolean> {
     };
 
     if (IPFS_API_TOKEN) {
-      const headers = options.headers || {};
-      if (Array.isArray(headers)) {
-        options.headers = [...headers, ["Authorization", `Bearer ${IPFS_API_TOKEN}`]];
-      } else {
-        options.headers = {
-          ...headers,
-          Authorization: `Bearer ${IPFS_API_TOKEN}`,
-        };
-      }
+      const headers = (options.headers || {}) as Record<string, string | string[] | number | undefined>;
+      options.headers = {
+        ...headers,
+        Authorization: `Bearer ${IPFS_API_TOKEN}`,
+      };
     }
 
     const req = httpModule.request(options, (res) => {
@@ -171,18 +167,11 @@ async function ipfsRequest(
         };
 
         if (IPFS_API_TOKEN) {
-          const reqHeaders = requestOptions.headers || {};
-          if (Array.isArray(reqHeaders)) {
-            requestOptions.headers = {
-              ...(reqHeaders as unknown as Record<string, string>),
-              Authorization: `Bearer ${IPFS_API_TOKEN}`,
-            };
-          } else {
-            requestOptions.headers = {
-              ...(reqHeaders as Record<string, string>),
-              Authorization: `Bearer ${IPFS_API_TOKEN}`,
-            };
-          }
+          const reqHeaders = (requestOptions.headers || {}) as Record<string, string | string[] | number | undefined>;
+          requestOptions.headers = {
+            ...reqHeaders,
+            Authorization: `Bearer ${IPFS_API_TOKEN}`,
+          };
         }
 
         const req = httpModule.request(requestOptions, (res) => {
@@ -306,15 +295,11 @@ async function ipfsUpload(
         };
 
         if (IPFS_API_TOKEN) {
-          const reqHeaders = requestOptions.headers || {};
-          if (Array.isArray(reqHeaders)) {
-            requestOptions.headers = [...reqHeaders, ["Authorization", `Bearer ${IPFS_API_TOKEN}`]];
-          } else {
-            requestOptions.headers = {
-              ...reqHeaders,
-              Authorization: `Bearer ${IPFS_API_TOKEN}`,
-            };
-          }
+          const reqHeaders = (requestOptions.headers || {}) as Record<string, string | string[] | number | undefined>;
+          requestOptions.headers = {
+            ...reqHeaders,
+            Authorization: `Bearer ${IPFS_API_TOKEN}`,
+          };
         }
 
         const req = httpModule.request(requestOptions, (res) => {

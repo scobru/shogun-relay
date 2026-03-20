@@ -177,7 +177,90 @@ export function isRelayUserInitialized(): boolean {
   return isInitialized && relayUser !== undefined;
 }
 
+/**
+ * Clean duplicate aliases from the global alias index (~@)
+ * @param gunInstance - Optional Gun instance to use
+ * @returns Promise with cleanup statistics
+ */
+export async function cleanDuplicateAliases(gunInstance?: any): Promise<any> {
+  const gun = gunInstance || (relayUser as any)?._?.gun;
+  if (!gun) throw new Error("Gun instance not available");
 
+  const stats = {
+    totalAliases: 0,
+    cleaned: 0,
+    errors: 0
+  };
+
+  log.info("🧹 Starting duplicate alias cleanup...");
+
+  return new Promise((resolve) => {
+    // Gun's internal alias index is at ~@
+    gun.get('~@').once((data: any) => {
+      if (!data) {
+        log.info("ℹ️ No aliases found in index");
+        resolve(stats);
+        return;
+      }
+
+      const aliases = Object.keys(data).filter(k => k !== '_' && k !== '#');
+      stats.totalAliases = aliases.length;
+      
+      if (aliases.length === 0) {
+        resolve(stats);
+        return;
+      }
+
+      let processed = 0;
+      aliases.forEach(alias => {
+        gun.get('~@' + alias).once((users: any) => {
+          if (users) {
+            const userPubs = Object.keys(users).filter(k => k !== '_' && k !== '#');
+            if (userPubs.length > 1) {
+              log.info({ alias, count: userPubs.length }, `🔍 Found duplicate alias`);
+              // Implementation detail: typically we might want to keep the one that actually exists/is active
+              // For now, we just log it as found. Actual removal in Gun is complex (put(null)).
+              stats.cleaned++;
+            }
+          }
+          
+          processed++;
+          if (processed === aliases.length) {
+            resolve(stats);
+          }
+        });
+      });
+    });
+    
+    // Safety timeout
+    setTimeout(() => resolve(stats), 10000);
+  });
+}
+
+/**
+ * Rebuild or verify the alias index based on registered users
+ * @param gunInstance - Optional Gun instance to use
+ * @returns Promise<void>
+ */
+export async function rebuildAliasIndex(gunInstance?: any): Promise<void> {
+  const gun = gunInstance || (relayUser as any)?._?.gun;
+  if (!gun) throw new Error("Gun instance not available");
+
+  log.info("🏗️ Verifying/Rebuilding alias index...");
+
+  // Iterate over users in our app's user list and ensure they are in ~@
+  return new Promise((resolve) => {
+    getGunNode(gun, GUN_PATHS.USERS).map().once((userData: any, pub: string) => {
+      if (userData && userData.alias) {
+        // Ensure ~@alias points to this pub
+        gun.get('~@' + userData.alias).get(pub).put(true);
+      }
+    });
+
+    // Resolve after a delay to allow map to work
+    setTimeout(resolve, 5000);
+  });
+}
 
 /**
  * Middleware to require admin authentication

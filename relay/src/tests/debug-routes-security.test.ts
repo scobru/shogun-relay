@@ -13,6 +13,12 @@ vi.mock("../utils/logger", () => ({
       error: vi.fn(),
       debug: vi.fn(),
     },
+    relayUser: {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    },
   },
 }));
 
@@ -31,6 +37,7 @@ const mockGun = {
     cb({ mbUsed: 50 });
     return mockGun;
   }),
+  map: vi.fn().mockReturnThis(),
 };
 
 describe("Debug Routes Security", () => {
@@ -94,7 +101,7 @@ describe("Debug Routes Security", () => {
         "Authorization": "Bearer test-password"
       }
     });
-    // It returns 200 with "Not implemented" message in current implementation
+    
     expect(res.status).toBe(200);
   });
 

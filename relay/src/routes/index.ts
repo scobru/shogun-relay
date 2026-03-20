@@ -72,6 +72,7 @@ import networkRouter from "./network";
 import driveRouter from "./drive";
 import apiKeysRouter from "./api-keys";
 import authRouter from "./auth";
+import chatRouter from "./chat";
 
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
@@ -584,10 +585,12 @@ export default (app: express.Application) => {
   // Route di autenticazione
   app.use(`${baseRoute}/auth`, authRouter);
 
-
-
+  // Route per Chat (always enabled)
+  app.use(`${baseRoute}/chat`, chatRouter);
+  loggers.server.info(`✅ Chat routes registered`);
 
   // Route per API Keys (always enabled, admin-only)
+
   // Initialize API Keys Manager lazily on first request
   app.use(`${baseRoute}/api-keys`, async (req: Request, res: Response, next: NextFunction) => {
     const gun = req.app.get("gunInstance");

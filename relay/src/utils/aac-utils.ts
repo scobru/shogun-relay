@@ -5,7 +5,7 @@
  * @see https://annas-archive.org/blog/annas-archive-containers.html
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 
 // AAC Format: aacid__{collection}__{timestamp}__{collection_id}__{shortuuid}
 const AAC_PREFIX = 'aacid';
@@ -31,7 +31,7 @@ export function formatAACTimestamp(date: Date = new Date()): string {
  * Converts UUID to a shorter alphanumeric representation
  */
 export function generateShortUUID(): string {
-  const uuid = uuidv4().replace(/-/g, '');
+  const uuid = crypto.randomUUID().replace(/-/g, '');
   // Convert hex to base64url-like (alphanumeric only)
   const bytes = Buffer.from(uuid, 'hex');
   return bytes.toString('base64url').substring(0, 22);
