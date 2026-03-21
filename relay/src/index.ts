@@ -87,7 +87,6 @@ async function initializeServer() {
   loggers.server.info("🚀 Initializing Shogun Relay Server...");
   loggers.server.info("🚀 Shogun Relay v1.0.1 - FORCE UPDATE");
 
-  // Moved drive public links init to after app declaration
 
   /**
    * System logging function (console only, no GunDB storage)
@@ -320,7 +319,6 @@ async function initializeServer() {
     "/charts",
     "/upload",
     "/pin-manager",
-    "/drive",
     "/api-keys",
   ];
 
@@ -660,36 +658,6 @@ async function initializeServer() {
   // They occur when using content-addressed storage with # namespace
   // The data is still saved correctly - this is just GunDB's internal verification
   // These warnings don't affect functionality and can be safely ignored
-
-  // Force initialize drive public links manager if relay user is ready
-  setTimeout(async () => {
-    try {
-      const { initDrivePublicLinks, isPublicLinksInitialized } = await import("./routes/drive");
-
-      // If already initialized, skip
-      if (isPublicLinksInitialized()) return;
-
-      const { getRelayUser, isRelayUserInitialized, getRelayPub } =
-        await import("./utils/relay-user");
-
-      if (isRelayUserInitialized()) {
-        const relayUser = getRelayUser();
-        const relayPub = getRelayPub();
-        const gun = app.get("gunInstance");
-
-        if (gun && relayPub && relayUser) {
-          initDrivePublicLinks(gun, relayPub, relayUser);
-          loggers.server.info("✅ DrivePublicLinksManager initialized via delayed startup check");
-        } else {
-          loggers.server.info(
-            "✅ Relay User ready. Drive Manager will initialize on first request."
-          );
-        }
-      }
-    } catch (err) {
-      loggers.server.error({ err }, "Failed to verify drive init status");
-    }
-  }, 10000);
 
   // Initialize Relay User for x402 subscriptions
   // This user owns the subscription data in GunDB

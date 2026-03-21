@@ -7,7 +7,6 @@ const pageTitles: Record<string, { title: string; description: string }> = {
   "/stats": { title: "Live Stats", description: "Real-time metrics and monitoring" },
   "/services": { title: "Services", description: "Monitor and control system services" },
   "/files": { title: "Files", description: "IPFS pin management and uploads" },
-  "/drive": { title: "Drive", description: "Private file storage" },
   "/explore": { title: "Explore", description: "Graph explorer and visualization" },
   "/network": { title: "Network", description: "Network statistics and peers" },
   "/settings": { title: "Settings", description: "API keys and configuration" },

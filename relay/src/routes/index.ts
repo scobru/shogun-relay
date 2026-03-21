@@ -69,7 +69,6 @@ import servicesRouter from "./services";
 import visualGraphRouter from "./visualGraph";
 import networkRouter from "./network";
 // torrentRouter removed
-import driveRouter from "./drive";
 import apiKeysRouter from "./api-keys";
 import authRouter from "./auth";
 import chatRouter from "./chat";
@@ -464,10 +463,6 @@ export default (app: express.Application) => {
     res.sendFile(path.resolve(publicPath, "upload.html"));
   });
 
-  app.get("/drive", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "drive.html"));
-  });
 
   app.get("/api-keys", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
@@ -614,37 +609,6 @@ export default (app: express.Application) => {
   app.use(`${baseRoute}/api-keys`, apiKeysRouter);
   loggers.server.info(`✅ API Keys routes registered`);
 
-  // Route per Drive (always enabled, admin-only)
-  // Initialize public links manager on EVERY drive request (middleware runs before router)
-  // Route per Drive (always enabled, admin-only)
-  // Initialize public links manager on EVERY drive request (middleware runs before router)
-  const driveInitMiddleware = async (req: Request, res: Response, next: NextFunction) => {
-    // Delegate to the robust middleware exported from drive.ts
-    try {
-      const { ensurePublicLinksInitialized } = await import("./drive");
-      await ensurePublicLinksInitialized(req, res, next);
-    } catch (err) {
-      loggers.server.error({ err }, "Error in driveInitMiddleware wrapper");
-      next();
-    }
-  };
-
-  // Apply initialization middleware to all drive routes
-  app.use(`${baseRoute}/drive`, driveInitMiddleware);
-  app.use(`${baseRoute}/drive`, driveRouter);
-
-  // Public endpoint for accessing files via share links (NO AUTH REQUIRED)
-  // This uses the same initialization middleware to ensure manager is ready
-  app.get(
-    `${baseRoute}/drive/public/:linkId`,
-    driveInitMiddleware,
-    async (req: Request, res: Response) => {
-      const { handlePublicLinkAccess } = await import("./drive");
-      handlePublicLinkAccess(req, res);
-    }
-  );
-
-  loggers.server.info(`✅ Drive routes registered`);
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {

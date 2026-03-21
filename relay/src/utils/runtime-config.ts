@@ -70,8 +70,6 @@ export const RESTART_REQUIRED_KEYS = [
   "STORAGE_TYPE",
   "DISABLE_RADISK",
 
-  // Drive
-  "DRIVE_DATA_DIR",
 ] as const;
 
 export type RestartRequiredKey = (typeof RESTART_REQUIRED_KEYS)[number];
@@ -275,7 +273,6 @@ export function getAllConfig(): ConfigInfo[] {
     if (key.startsWith("IPFS_")) return "IPFS";
     if (key.startsWith("WORMHOLE_")) return "Wormhole";
 
-    if (key.startsWith("DRIVE_")) return "Drive";
     if (key.includes("STORAGE") || key === "DATA_DIR") return "Storage";
     if (key.includes("PASSWORD") || key.includes("KEY") || key.includes("TOKEN")) return "Security";
     return "Other";

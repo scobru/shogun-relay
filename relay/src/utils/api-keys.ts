@@ -1,7 +1,7 @@
 /**
  * API Keys Manager
  *
- * Generic API key management service, usable across all relay services (Drive, IPFS, etc.)
+ * Generic API key management service, usable across all relay services (IPFS, etc.)
  * Keys are stored in GunDB user space
  */
 

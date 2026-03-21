@@ -2,7 +2,7 @@
  * Admin or API Key Authentication Middleware
  *
  * Accepts either admin token OR valid API key
- * Can be used by any service (IPFS, Drive, etc.)
+ * Can be used by any service (IPFS, etc.)
  */
 
 import { Request, Response, NextFunction } from "express";
