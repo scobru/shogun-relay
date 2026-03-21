@@ -626,6 +626,13 @@ router.get("/services/:name/logs", adminAuthMiddleware, (req, res) => {
     // Normalize service name
     const normalizedName = (serviceName as string).toLowerCase().replace(/%20/g, ' ').trim();
 
+    if (normalizedName.includes("..") || normalizedName.includes("/") || normalizedName.includes("\\")) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid service name",
+      });
+    }
+
     if (normalizedName.includes("ipfs")) {
       // Check common IPFS log locations or PM2
       logFile = "/var/log/supervisor/ipfs.log"; // Supervisor default
