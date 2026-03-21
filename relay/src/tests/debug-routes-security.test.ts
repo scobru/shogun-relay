@@ -1,4 +1,3 @@
-
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import express from "express";
 import debugRouter from "../routes/debug";
@@ -81,8 +80,8 @@ describe("Debug Routes Security", () => {
     const res = await fetch(`${baseUrl}/debug/user-mb-usage/test-user/reset`, {
       method: "POST",
       headers: {
-        "Authorization": "Bearer test-password"
-      }
+        Authorization: "Bearer test-password",
+      },
     });
     expect(res.status).toBe(200);
   });
@@ -98,10 +97,10 @@ describe("Debug Routes Security", () => {
     const res = await fetch(`${baseUrl}/debug/cleanup-aliases`, {
       method: "POST",
       headers: {
-        "Authorization": "Bearer test-password"
-      }
+        Authorization: "Bearer test-password",
+      },
     });
-    
+
     expect(res.status).toBe(200);
   });
 

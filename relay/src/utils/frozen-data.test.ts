@@ -17,14 +17,14 @@ vi.mock("./logger", () => ({
 
 // Mock Gun chain
 const mockChain = {
-    get: vi.fn().mockReturnThis(),
-    put: vi.fn().mockReturnThis(),
-    once: vi.fn(),
-    map: vi.fn().mockReturnThis(),
+  get: vi.fn().mockReturnThis(),
+  put: vi.fn().mockReturnThis(),
+  once: vi.fn(),
+  map: vi.fn().mockReturnThis(),
 };
 
 const mockGun = {
-    get: vi.fn().mockReturnValue(mockChain),
+  get: vi.fn().mockReturnValue(mockChain),
 } as any;
 
 describe("Frozen Data Utility", () => {
@@ -35,7 +35,7 @@ describe("Frozen Data Utility", () => {
     mockChain.get.mockReturnThis();
     mockChain.put.mockReturnThis();
     mockChain.once.mockImplementation((cb: any) => {
-        cb(undefined);
+      cb(undefined);
     });
   });
 
@@ -44,7 +44,7 @@ describe("Frozen Data Utility", () => {
     const data = { hello: "world" };
 
     // Spy on SEA.work
-    const seaWorkSpy = vi.spyOn(Gun.SEA, 'work');
+    const seaWorkSpy = vi.spyOn(Gun.SEA, "work");
 
     const result = await createFrozenEntry(mockGun, data, pair, "test-namespace");
 

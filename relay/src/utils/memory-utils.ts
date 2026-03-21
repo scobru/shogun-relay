@@ -1,13 +1,13 @@
 /**
  * Memory Utilities for Monitoring and Garbage Collection
- * 
+ *
  * Provides tools for monitoring heap usage, triggering GC, and detecting memory pressure.
  * Used to prevent out-of-memory crashes during heavy operations.
- * 
+ *
  * @module utils/memory-utils
  */
 
-import { loggers } from './logger';
+import { loggers } from "./logger";
 
 const log = loggers.server;
 
@@ -25,7 +25,10 @@ export interface MemoryStats {
 /**
  * Default heap limit in MB (Node.js default or from --max-old-space-size)
  */
-const DEFAULT_HEAP_LIMIT_MB = parseInt(process.env.NODE_OPTIONS?.match(/--max-old-space-size=(\d+)/)?.[1] || '4096', 10);
+const DEFAULT_HEAP_LIMIT_MB = parseInt(
+  process.env.NODE_OPTIONS?.match(/--max-old-space-size=(\d+)/)?.[1] || "4096",
+  10
+);
 
 /**
  * Get current memory usage statistics
@@ -73,7 +76,7 @@ export function triggerGC(): boolean {
       global.gc();
       return true;
     } catch (e) {
-      log.debug('Failed to trigger garbage collection');
+      log.debug("Failed to trigger garbage collection");
       return false;
     }
   }
@@ -101,10 +104,11 @@ export function performMemoryCleanup(label?: string): void {
     const afterStats = getMemoryUsage();
     const freedMB = beforeStats.heapUsedMB - afterStats.heapUsedMB;
 
-    if (freedMB > 10) { // Only log if significant memory was freed
+    if (freedMB > 10) {
+      // Only log if significant memory was freed
       log.debug(
         { label, freedMB, newHeapMB: afterStats.heapUsedMB },
-        `🧹 GC freed ${freedMB}MB${label ? ` after ${label}` : ''}`
+        `🧹 GC freed ${freedMB}MB${label ? ` after ${label}` : ""}`
       );
     }
   }
@@ -128,4 +132,3 @@ export function checkAndWarnMemory(operation: string): boolean {
   }
   return false;
 }
-

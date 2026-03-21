@@ -619,7 +619,8 @@ The wallet signature method is deprecated.`,
                         properties: {
                           hint: {
                             type: "string",
-                            example: "Sign 'I Love Shogun' with your wallet and provide X-Wallet-Signature header",
+                            example:
+                              "Sign 'I Love Shogun' with your wallet and provide X-Wallet-Signature header",
                           },
                         },
                       },
@@ -1343,8 +1344,6 @@ The wallet signature method is deprecated.`,
         },
       },
 
-
-
       "/api/v1/user-uploads/save-system-hash": {
         post: {
           tags: ["User Uploads"],
@@ -1436,8 +1435,6 @@ The wallet signature method is deprecated.`,
           },
         },
       },
-
-
 
       "/api/v1/user-uploads/remove-system-hash/{cid}": {
         delete: {
@@ -1637,7 +1634,8 @@ The wallet signature method is deprecated.`,
         post: {
           tags: ["Admin Drive"],
           summary: "Upload file(s) to root",
-          description: "Upload one or multiple files to the root directory. Use 'file' field for single file, 'files' field for multiple files.",
+          description:
+            "Upload one or multiple files to the root directory. Use 'file' field for single file, 'files' field for multiple files.",
           operationId: "uploadDriveFilesRoot",
           security: [{ bearerAuth: [] }, { tokenHeader: [] }],
           requestBody: {
@@ -2232,7 +2230,8 @@ The wallet signature method is deprecated.`,
         post: {
           tags: ["API Keys"],
           summary: "Create API key",
-          description: "Generate a new API key for programmatic access to all relay services (Drive, IPFS, etc.). Requires admin authentication.",
+          description:
+            "Generate a new API key for programmatic access to all relay services (Drive, IPFS, etc.). Requires admin authentication.",
           operationId: "createApiKey",
           security: [{ bearerAuth: [] }, { tokenHeader: [] }],
           requestBody: {
@@ -2417,7 +2416,8 @@ The wallet signature method is deprecated.`,
         post: {
           tags: ["Admin Drive"],
           summary: "Create public link",
-          description: "Create a public sharing link for a file. Requires admin or API key authentication.",
+          description:
+            "Create a public sharing link for a file. Requires admin or API key authentication.",
           operationId: "createDrivePublicLink",
           security: [{ bearerAuth: [] }, { tokenHeader: [] }],
           requestBody: {
@@ -2618,4 +2618,3 @@ The wallet signature method is deprecated.`,
     },
   };
 }
-

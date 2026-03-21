@@ -12,11 +12,11 @@ const router: express.Router = express.Router();
 router.get("/peers", adminAuthMiddleware, (req, res) => {
   try {
     const conversations = chatService.getConversations();
-    const peers = conversations.map(c => c.pub);
+    const peers = conversations.map((c) => c.pub);
     res.json({
       success: true,
       peers,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "❌ Chat peers error");
@@ -34,7 +34,7 @@ router.get("/conversations", adminAuthMiddleware, (req, res) => {
     res.json({
       success: true,
       conversations,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "❌ Chat conversations error");
@@ -53,10 +53,10 @@ router.get("/messages/:pub", adminAuthMiddleware, async (req, res) => {
     res.json({
       success: true,
       messages,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   } catch (error: any) {
-    loggers.server.error({ err: error, pub: (req.params.pub as string) }, "❌ Chat history error");
+    loggers.server.error({ err: error, pub: req.params.pub as string }, "❌ Chat history error");
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -77,10 +77,10 @@ router.post("/messages/:pub", adminAuthMiddleware, async (req, res) => {
     const success = await chatService.sendMessage(pub, text);
     res.json({
       success,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   } catch (error: any) {
-    loggers.server.error({ err: error, pub: (req.params.pub as string) }, "❌ Send message error");
+    loggers.server.error({ err: error, pub: req.params.pub as string }, "❌ Send message error");
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -96,10 +96,10 @@ router.post("/sync/:pub", adminAuthMiddleware, async (req, res) => {
     res.json({
       success: true,
       message: `Sync started for ${pub}`,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   } catch (error: any) {
-    loggers.server.error({ err: error, pub: (req.params.pub as string) }, "❌ Sync chat error");
+    loggers.server.error({ err: error, pub: req.params.pub as string }, "❌ Sync chat error");
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -110,12 +110,12 @@ router.post("/sync/:pub", adminAuthMiddleware, async (req, res) => {
  */
 router.get("/lobby", adminAuthMiddleware, (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string || "") || 50;
+    const limit = parseInt((req.query.limit as string) || "") || 50;
     const messages = chatService.getLobbyMessages(limit);
     res.json({
       success: true,
       messages,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "❌ Lobby messages error");
@@ -138,7 +138,7 @@ router.post("/lobby", adminAuthMiddleware, async (req, res) => {
     const success = await chatService.sendLobbyMessage(text);
     res.json({
       success,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "❌ Send lobby message error");
@@ -156,10 +156,13 @@ router.delete("/conversations/:pub", adminAuthMiddleware, async (req, res) => {
     const success = await chatService.clearConversation(pub);
     res.json({
       success,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   } catch (error: any) {
-    loggers.server.error({ err: error, pub: (req.params.pub as string) }, "❌ Delete conversation error");
+    loggers.server.error(
+      { err: error, pub: req.params.pub as string },
+      "❌ Delete conversation error"
+    );
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -170,14 +173,18 @@ router.delete("/conversations/:pub", adminAuthMiddleware, async (req, res) => {
  */
 router.delete("/messages/:pub/:messageId", adminAuthMiddleware, async (req, res) => {
   try {
-    const pub = req.params.pub as string; const messageId = req.params.messageId as string;
+    const pub = req.params.pub as string;
+    const messageId = req.params.messageId as string;
     const success = await chatService.deleteMessage(pub, messageId);
     res.json({
       success,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   } catch (error: any) {
-    loggers.server.error({ err: error, pub: (req.params.pub as string), messageId: (req.params.messageId as string) }, "❌ Delete message error");
+    loggers.server.error(
+      { err: error, pub: req.params.pub as string, messageId: req.params.messageId as string },
+      "❌ Delete message error"
+    );
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -189,7 +196,7 @@ router.delete("/messages/:pub/:messageId", adminAuthMiddleware, async (req, res)
 router.post("/console", adminAuthMiddleware, (req, res) => {
   res.status(501).json({
     success: false,
-    error: "Console commands are not implemented in this version"
+    error: "Console commands are not implemented in this version",
   });
 });
 

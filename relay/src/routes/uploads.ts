@@ -706,7 +706,10 @@ router.delete(
       // REFACTOR: Use direct function call instead of internal HTTP request to prevent SSRF
       try {
         await removeSystemHash(gun, hash);
-        loggers.uploads.info({ hash }, "Hash removed from systemhash node successfully (direct call)");
+        loggers.uploads.info(
+          { hash },
+          "Hash removed from systemhash node successfully (direct call)"
+        );
       } catch (error: any) {
         loggers.uploads.warn({ err: error }, `Failed to remove hash ${hash} from systemhash node`);
         // Continue even if systemhash removal fails

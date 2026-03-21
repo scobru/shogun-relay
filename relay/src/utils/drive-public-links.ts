@@ -1,6 +1,6 @@
 /**
  * Drive Public Links Manager
- * 
+ *
  * Manages public sharing links for drive files, stored in GunDB user space
  */
 
@@ -56,7 +56,10 @@ export class DrivePublicLinksManager {
 
   private getPublicLinksNode() {
     // Access public user space via ~ prefix
-    return this.gun.get("~" + this.relayPub).get("drive").get("public-links");
+    return this.gun
+      .get("~" + this.relayPub)
+      .get("drive")
+      .get("public-links");
   }
 
   /**
@@ -65,9 +68,7 @@ export class DrivePublicLinksManager {
   async createPublicLink(filePath: string, expiresInDays?: number): Promise<PublicLink> {
     const linkId = generateLinkId();
     const createdAt = Date.now();
-    const expiresAt = expiresInDays
-      ? createdAt + expiresInDays * 24 * 60 * 60 * 1000
-      : null;
+    const expiresAt = expiresInDays ? createdAt + expiresInDays * 24 * 60 * 60 * 1000 : null;
 
     const linkData: PublicLink = {
       linkId,
@@ -221,4 +222,3 @@ export class DrivePublicLinksManager {
     });
   }
 }
-

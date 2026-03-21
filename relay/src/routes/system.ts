@@ -1,6 +1,8 @@
 import express, { Request, Response, Router } from "express";
 import fs from "fs";
 import path from "path";
+import ip from "ip";
+import dns from "dns/promises";
 import { loggers } from "../utils/logger";
 import { packageConfig } from "../config";
 import { config } from "../config/env-config";
@@ -473,15 +475,15 @@ router.delete("/node/*", adminAuthMiddleware, async (req, res) => {
 // Logs endpoint for real-time relay logs from file
 router.get("/logs", adminAuthMiddleware, async (req, res) => {
   try {
-    const limit: number = parseInt(req.query.limit as string || "") || 100;
-    const tail: number = parseInt(req.query.tail as string || "") || 100; // Number of lines to read from end
+    const limit: number = parseInt((req.query.limit as string) || "") || 100;
+    const tail: number = parseInt((req.query.tail as string) || "") || 100; // Number of lines to read from end
 
     // Map of common log locations to check
     const logLocations = [
       "/var/log/supervisor/relay.log",
       path.join(process.cwd(), "logs", "relay.log"),
       path.join(process.cwd(), "relay.log"),
-      "/tmp/relay.log"
+      "/tmp/relay.log",
     ];
 
     let logFilePath = "";
@@ -672,15 +674,15 @@ router.post("/peers/add", adminAuthMiddleware, (req, res) => {
 router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
   try {
     const serviceName = req.params.name;
-    const limit = parseInt(req.query.limit as string || "") || 100;
-    const tail = parseInt(req.query.tail as string || "") || 100;
+    const limit = parseInt((req.query.limit as string) || "") || 100;
+    const tail = parseInt((req.query.tail as string) || "") || 100;
 
     // Map service names to log files
     // This assumes standard log locations or PM2 log naming convention
     let logFile = "";
 
     // Normalize service name
-    const normalizedName = (serviceName as string).toLowerCase().replace(/%20/g, ' ').trim();
+    const normalizedName = (serviceName as string).toLowerCase().replace(/%20/g, " ").trim();
 
     if (normalizedName.includes("..") || normalizedName.includes("/") || normalizedName.includes("\\")) {
       return res.status(400).json({
@@ -698,12 +700,17 @@ router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
       if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "relay.log");
     } else {
       // Generic fallback
-      logFile = `/var/log/supervisor/${normalizedName.replace(/\s+/g, '-')}.log`;
+      logFile = `/var/log/supervisor/${normalizedName.replace(/\s+/g, "-")}.log`;
     }
 
     if (!fs.existsSync(logFile)) {
       // Try PM2 convention if Supervisor not found
-      const pm2Log = path.join(process.env.HOME || '/root', '.pm2', 'logs', `${normalizedName.replace(/\s+/g, '-')}-out.log`);
+      const pm2Log = path.join(
+        process.env.HOME || "/root",
+        ".pm2",
+        "logs",
+        `${normalizedName.replace(/\s+/g, "-")}-out.log`
+      );
       if (fs.existsSync(pm2Log)) {
         logFile = pm2Log;
       } else {
@@ -711,25 +718,29 @@ router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
         // Return helpful message instead of 404
         return res.json({
           success: true,
-          logs: [{
-            id: 'info_0',
-            timestamp: new Date().toISOString(),
-            message: `Logs for ${serviceName} are managed by Docker/container orchestrator.`,
-            level: 'info'
-          }, {
-            id: 'info_1',
-            timestamp: new Date().toISOString(),
-            message: `Use 'docker logs <container>' to view container logs.`,
-            level: 'info'
-          }, {
-            id: 'info_2',
-            timestamp: new Date().toISOString(),
-            message: `Checked paths: ${logFile}, ${pm2Log}`,
-            level: 'debug'
-          }],
+          logs: [
+            {
+              id: "info_0",
+              timestamp: new Date().toISOString(),
+              message: `Logs for ${serviceName} are managed by Docker/container orchestrator.`,
+              level: "info",
+            },
+            {
+              id: "info_1",
+              timestamp: new Date().toISOString(),
+              message: `Use 'docker logs <container>' to view container logs.`,
+              level: "info",
+            },
+            {
+              id: "info_2",
+              timestamp: new Date().toISOString(),
+              message: `Checked paths: ${logFile}, ${pm2Log}`,
+              level: "debug",
+            },
+          ],
           count: 3,
           service: serviceName,
-          note: 'Log files not found at expected paths. Logs may be managed by Docker.'
+          note: "Log files not found at expected paths. Logs may be managed by Docker.",
         });
       }
     }
@@ -743,14 +754,14 @@ router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
       id: `l_${Date.now()}_${i}`,
       timestamp: new Date().toISOString(), // Placeholder, real parsing is complex
       message: line,
-      level: 'info'
+      level: "info",
     }));
 
     res.json({
       success: true,
       logs: formattedLogs,
       count: formattedLogs.length,
-      service: serviceName
+      service: serviceName,
     });
   } catch (error: any) {
     loggers.server.error({ err: error }, "❌ Service Logs error");
@@ -791,6 +802,41 @@ router.post("/rpc/execute", adminAuthMiddleware, async (req, res) => {
       });
     }
 
+    // SSRF Protection: Validate target URL and IP address
+    try {
+      const url = new URL(endpoint);
+
+      // Restrict protocols to HTTP/HTTPS
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        return res.status(403).json({
+          success: false,
+          error: "Invalid protocol. Only HTTP and HTTPS are allowed.",
+        });
+      }
+
+      // Resolve the hostname to an IP address
+      const { address } = await dns.lookup(url.hostname);
+
+      // Check for private, loopback, or cloud metadata IP addresses
+      const isLocalhost =
+        address === "127.0.0.1" || address === "::1" || address.startsWith("127.");
+      const isZero = address === "0.0.0.0" || address === "::";
+      const isAWSMetadata = address === "169.254.169.254";
+
+      if ((ip as any).isPrivate(address) || isLocalhost || isZero || isAWSMetadata) {
+        loggers.server.warn({ endpoint, address }, "Blocked SSRF attempt in RPC execute");
+        return res.status(403).json({
+          success: false,
+          error: "Access to private or internal network resources is forbidden.",
+        });
+      }
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        error: `Failed to resolve endpoint: ${error.message}`,
+      });
+    }
+
     // Execute RPC call
     const response = await fetch(endpoint, {
       method: "POST",
@@ -817,6 +863,5 @@ router.post("/rpc/execute", adminAuthMiddleware, async (req, res) => {
     });
   }
 });
-
 
 export default router;

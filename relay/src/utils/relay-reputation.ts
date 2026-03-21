@@ -406,7 +406,6 @@ export function calculateReputationScore(metrics: ReputationMetrics): Reputation
     scores.reliability = 50; // Default
   }
 
-
   // 11. Network Health Score (0-100)
   // Based on peer connections and reachability
   let peerScore = 50;
@@ -550,8 +549,8 @@ export async function recordProofSuccess(
           const newAvgResponseTime =
             (current.responseTimeSamples || 0) > 0
               ? ((current.avgResponseTimeMs || 0) * (current.responseTimeSamples || 0) +
-                responseTimeMs) /
-              ((current.responseTimeSamples || 0) + 1)
+                  responseTimeMs) /
+                ((current.responseTimeSamples || 0) + 1)
               : responseTimeMs;
 
           node.put({
@@ -593,8 +592,8 @@ export async function recordProofSuccess(
         const newAvgResponseTime =
           (current.responseTimeSamples || 0) > 0
             ? ((current.avgResponseTimeMs || 0) * (current.responseTimeSamples || 0) +
-              responseTimeMs) /
-            ((current.responseTimeSamples || 0) + 1)
+                responseTimeMs) /
+              ((current.responseTimeSamples || 0) + 1)
             : responseTimeMs;
 
         node.put({
@@ -946,10 +945,6 @@ export async function getReputationLeaderboard(
   });
 }
 
-
-
-
-
 /**
  * Update stored score (call periodically)
  * @param gun - GunDB instance
@@ -1056,7 +1051,6 @@ export async function recordResourceMetrics(
     releaseLock(relayHost);
   }
 }
-
 
 /**
  * Record data integrity check result

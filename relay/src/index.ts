@@ -1,4 +1,3 @@
-
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -37,11 +36,7 @@ import {
 } from "./config/env-config";
 
 import { startWormholeCleanup } from "./utils/wormhole-cleanup";
-import {
-  secureCompare,
-  hashToken,
-  createProductionErrorHandler,
-} from "./utils/security";
+import { secureCompare, hashToken, createProductionErrorHandler } from "./utils/security";
 import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/peer-discovery";
 
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
@@ -50,7 +45,6 @@ import { chatService } from "./utils/chat-service";
 // Route Imports
 
 // Middleware
-
 
 dotenv.config();
 
@@ -81,8 +75,6 @@ host = host.replace(/^https?:\/\//, "").replace(/\/$/, "");
 let port = serverConfig.port;
 let path_public = serverConfig.publicPath;
 
-
-
 /**
  * Main server initialization function
  * Sets up Express, GunDB, Holster, and all routes
@@ -95,9 +87,7 @@ async function initializeServer() {
   loggers.server.info("🚀 Initializing Shogun Relay Server...");
   loggers.server.info("🚀 Shogun Relay v1.0.1 - FORCE UPDATE");
 
-
   // Moved drive public links init to after app declaration
-
 
   /**
    * System logging function (console only, no GunDB storage)
@@ -176,20 +166,20 @@ async function initializeServer() {
     origin: authConfig.corsOrigins.includes("*")
       ? true // Allow all origins if '*' is configured
       : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
+          // Allow requests with no origin (like mobile apps or curl requests)
+          if (!origin) return callback(null, true);
 
-        if (
-          authConfig.corsOrigins.some(
-            (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
-          )
-        ) {
-          callback(null, true);
-        } else {
-          loggers.server.warn({ origin }, "CORS blocked request from origin");
-          callback(new Error("Not allowed by CORS"));
-        }
-      },
+          if (
+            authConfig.corsOrigins.some(
+              (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
+            )
+          ) {
+            callback(null, true);
+          } else {
+            loggers.server.warn({ origin }, "CORS blocked request from origin");
+            callback(new Error("Not allowed by CORS"));
+          }
+        },
     credentials: authConfig.corsCredentials,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: [
@@ -275,15 +265,18 @@ async function initializeServer() {
 
   // Serve React Dashboard SPA (built files from public/dashboard/dist)
   const dashboardPath = path.resolve(publicPath, "dashboard", "dist");
-  app.use("/dashboard", express.static(dashboardPath, {
-    setHeaders: (res) => {
-      res.set({
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        Pragma: "no-cache",
-        Expires: "0",
-      });
-    }
-  }));
+  app.use(
+    "/dashboard",
+    express.static(dashboardPath, {
+      setHeaders: (res) => {
+        res.set({
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        });
+      },
+    })
+  );
 
   // SPA fallback for React Router - serve index.html for non-asset routes
   app.get("/dashboard/*", (req, res) => {
@@ -294,7 +287,8 @@ async function initializeServer() {
       res.status(404).json({
         success: false,
         error: "Dashboard not found",
-        message: "Dashboard has not been built yet. Run 'npm run build' in the dashboard directory.",
+        message:
+          "Dashboard has not been built yet. Run 'npm run build' in the dashboard directory.",
       });
     }
   });
@@ -556,7 +550,6 @@ async function initializeServer() {
 
   // Initialize Holster Relay with built-in WebSocket server and connection management
 
-
   const peers = relayConfig.peers;
   loggers.server.info({ peers }, "🔍 Peers");
 
@@ -579,7 +572,9 @@ async function initializeServer() {
   } else if (storageType === "s3") {
     const s3Conf = storageConfig.s3;
     if (!s3Conf?.endpoint || !s3Conf?.accessKeyId || !s3Conf?.secretAccessKey) {
-      loggers.server.warn("⚠️ S3 storage configured but credentials missing. Falling back to radisk.");
+      loggers.server.warn(
+        "⚠️ S3 storage configured but credentials missing. Falling back to radisk."
+      );
     } else {
       store = new S3Store({
         endpoint: s3Conf.endpoint,
@@ -588,10 +583,13 @@ async function initializeServer() {
         bucket: s3Conf.bucket,
         region: s3Conf.region,
       });
-      loggers.server.info({
-        endpoint: s3Conf.endpoint,
-        bucket: s3Conf.bucket
-      }, "🪣 Using S3/MinIO storage for Gun");
+      loggers.server.info(
+        {
+          endpoint: s3Conf.endpoint,
+          bucket: s3Conf.bucket,
+        },
+        "🪣 Using S3/MinIO storage for Gun"
+      );
     }
   }
 
@@ -610,7 +608,7 @@ async function initializeServer() {
     peers: peers,
     chunk: 1000,
     pack: 1000,
-    jsonify: true
+    jsonify: true,
   };
 
   // Logic to ensure storage consistency
@@ -621,7 +619,9 @@ async function initializeServer() {
     // We do NOT set 'file' here to avoid Gun checking/creating default files unnecessarily
 
     if (storageConfig.disableRadisk) {
-      loggers.server.warn("⚠️ DISABLE_RADISK setting ignored because a custom storage adapter (SQLite/S3) is active.");
+      loggers.server.warn(
+        "⚠️ DISABLE_RADISK setting ignored because a custom storage adapter (SQLite/S3) is active."
+      );
     }
   } else {
     // Fallback to default Gun file storage (Radisk default) or memory-only
@@ -631,7 +631,9 @@ async function initializeServer() {
       gunConfig.file = dataDir; // Only set 'file' when using default file storage
       loggers.server.info("📁 Using file-based radisk storage (default)");
     } else {
-      loggers.server.warn("⚠️ Persistent storage DISABLED (radisk=false). Data will be in-memory only.");
+      loggers.server.warn(
+        "⚠️ Persistent storage DISABLED (radisk=false). Data will be in-memory only."
+      );
     }
   }
 
@@ -641,8 +643,6 @@ async function initializeServer() {
 
   // Initialize chat service
   chatService.initialize(gun);
-
-
 
   // Store gun instance in express app for access from routes
   app.set("gunInstance", gun);
@@ -669,7 +669,8 @@ async function initializeServer() {
       // If already initialized, skip
       if (isPublicLinksInitialized()) return;
 
-      const { getRelayUser, isRelayUserInitialized, getRelayPub } = await import("./utils/relay-user");
+      const { getRelayUser, isRelayUserInitialized, getRelayPub } =
+        await import("./utils/relay-user");
 
       if (isRelayUserInitialized()) {
         const relayUser = getRelayUser();
@@ -680,7 +681,9 @@ async function initializeServer() {
           initDrivePublicLinks(gun, relayPub, relayUser);
           loggers.server.info("✅ DrivePublicLinksManager initialized via delayed startup check");
         } else {
-          loggers.server.info("✅ Relay User ready. Drive Manager will initialize on first request.");
+          loggers.server.info(
+            "✅ Relay User ready. Drive Manager will initialize on first request."
+          );
         }
       }
     } catch (err) {
@@ -743,17 +746,14 @@ async function initializeServer() {
         }
 
         // Save to file
-        fs.writeFileSync(
-          keypairFilePath,
-          JSON.stringify(newKeyPair, null, 2),
-          "utf8"
-        );
+        fs.writeFileSync(keypairFilePath, JSON.stringify(newKeyPair, null, 2), "utf8");
         relayKeyPair = newKeyPair;
 
+        loggers.server.info(`✅ Generated and saved new keypair to ${keypairFilePath}`);
         loggers.server.info(
-          `✅ Generated and saved new keypair to ${keypairFilePath}`
+          { pub: newKeyPair.pub, pubLength: newKeyPair.pub.length },
+          `🔑 Public key (generated)`
         );
-        loggers.server.info({ pub: newKeyPair.pub, pubLength: newKeyPair.pub.length }, `🔑 Public key (generated)`);
         loggers.server.warn(`⚠️ IMPORTANT: Save this keypair file securely!`);
       } else {
         // File exists, load it
@@ -816,7 +816,10 @@ async function initializeServer() {
         relayKeyPair = newKeyPair;
 
         loggers.server.info(`✅ Generated new keypair at ${keyPairPath}`);
-        loggers.server.info({ pub: newKeyPair.pub, pubLength: newKeyPair.pub.length }, `🔑 Public key (auto-generated)`);
+        loggers.server.info(
+          { pub: newKeyPair.pub, pubLength: newKeyPair.pub.length },
+          `🔑 Public key (auto-generated)`
+        );
         loggers.server.warn(
           `⚠️ IMPORTANT: Save this keypair file securely or set RELAY_SEA_KEYPAIR_PATH!`
         );
@@ -1120,8 +1123,6 @@ See docs/RELAY_KEYS.md for more information.
   app.set("IPFS_API_TOKEN", IPFS_API_TOKEN);
   app.set("IPFS_GATEWAY_URL", IPFS_GATEWAY_URL);
 
-
-
   // Esponi l'istanza Gun globalmente per le route
   (global as any).gunInstance = gun;
 
@@ -1317,11 +1318,14 @@ See docs/RELAY_KEYS.md for more information.
       };
 
       // Warn if host is localhost (common discovery issue)
-      if (host.includes('localhost') || host.includes('127.0.0.1')) {
+      if (host.includes("localhost") || host.includes("127.0.0.1")) {
         // Only warn once every ~100 pulses to avoid spam, or warn at startup (but this is a loop)
         // Check random chance or just debug log
         if (Math.random() < 0.05) {
-          loggers.server.warn({ host }, "⚠️  Relay host is configured as localhost. External relays will not be able to connect to you. Set RELAY_HOST in .env");
+          loggers.server.warn(
+            { host },
+            "⚠️  Relay host is configured as localhost. External relays will not be able to connect to you. Set RELAY_HOST in .env"
+          );
         }
       }
 
@@ -1409,8 +1413,6 @@ See docs/RELAY_KEYS.md for more information.
     }
   }, 30000); // 30 seconds
 
-
-
   // ============================================================================
   // GUNDB PEER DISCOVERY
   // ============================================================================
@@ -1452,8 +1454,6 @@ See docs/RELAY_KEYS.md for more information.
   async function shutdown() {
     loggers.server.info("🛑 Shutting down Shogun Relay...");
 
-
-
     // Give a grace period for in-flight operations to complete
     // GunDB may still have pending operations, so we wait a bit longer
     loggers.server.info("⏳ Waiting for in-flight operations to complete...");
@@ -1487,11 +1487,7 @@ See docs/RELAY_KEYS.md for more information.
 
   loggers.server.info({ host, port }, `🚀 Shogun Relay Server running`);
 
-
-
   loggers.server.info({ host, port }, `🚀 Shogun Relay Server running`);
-
-
 
   return {
     server,
