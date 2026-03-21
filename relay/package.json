@@ -45,7 +45,7 @@
     "express-basic-auth": "^1.2.1",
     "express-rate-limit": "^8.0.1",
     "form-data": "^4.0.3",
-    "gun": "git+https://github.com/amark/gun.git",
+    "gun": "git+https://github.com/scobru/gun.git",
     "http-proxy-middleware": "^3.0.5",
     "ip": "^2.0.1",
     "is-fn": "^3.0.0",
@@ -96,11 +96,6 @@
     "url": "https://github.com/your-org/shogun-2/issues"
   },
   "homepage": "https://github.com/your-org/shogun-2#readme",
-  "config": {
-    "port": 8765,
-    "peers": "http://localhost:8766/gun",
-    "radiskPath": "radata"
-  },
   "nodemonConfig": {
     "watch": [
       "src"
