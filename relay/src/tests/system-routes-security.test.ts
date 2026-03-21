@@ -152,6 +152,22 @@ describe("System Routes Security", () => {
      expect(res.status).toBe(401);
   });
 
+  it("should NOT allow unauthenticated POST access to /node/*", async () => {
+     const res = await fetch(`${baseUrl}/system/node/some/path`, {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ data: "some data" })
+     });
+     expect(res.status).toBe(401);
+  });
+
+  it("should NOT allow unauthenticated DELETE access to /node/*", async () => {
+     const res = await fetch(`${baseUrl}/system/node/some/path`, {
+         method: "DELETE"
+     });
+     expect(res.status).toBe(401);
+  });
+
   it("should NOT allow unauthenticated access to /stats/update", async () => {
     const res = await fetch(`${baseUrl}/system/stats/update`, {
       method: "POST",
