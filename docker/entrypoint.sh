@@ -116,7 +116,7 @@ fi
 
 
 # Backwards compatibility: handle legacy radata directory if it exists
-LEGACY_RADATA_DIR="/app/relay/radata"
+LEGACY_RADATA_DIR="/app/relay/data"
 if [ -d "$LEGACY_RADATA_DIR" ]; then
     echo "🔐 Updating permissions for legacy radata directory..."
     chown -R node:node "$LEGACY_RADATA_DIR" || true

@@ -74,6 +74,8 @@ ARG GUN_S3_BUCKET
 ARG GUN_S3_ACCESS_KEY
 ARG GUN_S3_SECRET_KEY
 
+ARG LEGACY_RADATA_DIR
+
 RUN echo "RELAY_CACHE_BUST ${RELAY_CACHE_BUST}"
 
 # =============================================================================
