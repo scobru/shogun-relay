@@ -44,7 +44,7 @@ function Drive() {
     setUploading(true);
     try {
       // ⚡ Bolt: Use chunked parallel uploads to speed up multi-file transfers without overwhelming browser/server
-      const CHUNK_SIZE = 5;
+      const CHUNK_SIZE = 10;
       for (let i = 0; i < selectedFiles.length; i += CHUNK_SIZE) {
         const chunk = selectedFiles.slice(i, i + CHUNK_SIZE);
         await Promise.all(chunk.map(async (file) => {
@@ -120,7 +120,7 @@ function Drive() {
     setUploading(true)
     try {
       // ⚡ Bolt: Use chunked parallel uploads for folders to dramatically speed up deep directory structures
-      const CHUNK_SIZE = 5;
+      const CHUNK_SIZE = 10;
       const fileArray = Array.from(files);
       for (let i = 0; i < fileArray.length; i += CHUNK_SIZE) {
         const chunk = fileArray.slice(i, i + CHUNK_SIZE);
