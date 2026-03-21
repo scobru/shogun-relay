@@ -27,8 +27,8 @@ vi.mock("../config/env-config", () => ({
     relay: { name: "Test Relay" },
   },
   driveConfig: {
-      dataDir: "/tmp/test-data",
-  }
+    dataDir: "/tmp/test-data",
+  },
 }));
 
 vi.mock("../utils/gun-paths", () => ({
@@ -80,24 +80,28 @@ describe("System Routes Performance", () => {
 
     const stream = fs.createWriteStream(tempLogFile);
     for (let i = 0; i < dummyLines; i++) {
-        stream.write(`2025-12-12T08:21:19.939018162Z {"level":"info","time":"2025-12-12T08:21:19.939018162Z","pid":85,"message":"Dummy log line ${i}"}\n`);
+      stream.write(
+        `2025-12-12T08:21:19.939018162Z {"level":"info","time":"2025-12-12T08:21:19.939018162Z","pid":85,"message":"Dummy log line ${i}"}\n`
+      );
     }
     stream.end();
 
-    await new Promise(resolve => { stream.on('finish', () => resolve(null)); });
+    await new Promise((resolve) => {
+      stream.on("finish", () => resolve(null));
+    });
 
     // Mock fs.existsSync to point to our test file
-    vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
-        if (typeof p === 'string' && (p.includes('relay.log') || p.includes('ipfs.log'))) return true;
-        return originalExistsSync(p);
+    vi.spyOn(fs, "existsSync").mockImplementation((p) => {
+      if (typeof p === "string" && (p.includes("relay.log") || p.includes("ipfs.log"))) return true;
+      return originalExistsSync(p);
     });
 
     // We spy on readFileSync to intercept calls
-    vi.spyOn(fs, 'readFileSync').mockImplementation((p, options) => {
-        if (typeof p === 'string' && (p.includes('relay.log') || p.includes('ipfs.log'))) {
-            return originalReadFileSync(tempLogFile, options);
-        }
-        return originalReadFileSync(p, options);
+    vi.spyOn(fs, "readFileSync").mockImplementation((p, options) => {
+      if (typeof p === "string" && (p.includes("relay.log") || p.includes("ipfs.log"))) {
+        return originalReadFileSync(tempLogFile, options);
+      }
+      return originalReadFileSync(p, options);
     });
   });
 
@@ -105,7 +109,7 @@ describe("System Routes Performance", () => {
     server.close();
     vi.restoreAllMocks();
     if (originalExistsSync(tempLogFile)) {
-        fs.unlinkSync(tempLogFile);
+      fs.unlinkSync(tempLogFile);
     }
   });
 
@@ -115,7 +119,7 @@ describe("System Routes Performance", () => {
     const endTime = Date.now();
 
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = (await res.json()) as any;
     expect(body.success).toBe(true);
 
     console.log(`⏱️ /logs endpoint took ${endTime - startTime}ms`);
@@ -127,7 +131,7 @@ describe("System Routes Performance", () => {
     const endTime = Date.now();
 
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = (await res.json()) as any;
     expect(body.success).toBe(true);
 
     console.log(`⏱️ /services/:name/logs endpoint took ${endTime - startTime}ms`);

@@ -265,6 +265,12 @@ export class ChatService {
 
   public async deleteMessage(peerPub: string, messageId: string): Promise<boolean> {
     this.messageCache.get(peerPub)?.delete(messageId);
+
+    if (this.active && this.myPub) {
+      const chatId = this.getChatId(this.myPub, peerPub);
+      getGunNode(this.gun, GUN_PATHS.CHATS).get(chatId).get(messageId).put(null);
+    }
+
     return true;
   }
 
