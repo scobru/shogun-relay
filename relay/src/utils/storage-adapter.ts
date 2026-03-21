@@ -679,23 +679,77 @@ export class MinioStorageAdapter implements IStorageAdapter {
     const parentPath = oldKey.includes("/") ? oldKey.substring(0, oldKey.lastIndexOf("/")) : "";
     const newKey = parentPath ? `${parentPath}/${newName}` : newName;
 
-    // Copy and delete (S3 doesn't have rename)
-    await this.client.send(
-      new CopyObjectCommand({
+    // Check if it's a directory by listing objects with this prefix
+    const listResponse = await this.client.send(
+      new ListObjectsV2Command({
         Bucket: this.bucket,
-        CopySource: `${this.bucket}/${oldKey}`,
-        Key: newKey,
+        Prefix: `${oldKey}/`,
+        MaxKeys: 1,
       })
     );
 
-    await this.client.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucket,
-        Key: oldKey,
-      })
-    );
+    if (listResponse.Contents && listResponse.Contents.length > 0) {
+      // It's a directory - rename all objects with this prefix
+      let continuationToken: string | undefined;
 
-    loggers.server.info({ oldPath, newName }, "🪣 Item renamed (minio)");
+      do {
+        const allObjects = await this.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: `${oldKey}/`,
+            ContinuationToken: continuationToken,
+          })
+        );
+
+        if (allObjects.Contents && allObjects.Contents.length > 0) {
+          const chunkSize = 10;
+          for (let i = 0; i < allObjects.Contents.length; i += chunkSize) {
+            const chunk = allObjects.Contents.slice(i, i + chunkSize);
+            await Promise.all(
+              chunk.map(async (obj) => {
+                if (obj.Key) {
+                  const destKey = obj.Key.replace(oldKey, newKey);
+                  await this.client.send(
+                    new CopyObjectCommand({
+                      Bucket: this.bucket,
+                      CopySource: `${this.bucket}/${obj.Key}`,
+                      Key: destKey,
+                    })
+                  );
+                  await this.client.send(
+                    new DeleteObjectCommand({
+                      Bucket: this.bucket,
+                      Key: obj.Key,
+                    })
+                  );
+                }
+              })
+            );
+          }
+        }
+
+        continuationToken = allObjects.NextContinuationToken;
+      } while (continuationToken);
+
+      loggers.server.info({ oldPath, newName }, "🪣 Directory renamed (minio)");
+    } else {
+      // It's a file
+      await this.client.send(
+        new CopyObjectCommand({
+          Bucket: this.bucket,
+          CopySource: `${this.bucket}/${oldKey}`,
+          Key: newKey,
+        })
+      );
+
+      await this.client.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: oldKey,
+        })
+      );
+      loggers.server.info({ oldPath, newName }, "🪣 Item renamed (minio)");
+    }
   }
 
   async moveItem(sourcePath: string, destPath: string): Promise<void> {
@@ -704,23 +758,77 @@ export class MinioStorageAdapter implements IStorageAdapter {
     const sourceKey = this.validatePath(sourcePath);
     const destKey = this.validatePath(destPath);
 
-    // Copy and delete
-    await this.client.send(
-      new CopyObjectCommand({
+    // Check if it's a directory by listing objects with this prefix
+    const listResponse = await this.client.send(
+      new ListObjectsV2Command({
         Bucket: this.bucket,
-        CopySource: `${this.bucket}/${sourceKey}`,
-        Key: destKey,
+        Prefix: `${sourceKey}/`,
+        MaxKeys: 1,
       })
     );
 
-    await this.client.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucket,
-        Key: sourceKey,
-      })
-    );
+    if (listResponse.Contents && listResponse.Contents.length > 0) {
+      // It's a directory - move all objects with this prefix
+      let continuationToken: string | undefined;
 
-    loggers.server.info({ sourcePath, destPath }, "🪣 Item moved (minio)");
+      do {
+        const allObjects = await this.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: `${sourceKey}/`,
+            ContinuationToken: continuationToken,
+          })
+        );
+
+        if (allObjects.Contents && allObjects.Contents.length > 0) {
+          const chunkSize = 10;
+          for (let i = 0; i < allObjects.Contents.length; i += chunkSize) {
+            const chunk = allObjects.Contents.slice(i, i + chunkSize);
+            await Promise.all(
+              chunk.map(async (obj) => {
+                if (obj.Key) {
+                  const objDestKey = obj.Key.replace(sourceKey, destKey);
+                  await this.client.send(
+                    new CopyObjectCommand({
+                      Bucket: this.bucket,
+                      CopySource: `${this.bucket}/${obj.Key}`,
+                      Key: objDestKey,
+                    })
+                  );
+                  await this.client.send(
+                    new DeleteObjectCommand({
+                      Bucket: this.bucket,
+                      Key: obj.Key,
+                    })
+                  );
+                }
+              })
+            );
+          }
+        }
+
+        continuationToken = allObjects.NextContinuationToken;
+      } while (continuationToken);
+
+      loggers.server.info({ sourcePath, destPath }, "🪣 Directory moved (minio)");
+    } else {
+      // It's a file
+      await this.client.send(
+        new CopyObjectCommand({
+          Bucket: this.bucket,
+          CopySource: `${this.bucket}/${sourceKey}`,
+          Key: destKey,
+        })
+      );
+
+      await this.client.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: sourceKey,
+        })
+      );
+      loggers.server.info({ sourcePath, destPath }, "🪣 Item moved (minio)");
+    }
   }
 
   async getStorageStats(): Promise<StorageStats> {
