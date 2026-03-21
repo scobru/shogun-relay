@@ -1156,13 +1156,21 @@ See docs/RELAY_KEYS.md for more information.
   // Set up relay stats database
   const db = getGunNode(gun, GUN_PATHS.RELAYS).get(host);
 
+  let activeWiresUpdateTimer: NodeJS.Timeout | null = null;
+  const updateActiveWires = (total: number, active: number) => {
+    if (activeWiresUpdateTimer) clearTimeout(activeWiresUpdateTimer);
+    activeWiresUpdateTimer = setTimeout(() => {
+      db?.get("totalConnections").put(total);
+      db?.get("activeWires").put(active);
+    }, 2000);
+  };
+
   gun.on("hi", () => {
     totalConnections += 1;
     activeWires += 1;
     app.set("totalConnections", totalConnections);
     app.set("activeWires", activeWires);
-    db?.get("totalConnections").put(totalConnections);
-    db?.get("activeWires").put(activeWires);
+    updateActiveWires(totalConnections, activeWires);
     loggers.server.debug({ activeWires }, `Connection opened`);
   });
 
@@ -1172,11 +1180,9 @@ See docs/RELAY_KEYS.md for more information.
       activeWires -= 1;
     }
     app.set("activeWires", activeWires);
-    db?.get("activeWires").put(activeWires);
+    updateActiveWires(totalConnections, activeWires);
     loggers.server.debug({ activeWires }, `Connection closed`);
   });
-
-  gun.on("out", { get: { "#": { "*": "" } } } as any);
 
   // Set up pulse interval for health monitoring (extended with IPFS stats)
   setSelfAdjustingInterval(async () => {
