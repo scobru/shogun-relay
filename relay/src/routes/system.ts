@@ -414,8 +414,8 @@ router.delete("/node/*", adminAuthMiddleware, async (req, res) => {
 // Logs endpoint for real-time relay logs from file
 router.get("/logs", adminAuthMiddleware, (req, res) => {
   try {
-    const limit: number = parseInt(req.query.limit as string) || 100;
-    const tail: number = parseInt(req.query.tail as string) || 100; // Number of lines to read from end
+    const limit: number = parseInt(req.query.limit as string || "") || 100;
+    const tail: number = parseInt(req.query.tail as string || "") || 100; // Number of lines to read from end
 
     // Map of common log locations to check
     const logLocations = [
@@ -616,15 +616,15 @@ router.post("/peers/add", adminAuthMiddleware, (req, res) => {
 router.get("/services/:name/logs", adminAuthMiddleware, (req, res) => {
   try {
     const serviceName = req.params.name;
-    const limit = parseInt(req.query.limit as string) || 100;
-    const tail = parseInt(req.query.tail as string) || 100;
+    const limit = parseInt(req.query.limit as string || "") || 100;
+    const tail = parseInt(req.query.tail as string || "") || 100;
 
     // Map service names to log files
     // This assumes standard log locations or PM2 log naming convention
     let logFile = "";
 
     // Normalize service name
-    const normalizedName = serviceName.toLowerCase().replace(/%20/g, ' ').trim();
+    const normalizedName = (serviceName as string).toLowerCase().replace(/%20/g, ' ').trim();
 
     if (normalizedName.includes("ipfs")) {
       // Check common IPFS log locations or PM2

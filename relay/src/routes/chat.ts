@@ -3,7 +3,7 @@ import { chatService } from "../utils/chat-service";
 import { loggers } from "../utils/logger";
 import { adminAuthMiddleware } from "../middleware/admin-auth";
 
-const router = express.Router();
+const router: express.Router = express.Router();
 
 /**
  * GET /api/v1/chat/peers
@@ -48,7 +48,7 @@ router.get("/conversations", adminAuthMiddleware, (req, res) => {
  */
 router.get("/messages/:pub", adminAuthMiddleware, async (req, res) => {
   try {
-    const { pub } = req.params;
+    const pub = req.params.pub as string;
     const messages = await chatService.getHistory(pub);
     res.json({
       success: true,
@@ -56,7 +56,7 @@ router.get("/messages/:pub", adminAuthMiddleware, async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error: any) {
-    loggers.server.error({ err: error, pub: req.params.pub }, "❌ Chat history error");
+    loggers.server.error({ err: error, pub: (req.params.pub as string) }, "❌ Chat history error");
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -67,7 +67,7 @@ router.get("/messages/:pub", adminAuthMiddleware, async (req, res) => {
  */
 router.post("/messages/:pub", adminAuthMiddleware, async (req, res) => {
   try {
-    const { pub } = req.params;
+    const pub = req.params.pub as string;
     const { text } = req.body;
 
     if (!text) {
@@ -80,7 +80,7 @@ router.post("/messages/:pub", adminAuthMiddleware, async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error: any) {
-    loggers.server.error({ err: error, pub: req.params.pub }, "❌ Send message error");
+    loggers.server.error({ err: error, pub: (req.params.pub as string) }, "❌ Send message error");
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -91,7 +91,7 @@ router.post("/messages/:pub", adminAuthMiddleware, async (req, res) => {
  */
 router.post("/sync/:pub", adminAuthMiddleware, async (req, res) => {
   try {
-    const { pub } = req.params;
+    const pub = req.params.pub as string;
     await chatService.syncMessagesFrom(pub);
     res.json({
       success: true,
@@ -99,7 +99,7 @@ router.post("/sync/:pub", adminAuthMiddleware, async (req, res) => {
       timestamp: Date.now()
     });
   } catch (error: any) {
-    loggers.server.error({ err: error, pub: req.params.pub }, "❌ Sync chat error");
+    loggers.server.error({ err: error, pub: (req.params.pub as string) }, "❌ Sync chat error");
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -110,7 +110,7 @@ router.post("/sync/:pub", adminAuthMiddleware, async (req, res) => {
  */
 router.get("/lobby", adminAuthMiddleware, (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
+    const limit = parseInt(req.query.limit as string || "") || 50;
     const messages = chatService.getLobbyMessages(limit);
     res.json({
       success: true,
@@ -152,14 +152,14 @@ router.post("/lobby", adminAuthMiddleware, async (req, res) => {
  */
 router.delete("/conversations/:pub", adminAuthMiddleware, async (req, res) => {
   try {
-    const { pub } = req.params;
+    const pub = req.params.pub as string;
     const success = await chatService.clearConversation(pub);
     res.json({
       success,
       timestamp: Date.now()
     });
   } catch (error: any) {
-    loggers.server.error({ err: error, pub: req.params.pub }, "❌ Delete conversation error");
+    loggers.server.error({ err: error, pub: (req.params.pub as string) }, "❌ Delete conversation error");
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -170,14 +170,14 @@ router.delete("/conversations/:pub", adminAuthMiddleware, async (req, res) => {
  */
 router.delete("/messages/:pub/:messageId", adminAuthMiddleware, async (req, res) => {
   try {
-    const { pub, messageId } = req.params;
+    const pub = req.params.pub as string; const messageId = req.params.messageId as string;
     const success = await chatService.deleteMessage(pub, messageId);
     res.json({
       success,
       timestamp: Date.now()
     });
   } catch (error: any) {
-    loggers.server.error({ err: error, pub: req.params.pub, messageId: req.params.messageId }, "❌ Delete message error");
+    loggers.server.error({ err: error, pub: (req.params.pub as string), messageId: (req.params.messageId as string) }, "❌ Delete message error");
     res.status(500).json({ success: false, error: error.message });
   }
 });

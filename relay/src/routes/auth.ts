@@ -2,7 +2,7 @@
 import express, { Request, Response } from "express";
 import { loggers } from "../utils/logger";
 
-const router = express.Router();
+const router: express.Router = express.Router();
 
 // Helper to get gun instance safely
 const getGun = (req: Request) => {

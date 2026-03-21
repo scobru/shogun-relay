@@ -130,7 +130,7 @@ export default (app: express.Application) => {
       loggers.server.debug({ cid }, `📁 Direct IPFS retrieval attempt`);
 
       // Try to get file from IPFS directly using HTTP API
-      const fileBuffer = (await ipfsRequest(`/cat?arg=${encodeURIComponent(cid)}`, {
+      const fileBuffer = (await ipfsRequest(`/cat?arg=${encodeURIComponent(cid as string)}`, {
         responseType: "arraybuffer",
       })) as Buffer;
 
