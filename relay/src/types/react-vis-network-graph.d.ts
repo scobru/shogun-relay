@@ -1,6 +1,6 @@
-declare module 'react-vis-network-graph' {
-  import { Component } from 'react';
-  import { Network, NetworkEvents } from 'vis-network';
+declare module "react-vis-network-graph" {
+  import { Component } from "react";
+  import { Network, NetworkEvents } from "vis-network";
 
   export interface GraphData {
     nodes: any[];

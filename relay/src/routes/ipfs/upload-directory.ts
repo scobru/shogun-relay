@@ -86,7 +86,6 @@ router.post(
         `📁 Directory upload: ${files.length} files (${totalSizeMB.toFixed(2)} MB)`
       );
 
-
       // Create FormData with all files
       const formData = new FormData();
       files.forEach((file) => {
@@ -164,7 +163,6 @@ router.post(
             throw error;
           }
         })();
-
 
         Promise.all([saveUploadPromise, updateMBPromise])
           .then(() => {

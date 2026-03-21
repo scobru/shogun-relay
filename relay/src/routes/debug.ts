@@ -252,49 +252,50 @@ router.post(
       const { identifier } = req.params;
       const gun = getGunInstance(req);
 
-    loggers.server.info({ identifier }, `🔄 Reset MB usage`);
+      loggers.server.info({ identifier }, `🔄 Reset MB usage`);
 
-    // Reset MB usage to 0
-    gun
-      .get(GUN_PATHS.MB_USAGE)
-      .get(identifier)
-      .put(
-        {
-          mbUsed: 0,
-          lastUpdated: Date.now(),
-          userAddress: identifier,
-          resetAt: Date.now(),
-        },
-        (ack: any) => {
-          if (ack && ack.err) {
-            loggers.server.error({ err: ack.err, identifier }, "❌ Reset MB usage error");
-            res.status(500).json({
-              success: false,
-              error: ack.err,
-            });
-          } else {
-            loggers.server.info({ identifier }, `✅ MB usage reset`);
-            res.json({
-              success: true,
-              message: "MB usage reset successfully",
-              identifier,
-              mbUsage: {
-                mbUsed: 0,
-                limit: 100,
-                remaining: 100,
-                percentage: 0,
-              },
-              timestamp: Date.now(),
-            });
+      // Reset MB usage to 0
+      gun
+        .get(GUN_PATHS.MB_USAGE)
+        .get(identifier)
+        .put(
+          {
+            mbUsed: 0,
+            lastUpdated: Date.now(),
+            userAddress: identifier,
+            resetAt: Date.now(),
+          },
+          (ack: any) => {
+            if (ack && ack.err) {
+              loggers.server.error({ err: ack.err, identifier }, "❌ Reset MB usage error");
+              res.status(500).json({
+                success: false,
+                error: ack.err,
+              });
+            } else {
+              loggers.server.info({ identifier }, `✅ MB usage reset`);
+              res.json({
+                success: true,
+                message: "MB usage reset successfully",
+                identifier,
+                mbUsage: {
+                  mbUsed: 0,
+                  limit: 100,
+                  remaining: 100,
+                  percentage: 0,
+                },
+                timestamp: Date.now(),
+              });
+            }
           }
-        }
-      );
-  } catch (error: any) {
-    const { identifier } = req.params;
-    loggers.server.error({ err: error, identifier }, `💥 Reset MB usage error`);
-    res.status(500).json({ success: false, error: error.message });
+        );
+    } catch (error: any) {
+      const { identifier } = req.params;
+      loggers.server.error({ err: error, identifier }, `💥 Reset MB usage error`);
+      res.status(500).json({ success: false, error: error.message });
+    }
   }
-});
+);
 
 // Test Gun operations endpoint
 router.get("/test-gun", adminAuthMiddleware, async (req: Request, res: Response) => {
@@ -375,75 +376,76 @@ router.get(
       const { identifier, hash } = req.params;
       const gun = getGunInstance(req);
 
-    loggers.server.debug({ identifier, hash }, `🧪 Testing Gun save`);
+      loggers.server.debug({ identifier, hash }, `🧪 Testing Gun save`);
 
-    const testData = {
-      hash: hash,
-      name: "test-file.txt",
-      size: 1024,
-      sizeMB: 1,
-      uploadedAt: Date.now(),
-      test: true,
-    };
+      const testData = {
+        hash: hash,
+        name: "test-file.txt",
+        size: 1024,
+        sizeMB: 1,
+        uploadedAt: Date.now(),
+        test: true,
+      };
 
-    const testNode = gun.get(GUN_PATHS.UPLOADS).get(identifier).get(hash);
+      const testNode = gun.get(GUN_PATHS.UPLOADS).get(identifier).get(hash);
 
-    const writeTest = () => {
-      return new Promise((resolve, reject) => {
-        testNode.put(testData, (ack: any) => {
-          if (ack && ack.err) {
-            reject(new Error(ack.err));
-          } else {
-            resolve("Write successful");
-          }
+      const writeTest = () => {
+        return new Promise((resolve, reject) => {
+          testNode.put(testData, (ack: any) => {
+            if (ack && ack.err) {
+              reject(new Error(ack.err));
+            } else {
+              resolve("Write successful");
+            }
+          });
         });
-      });
-    };
+      };
 
-    const readTest = () => {
-      return new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error("Read timeout"));
-        }, 10000);
+      const readTest = () => {
+        return new Promise((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            reject(new Error("Read timeout"));
+          }, 10000);
 
-        testNode.once((data: any) => {
-          clearTimeout(timeoutId);
-          if (data && data.hash === hash) {
-            resolve(data);
-          } else {
-            reject(new Error("Invalid test data"));
-          }
+          testNode.once((data: any) => {
+            clearTimeout(timeoutId);
+            if (data && data.hash === hash) {
+              resolve(data);
+            } else {
+              reject(new Error("Invalid test data"));
+            }
+          });
         });
+      };
+
+      // Perform write test
+      await writeTest();
+      loggers.server.debug("✅ Write test passed");
+
+      // Perform read test
+      const readData = await readTest();
+      loggers.server.debug("✅ Read test passed");
+
+      res.json({
+        success: true,
+        message: "Gun save test successful",
+        identifier,
+        hash,
+        writeTest: "passed",
+        readTest: "passed",
+        readData,
+        timestamp: Date.now(),
       });
-    };
-
-    // Perform write test
-    await writeTest();
-    loggers.server.debug("✅ Write test passed");
-
-    // Perform read test
-    const readData = await readTest();
-    loggers.server.debug("✅ Read test passed");
-
-    res.json({
-      success: true,
-      message: "Gun save test successful",
-      identifier,
-      hash,
-      writeTest: "passed",
-      readTest: "passed",
-      readData,
-      timestamp: Date.now(),
-    });
-  } catch (error: any) {
-    loggers.server.error({ err: error }, "❌ Gun save test error");
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      message: "Gun save test failed",
-    });
+    } catch (error: any) {
+      loggers.server.error({ err: error }, "❌ Gun save test error");
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: "Gun save test failed",
+      });
+    }
   }
-});
+);
 
 // Cleanup duplicate aliases endpoint
 router.post("/cleanup-aliases", adminAuthMiddleware, async (req: Request, res: Response) => {
@@ -459,14 +461,13 @@ router.post("/cleanup-aliases", adminAuthMiddleware, async (req: Request, res: R
     res.json({
       success: true,
       message: "Alias cleanup completed successfully",
-      result: cleaningResult
+      result: cleaningResult,
     });
-
   } catch (error: any) {
     loggers.server.error({ err: error }, "❌ Alias cleanup error");
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
     });
   }
 });

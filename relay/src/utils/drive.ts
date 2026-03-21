@@ -1,28 +1,23 @@
 /**
  * Drive Manager Module
- * 
+ *
  * Provides file management capabilities using a pluggable storage backend.
  * The storage backend (fs or MinIO) is determined by configuration.
- * 
+ *
  * Configuration:
  * - DRIVE_STORAGE_TYPE: "fs" (default) or "minio"
  * - For MinIO: MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET
  */
 
 import path from "path";
-import {
-  IStorageAdapter,
-  createStorageAdapter,
-  DriveItem,
-  StorageStats
-} from "./storage-adapter";
+import { IStorageAdapter, createStorageAdapter, DriveItem, StorageStats } from "./storage-adapter";
 import { loggers } from "./logger";
 
 export type { DriveItem, StorageStats };
 
 /**
  * DriveManager - Facade for storage operations
- * 
+ *
  * Delegates all operations to the configured storage adapter (fs or MinIO).
  * Provides both sync-compatible and async methods for backward compatibility.
  */
@@ -69,12 +64,16 @@ export class DriveManager {
     // For async adapters, callers should use async methods
     if (promise instanceof Promise) {
       // Return empty and log warning - caller should use async version
-      promise.then(items => { result = items; }).catch(() => { });
+      promise
+        .then((items) => {
+          result = items;
+        })
+        .catch(() => {});
 
       // For FsStorageAdapter, the promise resolves immediately
       // We need to handle this synchronously
       let resolved = false;
-      promise.then(items => {
+      promise.then((items) => {
         result = items;
         resolved = true;
       });
@@ -101,7 +100,7 @@ export class DriveManager {
    */
   public uploadFile(relativePath: string, file: Buffer, filename: string): void {
     // Fire and forget for backward compatibility
-    this.adapter.uploadFile(relativePath, file, filename).catch(err => {
+    this.adapter.uploadFile(relativePath, file, filename).catch((err) => {
       loggers.server.error({ err }, "Failed to upload file");
     });
   }
@@ -109,7 +108,11 @@ export class DriveManager {
   /**
    * Upload a single file (async version - recommended)
    */
-  public async uploadFileAsync(relativePath: string, file: Buffer, filename: string): Promise<void> {
+  public async uploadFileAsync(
+    relativePath: string,
+    file: Buffer,
+    filename: string
+  ): Promise<void> {
     return this.adapter.uploadFile(relativePath, file, filename);
   }
 
@@ -135,7 +138,13 @@ export class DriveManager {
     let error: Error | null = null;
 
     const promise = this.adapter.downloadFile(relativePath);
-    promise.then(r => { result = r; }).catch(e => { error = e; });
+    promise
+      .then((r) => {
+        result = r;
+      })
+      .catch((e) => {
+        error = e;
+      });
 
     // For FsStorageAdapter this is sync, so result should be set
     if (error) {
@@ -153,7 +162,9 @@ export class DriveManager {
   /**
    * Download a file (async version - recommended)
    */
-  public async downloadFileAsync(relativePath: string): Promise<{ buffer: Buffer; filename: string; size: number }> {
+  public async downloadFileAsync(
+    relativePath: string
+  ): Promise<{ buffer: Buffer; filename: string; size: number }> {
     return this.adapter.downloadFile(relativePath);
   }
 
@@ -161,7 +172,7 @@ export class DriveManager {
    * Delete a file or directory (recursive)
    */
   public deleteItem(relativePath: string): void {
-    this.adapter.deleteItem(relativePath).catch(err => {
+    this.adapter.deleteItem(relativePath).catch((err) => {
       loggers.server.error({ err }, "Failed to delete item");
     });
   }
@@ -177,7 +188,7 @@ export class DriveManager {
    * Create a directory
    */
   public createDirectory(relativePath: string): void {
-    this.adapter.createDirectory(relativePath).catch(err => {
+    this.adapter.createDirectory(relativePath).catch((err) => {
       loggers.server.error({ err }, "Failed to create directory");
     });
   }
@@ -193,7 +204,7 @@ export class DriveManager {
    * Rename a file or directory
    */
   public renameItem(oldPath: string, newName: string): void {
-    this.adapter.renameItem(oldPath, newName).catch(err => {
+    this.adapter.renameItem(oldPath, newName).catch((err) => {
       loggers.server.error({ err }, "Failed to rename item");
     });
   }
@@ -209,7 +220,7 @@ export class DriveManager {
    * Move a file or directory
    */
   public moveItem(sourcePath: string, destPath: string): void {
-    this.adapter.moveItem(sourcePath, destPath).catch(err => {
+    this.adapter.moveItem(sourcePath, destPath).catch((err) => {
       loggers.server.error({ err }, "Failed to move item");
     });
   }
@@ -233,7 +244,12 @@ export class DriveManager {
       dirCount: 0,
     };
 
-    this.adapter.getStorageStats().then(r => { result = r; }).catch(() => { });
+    this.adapter
+      .getStorageStats()
+      .then((r) => {
+        result = r;
+      })
+      .catch(() => {});
 
     return result;
   }

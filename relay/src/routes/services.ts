@@ -100,7 +100,7 @@ router.get("/status", async (req: Request, res: Response) => {
         status: "running",
         uptime: "2h 15m",
         requests: 2341,
-      }
+      },
     };
 
     loggers.services.info("Returning services status");

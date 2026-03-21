@@ -11,7 +11,8 @@ const router: Router = Router();
  * Admin or API Key authentication middleware helper
  */
 async function adminOrApiKeyAuthMiddleware(req: Request, res: Response, next: NextFunction) {
-  const { adminOrApiKeyAuthMiddleware: authMiddleware } = await import("../../middleware/admin-or-api-key-auth");
+  const { adminOrApiKeyAuthMiddleware: authMiddleware } =
+    await import("../../middleware/admin-or-api-key-auth");
   authMiddleware(req, res, next);
 }
 
@@ -138,13 +139,11 @@ router.post("/pin/rm", adminOrApiKeyAuthMiddleware, async (req, res) => {
 
     ipfsReq.on("error", (err) => {
       loggers.server.error({ err, cid }, `❌ IPFS Pin rm network error`);
-      res
-        .status(500)
-        .json({
-          success: false,
-          error: err.message,
-          details: "Network error connecting to IPFS API",
-        });
+      res.status(500).json({
+        success: false,
+        error: err.message,
+        details: "Network error connecting to IPFS API",
+      });
     });
 
     ipfsReq.on("timeout", () => {
@@ -217,13 +216,11 @@ router.post("/pins/rm", adminOrApiKeyAuthMiddleware, async (req, res) => {
         } else {
           const statusCode = ipfsRes.statusCode || 500;
           loggers.server.error({ cid, statusCode }, `❌ IPFS Pin rm (alias /pins/rm) failed`);
-          res
-            .status(statusCode)
-            .json({
-              success: false,
-              error: `IPFS pin removal failed: ${statusCode}`,
-              details: data,
-            });
+          res.status(statusCode).json({
+            success: false,
+            error: `IPFS pin removal failed: ${statusCode}`,
+            details: data,
+          });
         }
       });
     });

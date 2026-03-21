@@ -38,10 +38,10 @@ export function announceRelayPresence(
 
   // Write to unified relays path
   getGunNode(gun, GUN_PATHS.RELAYS).get(pubKey).put(presenceData);
-  
+
   // Also announce to PEERS path so Mules can find us as a generic peer
   getGunNode(gun, GUN_PATHS.PEERS).get(pubKey).put(presenceData);
-  
+
   log.info({ pubKey, endpoint: relayInfo.endpoint }, "Announced relay presence on GunDB");
 }
 
@@ -52,39 +52,41 @@ export function announceRelayPresence(
  */
 export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): void {
   log.info("Starting GunDB peer discovery...");
-  
-  getGunNode(gun, GUN_PATHS.RELAYS).map().on((data: any, pubKey: string) => {
-    if (!data || !data.endpoint) return;
 
-    // Validate endpoint (basic check)
-    if (typeof data.endpoint !== 'string' || !data.endpoint.startsWith('http')) {
-      log.warn({ pubKey, data }, "Invalid endpoint in peer discovery");
-      return;
-    }
+  getGunNode(gun, GUN_PATHS.RELAYS)
+    .map()
+    .on((data: any, pubKey: string) => {
+      if (!data || !data.endpoint) return;
 
-    let peerEndpoint = data.endpoint.trim();
-    if (peerEndpoint.endsWith("/")) {
-      peerEndpoint = peerEndpoint.slice(0, -1);
-    }
+      // Validate endpoint (basic check)
+      if (typeof data.endpoint !== "string" || !data.endpoint.startsWith("http")) {
+        log.warn({ pubKey, data }, "Invalid endpoint in peer discovery");
+        return;
+      }
 
-    // Skip our own endpoint
-    if (excludeEndpoint && peerEndpoint.toLowerCase() === excludeEndpoint.toLowerCase()) {
-      return;
-    }
+      let peerEndpoint = data.endpoint.trim();
+      if (peerEndpoint.endsWith("/")) {
+        peerEndpoint = peerEndpoint.slice(0, -1);
+      }
 
-    // Build Gun peer URL - add /gun if not already present
-    let gunPeerUrl: string;
-    if (peerEndpoint.endsWith("/gun")) {
-      gunPeerUrl = peerEndpoint;
-    } else {
-      gunPeerUrl = `${peerEndpoint}/gun`;
-    }
+      // Skip our own endpoint
+      if (excludeEndpoint && peerEndpoint.toLowerCase() === excludeEndpoint.toLowerCase()) {
+        return;
+      }
 
-    // Add as peer
-    gun.opt({ peers: [gunPeerUrl] });
+      // Build Gun peer URL - add /gun if not already present
+      let gunPeerUrl: string;
+      if (peerEndpoint.endsWith("/gun")) {
+        gunPeerUrl = peerEndpoint;
+      } else {
+        gunPeerUrl = `${peerEndpoint}/gun`;
+      }
 
-    log.info({ peer: gunPeerUrl, pubKey }, "Discovered peer via GunDB");
-  });
+      // Add as peer
+      gun.opt({ peers: [gunPeerUrl] });
+
+      log.info({ peer: gunPeerUrl, pubKey }, "Discovered peer via GunDB");
+    });
 }
 
 /**
@@ -93,11 +95,13 @@ export function syncGunDBPeers(gun: IGunInstance, excludeEndpoint?: string): voi
  */
 export function syncMulePeers(gun: IGunInstance): void {
   log.info("Starting GunDB Mule peer discovery...");
-  
-  getGunNode(gun, GUN_PATHS.PEERS).map().on((data: any, pubKey: string) => {
-    if (!data) return;
-    
-    // We don't add Mules as gun.opt({peers}) because they are likely not running Gun servers (or are behind NAT)
-    // But we do want to discover them for chat.
-  });
+
+  getGunNode(gun, GUN_PATHS.PEERS)
+    .map()
+    .on((data: any, pubKey: string) => {
+      if (!data) return;
+
+      // We don't add Mules as gun.opt({peers}) because they are likely not running Gun servers (or are behind NAT)
+      // But we do want to discover them for chat.
+    });
 }

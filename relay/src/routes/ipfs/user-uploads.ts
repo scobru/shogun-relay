@@ -188,7 +188,8 @@ router.get("/user-uploads/:userAddress/:hash/decrypt", async (req: Request, res:
     if (
       !headerUserAddress ||
       typeof headerUserAddress !== "string" ||
-      ((headerUserAddress as string) || "").toLowerCase() !== ((userAddress as string) || "").toLowerCase()
+      ((headerUserAddress as string) || "").toLowerCase() !==
+        ((userAddress as string) || "").toLowerCase()
     ) {
       return res
         .status(401)
@@ -241,7 +242,8 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
     if (
       !headerUserAddress ||
       typeof headerUserAddress !== "string" ||
-      ((headerUserAddress as string) || "").toLowerCase() !== ((userAddress as string) || "").toLowerCase()
+      ((headerUserAddress as string) || "").toLowerCase() !==
+        ((userAddress as string) || "").toLowerCase()
     ) {
       return res
         .status(401)
