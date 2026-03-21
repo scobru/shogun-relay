@@ -114,9 +114,6 @@ services:
     networks:
       - shogun-network
 
-    networks:
-      - shogun-network
-
 
 volumes:
   radata:
