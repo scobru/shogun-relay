@@ -127,7 +127,8 @@ router.get(
   "/cat-directory/:directoryCid/:filePath(*)",
   async (req: CustomRequest, res: Response) => {
     try {
-      const directoryCid = req.params.directoryCid as string; const filePath = req.params.filePath as string;
+      const directoryCid = req.params.directoryCid as string;
+      const filePath = req.params.filePath as string;
 
       if (!directoryCid || !filePath) {
         return res.status(400).json({
@@ -194,7 +195,7 @@ router.get(
  */
 router.post("/api/:endpoint(*)", async (req: CustomRequest, res: Response) => {
   try {
-    const endpoint = (req.params.endpoint as string);
+    const endpoint = req.params.endpoint as string;
     const requestOptions: IpfsRequestOptions = {
       hostname: "127.0.0.1",
       port: 5001,

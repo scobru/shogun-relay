@@ -1,13 +1,13 @@
 /**
  * Runtime Configuration Manager
- * 
+ *
  * Provides hot-reload capability for certain configuration values.
  * Some configs can be changed without restart, others require .env modification.
  */
 
-import fs from 'fs';
-import path from 'path';
-import { loggers } from './logger';
+import fs from "fs";
+import path from "path";
+import { loggers } from "./logger";
 
 // ============================================================================
 // HOT-RELOADABLE CONFIGURATION KEYS
@@ -18,63 +18,63 @@ import { loggers } from './logger';
  */
 export const HOT_RELOADABLE_KEYS = [
   // Logging
-  'LOG_LEVEL',
-  'DEBUG',
+  "LOG_LEVEL",
+  "DEBUG",
 
   // Sync Intervals
-  'WORMHOLE_CLEANUP_INTERVAL_MS',
-  'WORMHOLE_MAX_AGE_SECS',
+  "WORMHOLE_CLEANUP_INTERVAL_MS",
+  "WORMHOLE_MAX_AGE_SECS",
 
   // Limits
-  'RELAY_MAX_STORAGE_GB',
-  'RELAY_STORAGE_WARNING_THRESHOLD',
-  'IPFS_PIN_TIMEOUT_MS',
+  "RELAY_MAX_STORAGE_GB",
+  "RELAY_STORAGE_WARNING_THRESHOLD",
+  "IPFS_PIN_TIMEOUT_MS",
 
   // Replication
-  'AUTO_REPLICATION',
+  "AUTO_REPLICATION",
 ] as const;
 
-export type HotReloadableKey = typeof HOT_RELOADABLE_KEYS[number];
+export type HotReloadableKey = (typeof HOT_RELOADABLE_KEYS)[number];
 
 /**
  * Keys that require server restart
  */
 export const RESTART_REQUIRED_KEYS = [
   // Server
-  'RELAY_HOST',
-  'RELAY_PORT',
-  'RELAY_NAME',
-  'RELAY_PEERS',
-  'RELAY_PROTECTED',
+  "RELAY_HOST",
+  "RELAY_PORT",
+  "RELAY_NAME",
+  "RELAY_PEERS",
+  "RELAY_PROTECTED",
 
   // Authentication
-  'ADMIN_PASSWORD',
+  "ADMIN_PASSWORD",
 
   // Keys
-  'RELAY_SEA_KEYPAIR',
-  'RELAY_SEA_KEYPAIR_PATH',
-  'RELAY_PRIVATE_KEY',
-  'PRIVATE_KEY',
+  "RELAY_SEA_KEYPAIR",
+  "RELAY_SEA_KEYPAIR_PATH",
+  "RELAY_PRIVATE_KEY",
+  "PRIVATE_KEY",
 
   // Module Enable Flags
-  'IPFS_ENABLED',
-  'WORMHOLE_ENABLED',
+  "IPFS_ENABLED",
+  "WORMHOLE_ENABLED",
 
   // URLs / Endpoints
-  'IPFS_API_URL',
-  'IPFS_GATEWAY_URL',
-  'IPFS_API_TOKEN',
+  "IPFS_API_URL",
+  "IPFS_GATEWAY_URL",
+  "IPFS_API_TOKEN",
 
   // Storage
-  'DATA_DIR',
-  'STORAGE_TYPE',
-  'DISABLE_RADISK',
+  "DATA_DIR",
+  "STORAGE_TYPE",
+  "DISABLE_RADISK",
 
   // Drive
-  'DRIVE_DATA_DIR',
+  "DRIVE_DATA_DIR",
 ] as const;
 
-export type RestartRequiredKey = typeof RESTART_REQUIRED_KEYS[number];
+export type RestartRequiredKey = (typeof RESTART_REQUIRED_KEYS)[number];
 export type ConfigKey = HotReloadableKey | RestartRequiredKey;
 
 // ============================================================================
@@ -105,12 +105,12 @@ export function getConfigValue(key: string): string | undefined {
  */
 export function setRuntimeValue(key: HotReloadableKey, value: string): boolean {
   if (!HOT_RELOADABLE_KEYS.includes(key)) {
-    loggers.server.warn({ key }, 'Attempted to hot-reload non-hot-reloadable key');
+    loggers.server.warn({ key }, "Attempted to hot-reload non-hot-reloadable key");
     return false;
   }
 
   runtimeOverrides.set(key, value);
-  loggers.server.info({ key, value }, '🔄 Runtime config updated (hot-reload)');
+  loggers.server.info({ key, value }, "🔄 Runtime config updated (hot-reload)");
   return true;
 }
 
@@ -155,13 +155,13 @@ export function requiresRestart(key: string): boolean {
  */
 export function readEnvFile(): string | null {
   try {
-    const envPath = path.join(process.cwd(), '.env');
+    const envPath = path.join(process.cwd(), ".env");
     if (!fs.existsSync(envPath)) {
       return null;
     }
-    return fs.readFileSync(envPath, 'utf-8');
+    return fs.readFileSync(envPath, "utf-8");
   } catch (error) {
-    loggers.server.error({ err: error }, 'Failed to read .env file');
+    loggers.server.error({ err: error }, "Failed to read .env file");
     return null;
   }
 }
@@ -171,21 +171,23 @@ export function readEnvFile(): string | null {
  */
 export function parseEnvFile(content: string): Record<string, string> {
   const result: Record<string, string> = {};
-  const lines = content.split('\n');
+  const lines = content.split("\n");
 
   for (const line of lines) {
     const trimmed = line.trim();
     // Skip comments and empty lines
-    if (!trimmed || trimmed.startsWith('#')) continue;
+    if (!trimmed || trimmed.startsWith("#")) continue;
 
-    const eqIndex = trimmed.indexOf('=');
+    const eqIndex = trimmed.indexOf("=");
     if (eqIndex > 0) {
       const key = trimmed.substring(0, eqIndex).trim();
       let value = trimmed.substring(eqIndex + 1).trim();
 
       // Remove surrounding quotes if present
-      if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
         value = value.slice(1, -1);
       }
 
@@ -202,22 +204,22 @@ export function parseEnvFile(content: string): Record<string, string> {
  */
 export function updateEnvFile(updates: Record<string, string>): boolean {
   try {
-    const envPath = path.join(process.cwd(), '.env');
-    let content = '';
+    const envPath = path.join(process.cwd(), ".env");
+    let content = "";
 
     if (fs.existsSync(envPath)) {
-      content = fs.readFileSync(envPath, 'utf-8');
+      content = fs.readFileSync(envPath, "utf-8");
     }
 
-    const lines = content.split('\n');
+    const lines = content.split("\n");
     const updatedKeys = new Set<string>();
 
     // Update existing keys
-    const newLines = lines.map(line => {
+    const newLines = lines.map((line) => {
       const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) return line;
+      if (!trimmed || trimmed.startsWith("#")) return line;
 
-      const eqIndex = trimmed.indexOf('=');
+      const eqIndex = trimmed.indexOf("=");
       if (eqIndex > 0) {
         const key = trimmed.substring(0, eqIndex).trim();
         if (updates.hasOwnProperty(key)) {
@@ -239,12 +241,12 @@ export function updateEnvFile(updates: Record<string, string>): boolean {
       }
     }
 
-    fs.writeFileSync(envPath, newLines.join('\n'));
-    loggers.server.info({ keys: Object.keys(updates) }, '📝 .env file updated');
+    fs.writeFileSync(envPath, newLines.join("\n"));
+    loggers.server.info({ keys: Object.keys(updates) }, "📝 .env file updated");
 
     return true;
   } catch (error) {
-    loggers.server.error({ err: error }, 'Failed to update .env file');
+    loggers.server.error({ err: error }, "Failed to update .env file");
     return false;
   }
 }
@@ -256,7 +258,7 @@ export function updateEnvFile(updates: Record<string, string>): boolean {
 interface ConfigInfo {
   key: string;
   value: string | undefined;
-  source: 'runtime' | 'env' | 'default';
+  source: "runtime" | "env" | "default";
   hotReloadable: boolean;
   category: string;
 }
@@ -268,25 +270,25 @@ export function getAllConfig(): ConfigInfo[] {
   const allKeys = [...HOT_RELOADABLE_KEYS, ...RESTART_REQUIRED_KEYS];
 
   const categorize = (key: string): string => {
-    if (key.startsWith('LOG') || key === 'DEBUG') return 'Logging';
-    if (key.startsWith('RELAY_')) return 'Relay';
-    if (key.startsWith('IPFS_')) return 'IPFS';
-    if (key.startsWith('WORMHOLE_')) return 'Wormhole';
+    if (key.startsWith("LOG") || key === "DEBUG") return "Logging";
+    if (key.startsWith("RELAY_")) return "Relay";
+    if (key.startsWith("IPFS_")) return "IPFS";
+    if (key.startsWith("WORMHOLE_")) return "Wormhole";
 
-    if (key.startsWith('DRIVE_')) return 'Drive';
-    if (key.includes('STORAGE') || key === 'DATA_DIR') return 'Storage';
-    if (key.includes('PASSWORD') || key.includes('KEY') || key.includes('TOKEN')) return 'Security';
-    return 'Other';
+    if (key.startsWith("DRIVE_")) return "Drive";
+    if (key.includes("STORAGE") || key === "DATA_DIR") return "Storage";
+    if (key.includes("PASSWORD") || key.includes("KEY") || key.includes("TOKEN")) return "Security";
+    return "Other";
   };
 
-  return allKeys.map(key => {
+  return allKeys.map((key) => {
     const hasRuntimeOverride = runtimeOverrides.has(key);
     const envValue = process.env[key];
 
     return {
       key,
       value: hasRuntimeOverride ? runtimeOverrides.get(key) : envValue,
-      source: hasRuntimeOverride ? 'runtime' : (envValue !== undefined ? 'env' : 'default'),
+      source: hasRuntimeOverride ? "runtime" : envValue !== undefined ? "env" : "default",
       hotReloadable: isHotReloadable(key),
       category: categorize(key),
     };

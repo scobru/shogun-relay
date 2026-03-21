@@ -48,17 +48,20 @@ export const config = {
     peers: (() => {
       const peersEnv = process.env.GUN_PEERS || process.env.RELAY_PEERS;
       if (peersEnv) {
-        return peersEnv.split(",").map(p => p.trim()).filter(p => p.length > 0);
+        return peersEnv
+          .split(",")
+          .map((p) => p.trim())
+          .filter((p) => p.length > 0);
       }
       // Default public Gun peers
       return [
-        'https://gun-manhattan.herokuapp.com/gun',
-        'https://peer.wallie.io/gun',
-        'https://gundb-relay-mlccl.ondigitalocean.app/gun',
-        'https://plankton-app-6qfp3.ondigitalocean.app/gun',
-        'https://gun.defucc.me/gun',
-        'https://shogun-relay.scobrudot.dev/gun',
-        'https://shogun-relay-2.scobrudot.dev/gun',
+        "https://gun-manhattan.herokuapp.com/gun",
+        "https://peer.wallie.io/gun",
+        "https://gundb-relay-mlccl.ondigitalocean.app/gun",
+        "https://plankton-app-6qfp3.ondigitalocean.app/gun",
+        "https://gun.defucc.me/gun",
+        "https://shogun-relay.scobrudot.dev/gun",
+        "https://shogun-relay-2.scobrudot.dev/gun",
       ];
     })(),
   },
@@ -168,9 +171,7 @@ export const config = {
   // ============================================================================
 
   drive: {
-    dataDir:
-      process.env.DRIVE_DATA_DIR ||
-      path.join(process.cwd(), "data", "drive"),
+    dataDir: process.env.DRIVE_DATA_DIR || path.join(process.cwd(), "data", "drive"),
 
     // Storage backend: "fs" (local filesystem) or "minio" (S3-compatible)
     storageType: (process.env.DRIVE_STORAGE_TYPE || "fs") as "fs" | "minio",

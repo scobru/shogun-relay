@@ -99,17 +99,17 @@ describe("Drive Security - Public Link Access", () => {
 
     // Assert that we are NOT serving HTML inline as HTML
     if (isInline) {
-        expect(contentTypeCall[1], "Should force text/plain for inline HTML").toBe("text/plain");
-        // Also ensure nosniff is set
-        expect(nosniffCall, "Should set X-Content-Type-Options: nosniff").toBeDefined();
-        expect(nosniffCall[1]).toBe("nosniff");
+      expect(contentTypeCall[1], "Should force text/plain for inline HTML").toBe("text/plain");
+      // Also ensure nosniff is set
+      expect(nosniffCall, "Should set X-Content-Type-Options: nosniff").toBeDefined();
+      expect(nosniffCall[1]).toBe("nosniff");
     } else {
-       // If attached, it's safer, but we prefer checking for text/plain in this fix
+      // If attached, it's safer, but we prefer checking for text/plain in this fix
     }
   });
 
   it("should force text/plain for SVG files to prevent XSS", async () => {
-     // 1. Setup mock data
+    // 1. Setup mock data
     mockLinkManager.getPublicLink.mockResolvedValue({
       linkId: "test-link-id",
       filePath: "malicious.svg",

@@ -53,7 +53,10 @@ async function checkIpfsReady(timeout: number = 2000): Promise<boolean> {
     };
 
     if (IPFS_API_TOKEN) {
-      const headers = (options.headers || {}) as Record<string, string | string[] | number | undefined>;
+      const headers = (options.headers || {}) as Record<
+        string,
+        string | string[] | number | undefined
+      >;
       options.headers = {
         ...headers,
         Authorization: `Bearer ${IPFS_API_TOKEN}`,
@@ -167,7 +170,10 @@ async function ipfsRequest(
         };
 
         if (IPFS_API_TOKEN) {
-          const reqHeaders = (requestOptions.headers || {}) as Record<string, string | string[] | number | undefined>;
+          const reqHeaders = (requestOptions.headers || {}) as Record<
+            string,
+            string | string[] | number | undefined
+          >;
           requestOptions.headers = {
             ...reqHeaders,
             Authorization: `Bearer ${IPFS_API_TOKEN}`,
@@ -295,7 +301,10 @@ async function ipfsUpload(
         };
 
         if (IPFS_API_TOKEN) {
-          const reqHeaders = (requestOptions.headers || {}) as Record<string, string | string[] | number | undefined>;
+          const reqHeaders = (requestOptions.headers || {}) as Record<
+            string,
+            string | string[] | number | undefined
+          >;
           requestOptions.headers = {
             ...reqHeaders,
             Authorization: `Bearer ${IPFS_API_TOKEN}`,

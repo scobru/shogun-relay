@@ -28,24 +28,26 @@ vi.mock("../utils/gun-paths", () => ({
 }));
 
 // Mock http.request
-const mockHttpRequest = vi.spyOn(http, "request").mockImplementation((options: any, callback?: any) => {
-  const req: any = {
-    on: vi.fn(),
-    write: vi.fn(),
-    end: vi.fn(),
-  };
-  // Simulate immediate response to prevent hanging
-  if (callback) {
+const mockHttpRequest = vi
+  .spyOn(http, "request")
+  .mockImplementation((options: any, callback?: any) => {
+    const req: any = {
+      on: vi.fn(),
+      write: vi.fn(),
+      end: vi.fn(),
+    };
+    // Simulate immediate response to prevent hanging
+    if (callback) {
       const res: any = {
-          on: vi.fn((event, cb) => {
-              if (event === 'end') cb();
-          }),
-          statusCode: 200
+        on: vi.fn((event, cb) => {
+          if (event === "end") cb();
+        }),
+        statusCode: 200,
       };
       callback(res);
-  }
-  return req as any;
-});
+    }
+    return req as any;
+  });
 
 describe("Uploads Route Security", () => {
   let app: express.Express;
@@ -63,9 +65,9 @@ describe("Uploads Route Security", () => {
     mockGun = {
       get: vi.fn().mockReturnThis(),
       once: vi.fn((cb) => {
-          // Default behavior: return file data immediately
-          if (cb) cb({ size: 1024, name: "test.txt" });
-          return mockGun;
+        // Default behavior: return file data immediately
+        if (cb) cb({ size: 1024, name: "test.txt" });
+        return mockGun;
       }),
       put: vi.fn((data, cb) => {
         if (cb) cb({ err: null });
@@ -99,35 +101,35 @@ describe("Uploads Route Security", () => {
 
     // Setup specific mock return for the file lookup
     const fileNode = {
-        once: vi.fn((cb) => {
-            cb({ size: 1024, name: "test.txt", hash: "testhash" });
-        }),
-        put: vi.fn((data, cb) => {
-            cb({ err: null });
-        })
+      once: vi.fn((cb) => {
+        cb({ size: 1024, name: "test.txt", hash: "testhash" });
+      }),
+      put: vi.fn((data, cb) => {
+        cb({ err: null });
+      }),
     };
 
     const userNode = {
-        get: vi.fn().mockReturnValue(fileNode)
+      get: vi.fn().mockReturnValue(fileNode),
     };
 
     // Mock system hash node
     const systemHashNode = {
-        get: vi.fn().mockReturnThis(),
-        put: vi.fn((data, cb) => {
-             if (cb) cb({ err: null });
-             return systemHashNode;
-        })
+      get: vi.fn().mockReturnThis(),
+      put: vi.fn((data, cb) => {
+        if (cb) cb({ err: null });
+        return systemHashNode;
+      }),
     };
 
     mockGun.get.mockImplementation((path: any) => {
-        if (path === GUN_PATHS.UPLOADS) return { get: vi.fn().mockReturnValue(userNode) };
-        if (path === GUN_PATHS.SYSTEM_HASH) return systemHashNode;
-        return mockGun;
+      if (path === GUN_PATHS.UPLOADS) return { get: vi.fn().mockReturnValue(userNode) };
+      if (path === GUN_PATHS.SYSTEM_HASH) return systemHashNode;
+      return mockGun;
     });
 
     await fetch(`${baseUrl}/user-uploads/testuser/testhash`, {
-        method: "DELETE"
+      method: "DELETE",
     });
 
     // Verify http.request was NOT called (SSRF fix)

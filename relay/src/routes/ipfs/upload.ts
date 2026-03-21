@@ -29,14 +29,14 @@ router.post(
     const bearerToken = authHeader && authHeader.split(" ")[1];
     const customToken = req.headers["token"];
     const adminToken = bearerToken || customToken;
-    
+
     // Check admin token or API key
     let isAdmin = false;
     let isApiKey = false;
-    
+
     // Ensure adminToken is a string (could be string | string[] from headers)
     const adminTokenStr = Array.isArray(adminToken) ? adminToken[0] : adminToken;
-    
+
     if (adminTokenStr && typeof adminTokenStr === "string") {
       // Check admin password
       if (adminTokenStr === authConfig.adminPassword) {
@@ -271,8 +271,6 @@ router.post(
           httpReq.write(postData);
           httpReq.end();
         });
-
-
 
         Promise.all([saveUploadPromise, updateMBPromise])
           .then(() => {

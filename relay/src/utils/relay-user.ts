@@ -39,8 +39,6 @@ interface RelayUserResult {
   keyPair: ISEAPair;
 }
 
-
-
 interface UploadData {
   hash?: string;
   name?: string;
@@ -96,12 +94,15 @@ async function initRelayUserWithKeyPair(
       // IMPORTANT: Explicitly publish epub to user graph for encrypted chat
       // This ensures other relays can find our encryption key
       if (keyPair.epub) {
-        user.get('epub').put(keyPair.epub);
-        user.get('pub').put(keyPair.pub);
+        user.get("epub").put(keyPair.epub);
+        user.get("pub").put(keyPair.pub);
         log.debug({ pub: relayPub }, "Published epub key for encrypted chat");
       }
 
-      log.debug({ pub: relayPub, pubLength: relayPub?.length }, "Relay user authenticated with keypair");
+      log.debug(
+        { pub: relayPub, pubLength: relayPub?.length },
+        "Relay user authenticated with keypair"
+      );
       resolve({ user: relayUser, pub: relayPub!, keyPair: relayKeyPair });
     });
   });
@@ -189,33 +190,33 @@ export async function cleanDuplicateAliases(gunInstance?: any): Promise<any> {
   const stats = {
     totalAliases: 0,
     cleaned: 0,
-    errors: 0
+    errors: 0,
   };
 
   log.info("🧹 Starting duplicate alias cleanup...");
 
   return new Promise((resolve) => {
     // Gun's internal alias index is at ~@
-    gun.get('~@').once((data: any) => {
+    gun.get("~@").once((data: any) => {
       if (!data) {
         log.info("ℹ️ No aliases found in index");
         resolve(stats);
         return;
       }
 
-      const aliases = Object.keys(data).filter(k => k !== '_' && k !== '#');
+      const aliases = Object.keys(data).filter((k) => k !== "_" && k !== "#");
       stats.totalAliases = aliases.length;
-      
+
       if (aliases.length === 0) {
         resolve(stats);
         return;
       }
 
       let processed = 0;
-      aliases.forEach(alias => {
-        gun.get('~@' + alias).once((users: any) => {
+      aliases.forEach((alias) => {
+        gun.get("~@" + alias).once((users: any) => {
           if (users) {
-            const userPubs = Object.keys(users).filter(k => k !== '_' && k !== '#');
+            const userPubs = Object.keys(users).filter((k) => k !== "_" && k !== "#");
             if (userPubs.length > 1) {
               log.info({ alias, count: userPubs.length }, `🔍 Found duplicate alias`);
               // Implementation detail: typically we might want to keep the one that actually exists/is active
@@ -223,7 +224,7 @@ export async function cleanDuplicateAliases(gunInstance?: any): Promise<any> {
               stats.cleaned++;
             }
           }
-          
+
           processed++;
           if (processed === aliases.length) {
             resolve(stats);
@@ -231,7 +232,7 @@ export async function cleanDuplicateAliases(gunInstance?: any): Promise<any> {
         });
       });
     });
-    
+
     // Safety timeout
     setTimeout(() => resolve(stats), 10000);
   });
@@ -250,12 +251,17 @@ export async function rebuildAliasIndex(gunInstance?: any): Promise<void> {
 
   // Iterate over users in our app's user list and ensure they are in ~@
   return new Promise((resolve) => {
-    getGunNode(gun, GUN_PATHS.USERS).map().once((userData: any, pub: string) => {
-      if (userData && userData.alias) {
-        // Ensure ~@alias points to this pub
-        gun.get('~@' + userData.alias).get(pub).put(true);
-      }
-    });
+    getGunNode(gun, GUN_PATHS.USERS)
+      .map()
+      .once((userData: any, pub: string) => {
+        if (userData && userData.alias) {
+          // Ensure ~@alias points to this pub
+          gun
+            .get("~@" + userData.alias)
+            .get(pub)
+            .put(true);
+        }
+      });
 
     // Resolve after a delay to allow map to work
     setTimeout(resolve, 5000);
@@ -287,6 +293,4 @@ export default {
   getRelayUser,
   getRelayPub,
   isRelayUserInitialized,
-
 };
-
