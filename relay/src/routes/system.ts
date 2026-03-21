@@ -9,7 +9,6 @@ import { config } from "../config/env-config";
 import { GUN_PATHS, getGunNode } from "../utils/gun-paths";
 import { adminAuthMiddleware } from "../middleware/admin-auth";
 
-
 // Helper to read the last N lines of a file without loading the entire file into memory
 // Helper to read the last N lines of a file without loading the entire file into memory
 async function readLastLines(filePath: string, numLines: number): Promise<string[]> {
@@ -63,7 +62,7 @@ async function readLastLines(filePath: string, numLines: number): Promise<string
       }
     }
   } catch (error: any) {
-    if (error.code === 'ENOENT') return [];
+    if (error.code === "ENOENT") return [];
     throw error;
   }
 }
@@ -684,7 +683,11 @@ router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
     // Normalize service name
     const normalizedName = (serviceName as string).toLowerCase().replace(/%20/g, " ").trim();
 
-    if (normalizedName.includes("..") || normalizedName.includes("/") || normalizedName.includes("\\")) {
+    if (
+      normalizedName.includes("..") ||
+      normalizedName.includes("/") ||
+      normalizedName.includes("\\")
+    ) {
       return res.status(400).json({
         success: false,
         error: "Invalid service name",

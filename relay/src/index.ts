@@ -710,9 +710,6 @@ async function initializeServer() {
     }
   } else if (relayKeysConfig.seaKeypairPath) {
     try {
-
-
-
       // Determine the actual keypair file path
       let keypairFilePath = relayKeysConfig.seaKeypairPath;
 
@@ -773,9 +770,6 @@ async function initializeServer() {
     loggers.server.warn(`⚠️ No keypair configured. Attempting to auto-generate...`);
 
     try {
-
-
-
       // Try default locations
       const defaultPaths = [
         "/app/keys/relay-keypair.json",

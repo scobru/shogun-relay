@@ -493,14 +493,18 @@ router.get("/stats", async (req, res) => {
 
               // Use NumObjects from repoStats instead of fetching all pins
               if (repoStats && typeof repoStats === "object" && "NumObjects" in repoStats) {
-                const pinCount = safeParseNumber((repoStats as { NumObjects?: unknown }).NumObjects);
+                const pinCount = safeParseNumber(
+                  (repoStats as { NumObjects?: unknown }).NumObjects
+                );
                 stats.totalPins += pinCount;
                 loggers.server.debug(
                   { pinCount },
                   `   📌 Current relay IPFS objects (fallback): ${pinCount}`
                 );
               } else if (repoStats && typeof repoStats === "object" && "numObjects" in repoStats) {
-                const pinCount = safeParseNumber((repoStats as { numObjects?: unknown }).numObjects);
+                const pinCount = safeParseNumber(
+                  (repoStats as { numObjects?: unknown }).numObjects
+                );
                 stats.totalPins += pinCount;
                 loggers.server.debug(
                   { pinCount },
@@ -552,21 +556,29 @@ router.get("/stats", async (req, res) => {
                 }
 
                 // Use NumObjects from repoStats instead of fetching all pins
-              if (repoStats && typeof repoStats === "object" && "NumObjects" in repoStats) {
-                const pinCount = safeParseNumber((repoStats as { NumObjects?: unknown }).NumObjects);
-                stats.totalPins += pinCount;
-                loggers.server.debug(
-                  { pinCount },
-                  `   📌 Current relay IPFS objects (fallback): ${pinCount}`
-                );
-              } else if (repoStats && typeof repoStats === "object" && "numObjects" in repoStats) {
-                const pinCount = safeParseNumber((repoStats as { numObjects?: unknown }).numObjects);
-                stats.totalPins += pinCount;
-                loggers.server.debug(
-                  { pinCount },
-                  `   📌 Current relay IPFS objects (fallback): ${pinCount}`
-                );
-              }
+                if (repoStats && typeof repoStats === "object" && "NumObjects" in repoStats) {
+                  const pinCount = safeParseNumber(
+                    (repoStats as { NumObjects?: unknown }).NumObjects
+                  );
+                  stats.totalPins += pinCount;
+                  loggers.server.debug(
+                    { pinCount },
+                    `   📌 Current relay IPFS objects (fallback): ${pinCount}`
+                  );
+                } else if (
+                  repoStats &&
+                  typeof repoStats === "object" &&
+                  "numObjects" in repoStats
+                ) {
+                  const pinCount = safeParseNumber(
+                    (repoStats as { numObjects?: unknown }).numObjects
+                  );
+                  stats.totalPins += pinCount;
+                  loggers.server.debug(
+                    { pinCount },
+                    `   📌 Current relay IPFS objects (fallback): ${pinCount}`
+                  );
+                }
               }
             } catch (ipfsError) {
               // Ignore IPFS errors
@@ -615,7 +627,9 @@ router.get("/stats", async (req, res) => {
           }
         }
       } catch (repoError) {
-        loggers.server.debug(`   ⚠️ IPFS repo/stat failed. IPFS may be starting up or have config issues.`);
+        loggers.server.debug(
+          `   ⚠️ IPFS repo/stat failed. IPFS may be starting up or have config issues.`
+        );
       }
     }
 
