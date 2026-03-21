@@ -603,7 +603,7 @@ async function initializeServer() {
     uuid: relayConfig.name,
     localStorage: false,
     wire: true,
-    axe: true,
+    axe: false,
     rfs: true,
     wait: 500,
     webrtc: true,
