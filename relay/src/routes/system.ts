@@ -412,7 +412,7 @@ router.delete("/node/*", adminAuthMiddleware, async (req, res) => {
 });
 
 // Logs endpoint for real-time relay logs from file
-router.get("/logs", adminAuthMiddleware, (req, res) => {
+router.get("/logs", adminAuthMiddleware, async (req, res) => {
   try {
     const limit: number = parseInt(req.query.limit as string || "") || 100;
     const tail: number = parseInt(req.query.tail as string || "") || 100; // Number of lines to read from end
@@ -445,7 +445,7 @@ router.get("/logs", adminAuthMiddleware, (req, res) => {
     }
 
     // Read the last N lines from the log file
-    const logContent = fs.readFileSync(logFilePath, "utf8");
+    const logContent = await fs.promises.readFile(logFilePath, "utf8");
     const lines = logContent.split("\n").filter((line) => line.trim() !== "");
 
     // Get the last N lines
@@ -613,7 +613,7 @@ router.post("/peers/add", adminAuthMiddleware, (req, res) => {
 });
 
 // Services Logs endpoint
-router.get("/services/:name/logs", adminAuthMiddleware, (req, res) => {
+router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
   try {
     const serviceName = req.params.name;
     const limit = parseInt(req.query.limit as string || "") || 100;
@@ -672,7 +672,7 @@ router.get("/services/:name/logs", adminAuthMiddleware, (req, res) => {
     }
 
     // Reuse log reading logic (simplified here)
-    const logContent = fs.readFileSync(logFile, "utf8");
+    const logContent = await fs.promises.readFile(logFile, "utf8");
     const lines = logContent.split("\n").filter((line) => line.trim() !== "");
     const lastLines = lines.slice(-tail);
 
