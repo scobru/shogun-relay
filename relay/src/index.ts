@@ -11,7 +11,7 @@ import Gun from "gun";
 import "gun/sea";
 import "gun/lib/stats";
 import "gun/lib/webrtc";
-import "gun/axe";
+// import "gun/axe"; // Disabled: causes infinite event-loop blocks / 504 Gateway Timeouts on writes in cyclic nets
 import "gun/lib/wire";
 import "./utils/bullet-catcher";
 

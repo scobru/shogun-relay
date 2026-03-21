@@ -94,7 +94,8 @@ class SQLiteStore {
     if (this.isClosed) {
       // Silently return null during shutdown to avoid errors
       // GunDB may still have pending operations during shutdown
-      return cb(null, null);
+      setImmediate(() => cb(null, null));
+      return;
     }
 
     try {
@@ -105,7 +106,7 @@ class SQLiteStore {
           // Try to parse the JSON to validate it
           JSON.parse(row.data);
           // If parsing succeeds, return the data
-          cb(null, row.data);
+          setImmediate(() => cb(null, row.data));
         } catch (parseErr) {
           // If JSON is corrupted, log and return null (GUN will treat as missing file)
           log.warn(
@@ -113,18 +114,19 @@ class SQLiteStore {
             "Corrupted JSON data detected in radisk file, skipping"
           );
           // Return null so GUN treats it as a missing file and can recreate it
-          cb(null, null);
+          setImmediate(() => cb(null, null));
         }
       } else {
-        cb(null, null); // File not foundefined, return undefinedefined
+        setImmediate(() => cb(null, null)); // File not foundefined, return undefinedefined
       }
     } catch (err) {
       // If error is due to closed database, return undefinedined silently
       if (err instanceof Error && err.message.includes("not open")) {
         this.isClosed = true; // Mark as closed
-        return cb(null, null);
+        setImmediate(() => cb(null, null));
+        return;
       }
-      cb(err as Error, null);
+      setImmediate(() => cb(err as Error, null));
     }
   }
 
@@ -138,20 +140,22 @@ class SQLiteStore {
     // Check if database is closed (during shutdown)
     if (this.isClosed) {
       // Silently ignore writes during shutdown
-      return cb(null, 1);
+      setImmediate(() => cb(null, 1));
+      return;
     }
 
     try {
       const timestamp = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
       this.putStmt.run(file, data, timestamp);
-      cb(null, 1); // Success
+      setImmediate(() => cb(null, 1)); // Success
     } catch (err) {
       // If error is due to closed database, silently ignore
       if (err instanceof Error && err.message.includes("not open")) {
         this.isClosed = true; // Mark as closed
-        return cb(null, 1);
+        setImmediate(() => cb(null, 1));
+        return;
       }
-      cb(err as Error, null);
+      setImmediate(() => cb(err as Error, null));
     }
   }
 
@@ -163,21 +167,22 @@ class SQLiteStore {
     // Check if database is closed (during shutdown)
     if (this.isClosed) {
       // Signal completion immediately during shutdown
-      return cb(null);
+      setImmediate(() => cb(null));
+      return;
     }
 
     try {
       const rows = this.listStmt.all();
       for (const row of rows) {
-        cb(row.file);
+        cb(row.file); // Do not defer loop callbacks to avoid massive queues if list is huge
       }
-      cb(null); // Signal completion
+      setImmediate(() => cb(null)); // Signal completion once at the end
     } catch (err) {
       // If error is due to closed database, mark as closed and signal completion
       if (err instanceof Error && err.message.includes("not open")) {
         this.isClosed = true; // Mark as closed
       }
-      cb(null); // On error, just signal completion
+      setImmediate(() => cb(null)); // On error, just signal completion
     }
   }
 
