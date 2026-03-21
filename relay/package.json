@@ -7,7 +7,6 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "start:dev": "nodemon --exec tsx src/index.ts",
-    "postinstall": "node scripts/postinstall.js",
     "build:ts": "tsc",
     "build:ts:watch": "tsc --watch",
     "test": "vitest run",
