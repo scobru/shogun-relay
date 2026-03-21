@@ -8,7 +8,7 @@ const router: Router = express.Router();
 // Route per riavviare un servizio specifico
 router.post("/:service/restart", async (req: Request, res: Response) => {
   try {
-    const { service } = req.params;
+    const service = req.params.service as string;
     loggers.services.info({ service }, "Requesting service restart");
 
     // Verifica autenticazione

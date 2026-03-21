@@ -51,7 +51,7 @@ router.get("/user-uploads/:userAddress", async (req, res) => {
         .json({ success: false, error: "Server error - Gun instance not available" });
     }
 
-    const uploads = await getUserUploadsFromGun(gun, userAddress);
+    const uploads = await getUserUploadsFromGun(gun, userAddress as string);
 
     res.json({
       success: true,
@@ -87,7 +87,7 @@ router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
         .json({ success: false, error: "Server error - Gun instance not available" });
     }
 
-    const uploads = await getUserUploadsFromGun(gun, userAddress);
+    const uploads = await getUserUploadsFromGun(gun, userAddress as string);
     const uploadRecord = uploads.find((u) => u.hash === hash);
 
     if (!uploadRecord) {
@@ -188,7 +188,7 @@ router.get("/user-uploads/:userAddress/:hash/decrypt", async (req: Request, res:
     if (
       !headerUserAddress ||
       typeof headerUserAddress !== "string" ||
-      headerUserAddress.toLowerCase() !== userAddress.toLowerCase()
+      ((headerUserAddress as string) || "").toLowerCase() !== ((userAddress as string) || "").toLowerCase()
     ) {
       return res
         .status(401)
@@ -202,7 +202,7 @@ router.get("/user-uploads/:userAddress/:hash/decrypt", async (req: Request, res:
         .json({ success: false, error: "Server error - Gun instance not available" });
     }
 
-    const uploads = await getUserUploadsFromGun(gun, userAddress);
+    const uploads = await getUserUploadsFromGun(gun, userAddress as string);
     const uploadRecord = uploads.find((u) => u.hash === hash);
 
     if (!uploadRecord) {
@@ -241,7 +241,7 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
     if (
       !headerUserAddress ||
       typeof headerUserAddress !== "string" ||
-      headerUserAddress.toLowerCase() !== userAddress.toLowerCase()
+      ((headerUserAddress as string) || "").toLowerCase() !== ((userAddress as string) || "").toLowerCase()
     ) {
       return res
         .status(401)
@@ -255,7 +255,7 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
         .json({ success: false, error: "Server error - Gun instance not available" });
     }
 
-    const uploads = await getUserUploadsFromGun(gun, userAddress);
+    const uploads = await getUserUploadsFromGun(gun, userAddress as string);
     const uploadRecord = uploads.find((u) => u.hash === hash);
 
     if (!uploadRecord) {

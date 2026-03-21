@@ -10,7 +10,7 @@ const router: Router = Router();
  */
 router.get("/cat/:cid/decrypt", async (req: Request, res: Response) => {
   try {
-    const { cid } = req.params;
+    const cid = req.params.cid as string;
     let { token } = req.query;
     const userAddress = req.headers["x-user-address"]; // Optional: user address for signature verification
     const IPFS_GATEWAY_URL = ipfsConfig.gatewayUrl || "http://127.0.0.1:8080";
@@ -55,7 +55,7 @@ router.get("/cat/:cid/decrypt", async (req: Request, res: Response) => {
       requestOptions = {
         hostname: "127.0.0.1",
         port: 5001,
-        path: `/api/v0/cat?arg=${encodeURIComponent(cid)}`,
+        path: `/api/v0/cat?arg=${encodeURIComponent(cid as string)}`,
         method: "POST",
         headers: { "Content-Length": "0" },
       };

@@ -7,7 +7,7 @@ import { adminOrApiKeyAuthMiddleware } from "../middleware/admin-or-api-key-auth
 import { DrivePublicLinksManager } from "../utils/drive-public-links";
 import { getRelayUser, isRelayUserInitialized, initRelayUser } from "../utils/relay-user";
 
-const router = express.Router();
+const router: express.Router = express.Router();
 
 // Initialize public links manager when router is set up (will be called from routes/index.ts)
 let publicLinksInitialized = false;
@@ -109,7 +109,7 @@ const upload = multer({
  */
 router.get("/list/:path(*)?", adminOrApiKeyAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const relativePath = req.params.path || "";
+    const relativePath = (req.params.path as string) || "";
     const items = await driveManager.listDirectoryAsync(relativePath);
 
     res.json({
@@ -136,7 +136,7 @@ router.post(
   upload.fields([{ name: "file", maxCount: 1 }, { name: "files", maxCount: 100 }]),
   async (req: Request, res: Response) => {
     try {
-      const relativePath = req.params.path || "";
+      const relativePath = (req.params.path as string) || "";
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
       if (!files || (Object.keys(files).length === 0)) {
@@ -184,7 +184,7 @@ router.post(
  */
 router.get("/download/:path(*)", adminOrApiKeyAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const relativePath = req.params.path;
+    const relativePath = (req.params.path as string);
 
     if (!relativePath) {
       return res.status(400).json({
@@ -253,7 +253,7 @@ router.get("/download/:path(*)", adminOrApiKeyAuthMiddleware, async (req: Reques
  */
 router.delete("/delete/:path(*)", adminOrApiKeyAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const relativePath = req.params.path;
+    const relativePath = (req.params.path as string);
 
     if (!relativePath) {
       return res.status(400).json({
@@ -291,7 +291,7 @@ router.delete("/delete/:path(*)", adminOrApiKeyAuthMiddleware, async (req: Reque
  */
 router.post("/mkdir/:path(*)?", adminOrApiKeyAuthMiddleware, express.json(), async (req: Request, res: Response) => {
   try {
-    const parentPath = req.params.path || "";
+    const parentPath = (req.params.path as string) || "";
     const { name } = req.body;
 
     if (!name || typeof name !== "string") {
@@ -558,7 +558,7 @@ router.post("/links", adminOrApiKeyAuthMiddleware, ensurePublicLinksInitialized,
  */
 router.delete("/links/:linkId", adminOrApiKeyAuthMiddleware, ensurePublicLinksInitialized, async (req: Request, res: Response) => {
   try {
-    const { linkId } = req.params;
+    const linkId = req.params.linkId as string;
 
     if (!linkId) {
       return res.status(400).json({
@@ -602,7 +602,7 @@ router.delete("/links/:linkId", adminOrApiKeyAuthMiddleware, ensurePublicLinksIn
 export async function handlePublicLinkAccess(req: Request, res: Response): Promise<void> {
   try {
     // Extract linkId from URL path if not in params
-    let linkId: string | undefined = req.params?.linkId;
+    let linkId: string | undefined = req.params?.linkId as string | undefined;
     if (!linkId && req.url) {
       const match = req.url.match(/\/public\/([^/?]+)/);
       linkId = match?.[1];

@@ -9,7 +9,7 @@ import { loggers } from "../utils/logger";
 import { adminAuthMiddleware } from "../middleware/admin-auth";
 import { getApiKeysManager } from "../middleware/api-keys-auth";
 
-const router = express.Router();
+const router: express.Router = express.Router();
 
 /**
  * GET /api/v1/api-keys
@@ -93,7 +93,7 @@ router.post("/", adminAuthMiddleware, express.json(), async (req: Request, res: 
  */
 router.delete("/:keyId", adminAuthMiddleware, async (req: Request, res: Response) => {
   try {
-    const { keyId } = req.params;
+    const keyId = req.params.keyId as string;
 
     if (!keyId) {
       return res.status(400).json({
