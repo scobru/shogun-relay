@@ -32,6 +32,16 @@ cd shogun-relay
 curl http://localhost:8765/health
 ```
 
+### CapRover Deployment
+
+When deploying via CapRover, you **must** configure the Container HTTP Port in the app settings to correctly route NGINX traffic.
+
+1. Go to your CapRover Dashboard -> **Apps** -> **shogun-relay** -> **HTTP Settings**.
+2. Set **Container HTTP Port** to `8765`.
+3. Click **Save & Update**.
+
+*(Failure to do this will result in `502 Bad Gateway` or `504 Gateway Timeout` errors).*
+
 ### Manual
 
 ```bash
