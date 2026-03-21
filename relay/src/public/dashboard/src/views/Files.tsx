@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 
@@ -31,6 +31,15 @@ function Files() {
   
   // New State variables
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+
+  // ⚡ Bolt: Debounce search input to reduce re-renders and lag on large arrays
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 300)
+    return () => clearTimeout(handler)
+  }, [searchQuery])
   const [filterType, setFilterType] = useState('all')
   const [uploadMode, setUploadMode] = useState<'single' | 'directory'>('single')
   const [encryptUpload, setEncryptUpload] = useState(false)
@@ -77,12 +86,14 @@ function Files() {
     if (isAuthenticated) fetchPins()
   }, [isAuthenticated, fetchPins])
 
-  const filteredPins = pins.filter(pin => {
-    const matchesSearch = pin.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         pin.cid.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesFilter = filterType === 'all' || pin.type === filterType
-    return matchesSearch && matchesFilter
-  })
+  const filteredPins = useMemo(() => {
+    return pins.filter(pin => {
+      const matchesSearch = pin.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+                           pin.cid.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+      const matchesFilter = filterType === 'all' || pin.type === filterType
+      return matchesSearch && matchesFilter
+    })
+  }, [pins, debouncedSearchQuery, filterType])
 
   // --- File Handling & Encryption ---
 

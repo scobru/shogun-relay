@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 
 interface LogEntry {
@@ -17,6 +17,15 @@ function ConsoleLogs() {
   const [autoScroll, setAutoScroll] = useState(true);
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
+  // ⚡ Bolt: Debounce search input to reduce re-renders and lag on large log arrays
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+    return () => clearTimeout(handler)
+  }, [searchTerm]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchLogs = async () => {
@@ -49,11 +58,13 @@ function ConsoleLogs() {
     }
   }, [logs, autoScroll]);
 
-  const filteredLogs = logs.filter((log) => {
-    const matchesFilter = filter === "all" || log.level?.toLowerCase() === filter;
-    const matchesSearch = log.message?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  const filteredLogs = useMemo(() => {
+    return logs.filter((log) => {
+      const matchesFilter = filter === "all" || log.level?.toLowerCase() === filter;
+      const matchesSearch = log.message?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+      return matchesFilter && matchesSearch;
+    });
+  }, [logs, debouncedSearchTerm, filter]);
 
   const getLevelBadgeClass = (level: string) => {
     switch (level?.toLowerCase()) {
