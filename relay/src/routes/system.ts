@@ -7,6 +7,65 @@ import { config } from "../config/env-config";
 import { GUN_PATHS, getGunNode } from "../utils/gun-paths";
 import { adminAuthMiddleware } from "../middleware/admin-auth";
 
+
+// Helper to read the last N lines of a file without loading the entire file into memory
+// Helper to read the last N lines of a file without loading the entire file into memory
+async function readLastLines(filePath: string, numLines: number): Promise<string[]> {
+  try {
+    const stat = await fs.promises.stat(filePath);
+    const fileSize = stat.size;
+    if (fileSize === 0) return [];
+
+    const chunkSize = Math.min(1024 * 64, fileSize);
+    let fd: fs.promises.FileHandle | null = null;
+    let lines: string[] = [];
+    let currentPosition = fileSize;
+    let partialLine = "";
+
+    try {
+      fd = await fs.promises.open(filePath, "r");
+      const buffer = Buffer.alloc(chunkSize);
+
+      while (currentPosition > 0 && lines.length < numLines) {
+        const readSize = Math.min(chunkSize, currentPosition);
+        const offset = currentPosition - readSize;
+
+        const { bytesRead } = await fd.read(buffer, 0, readSize, offset);
+
+        const chunkStr = buffer.toString("utf8", 0, bytesRead);
+        const chunkLines = chunkStr.split("\n");
+
+        // Handle the partial line from the previous chunk
+        chunkLines[chunkLines.length - 1] += partialLine;
+        partialLine = chunkLines[0];
+
+        // Add the lines we just read, except the first one which might be incomplete
+        const newLines = chunkLines.slice(1);
+
+        // Filter out empty lines
+        const validNewLines = newLines.filter((line) => line.trim() !== "");
+
+        lines = validNewLines.concat(lines);
+        currentPosition = offset;
+      }
+
+      // Reached the start of the file
+      if (currentPosition === 0 && partialLine.trim() !== "") {
+        lines.unshift(partialLine);
+      }
+
+      return lines.slice(-numLines);
+    } finally {
+      if (fd) {
+        await fd.close();
+      }
+    }
+  } catch (error: any) {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
 const router: Router = express.Router();
 
 // Middleware per ottenere l'istanza Gun dal relay
@@ -412,7 +471,7 @@ router.delete("/node/*", adminAuthMiddleware, async (req, res) => {
 });
 
 // Logs endpoint for real-time relay logs from file
-router.get("/logs", adminAuthMiddleware, (req, res) => {
+router.get("/logs", adminAuthMiddleware, async (req, res) => {
   try {
     const limit: number = parseInt(req.query.limit as string || "") || 100;
     const tail: number = parseInt(req.query.tail as string || "") || 100; // Number of lines to read from end
@@ -445,11 +504,8 @@ router.get("/logs", adminAuthMiddleware, (req, res) => {
     }
 
     // Read the last N lines from the log file
-    const logContent = fs.readFileSync(logFilePath, "utf8");
-    const lines = logContent.split("\n").filter((line) => line.trim() !== "");
-
-    // Get the last N lines
-    const lastLines = lines.slice(-tail);
+    // Read the last N lines efficiently
+    const lastLines = await readLastLines(logFilePath, tail);
 
     // Parse log entries - extract JSON from log lines
     const logEntries = lastLines.map((line, index) => {
@@ -482,13 +538,13 @@ router.get("/logs", adminAuthMiddleware, (req, res) => {
       }
 
       return {
-        id: `line_${lines.length - tail + index}`,
+        id: `line_${Date.now()}_${index}`,
         timestamp: timestamp,
         level: level,
         message: logData.message || logData.msg || rawMessage,
         raw: rawMessage,
         data: logData,
-        lineNumber: lines.length - tail + index + 1,
+        lineNumber: index + 1,
       };
     });
 
@@ -498,7 +554,7 @@ router.get("/logs", adminAuthMiddleware, (req, res) => {
     // Log for debugging
     loggers.server.debug(
       {
-        totalLines: lines.length,
+        totalLines: -1, // -1 indicates exact count is skipped for performance
         tail: tail,
         parsedEntries: logEntries.length,
         limitedLogs: limitedLogs.length,
@@ -511,7 +567,7 @@ router.get("/logs", adminAuthMiddleware, (req, res) => {
       success: true,
       logs: limitedLogs,
       count: limitedLogs.length,
-      totalLines: lines.length,
+      totalLines: -1, // -1 indicates exact count is skipped for performance
       timestamp: Date.now(),
     });
   } catch (error: any) {
@@ -613,7 +669,7 @@ router.post("/peers/add", adminAuthMiddleware, (req, res) => {
 });
 
 // Services Logs endpoint
-router.get("/services/:name/logs", adminAuthMiddleware, (req, res) => {
+router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
   try {
     const serviceName = req.params.name;
     const limit = parseInt(req.query.limit as string || "") || 100;
@@ -679,9 +735,8 @@ router.get("/services/:name/logs", adminAuthMiddleware, (req, res) => {
     }
 
     // Reuse log reading logic (simplified here)
-    const logContent = fs.readFileSync(logFile, "utf8");
-    const lines = logContent.split("\n").filter((line) => line.trim() !== "");
-    const lastLines = lines.slice(-tail);
+    // Read the last N lines efficiently
+    const lastLines = await readLastLines(logFile, tail);
 
     // Simple parsing - just return lines for now to fix 404
     const formattedLogs = lastLines.map((line, i) => ({
