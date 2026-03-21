@@ -491,18 +491,21 @@ router.get("/stats", async (req, res) => {
                 );
               }
 
-              // Get pin count
-              const pinLs = await ipfsRequest("/api/v0/pin/ls?type=recursive");
-              if (pinLs && typeof pinLs === "object" && "Keys" in pinLs) {
-                const keys = (pinLs as { Keys?: Record<string, any> }).Keys;
-                if (keys) {
-                  const pinCount = Object.keys(keys).length;
-                  stats.totalPins += pinCount;
-                  loggers.server.debug(
-                    { pinCount },
-                    `   📌 Current relay IPFS pins (fallback): ${pinCount}`
-                  );
-                }
+              // Use NumObjects from repoStats instead of fetching all pins
+              if (repoStats && typeof repoStats === "object" && "NumObjects" in repoStats) {
+                const pinCount = safeParseNumber((repoStats as { NumObjects?: unknown }).NumObjects);
+                stats.totalPins += pinCount;
+                loggers.server.debug(
+                  { pinCount },
+                  `   📌 Current relay IPFS objects (fallback): ${pinCount}`
+                );
+              } else if (repoStats && typeof repoStats === "object" && "numObjects" in repoStats) {
+                const pinCount = safeParseNumber((repoStats as { numObjects?: unknown }).numObjects);
+                stats.totalPins += pinCount;
+                loggers.server.debug(
+                  { pinCount },
+                  `   📌 Current relay IPFS objects (fallback): ${pinCount}`
+                );
               }
             }
           } catch (ipfsError) {
@@ -548,19 +551,22 @@ router.get("/stats", async (req, res) => {
                   );
                 }
 
-                // Get pin count
-                const pinLs = await ipfsRequest("/api/v0/pin/ls?type=recursive");
-                if (pinLs && typeof pinLs === "object" && "Keys" in pinLs) {
-                  const keys = (pinLs as { Keys?: Record<string, any> }).Keys;
-                  if (keys) {
-                    const pinCount = Object.keys(keys).length;
-                    stats.totalPins += pinCount;
-                    loggers.server.debug(
-                      { pinCount },
-                      `   📌 Current relay IPFS pins (fallback): ${pinCount}`
-                    );
-                  }
-                }
+                // Use NumObjects from repoStats instead of fetching all pins
+              if (repoStats && typeof repoStats === "object" && "NumObjects" in repoStats) {
+                const pinCount = safeParseNumber((repoStats as { NumObjects?: unknown }).NumObjects);
+                stats.totalPins += pinCount;
+                loggers.server.debug(
+                  { pinCount },
+                  `   📌 Current relay IPFS objects (fallback): ${pinCount}`
+                );
+              } else if (repoStats && typeof repoStats === "object" && "numObjects" in repoStats) {
+                const pinCount = safeParseNumber((repoStats as { numObjects?: unknown }).numObjects);
+                stats.totalPins += pinCount;
+                loggers.server.debug(
+                  { pinCount },
+                  `   📌 Current relay IPFS objects (fallback): ${pinCount}`
+                );
+              }
               }
             } catch (ipfsError) {
               // Ignore IPFS errors
@@ -583,32 +589,36 @@ router.get("/stats", async (req, res) => {
     if (stats.totalStorageBytes === 0 && stats.totalPins === 0) {
       loggers.server.info(`📊 Pulse data missing/old, syncing directly from IPFS...`);
 
-      // NOTE: Skipping /api/v0/repo/stat as it can trigger "strconv.ParseFloat: parsing '': invalid syntax"
-      // error in IPFS when StorageMax or other config values are empty/missing.
-      // See: https://github.com/ipfs/kubo/issues/10xxx
-      // Instead, we just get pin count which is more reliable.
-
-      // Get pin count (this is reliable and doesn't require config parsing)
       try {
-        const pinLs = await ipfsRequest("/api/v0/pin/ls?type=recursive");
-        if (pinLs && typeof pinLs === "object" && "Keys" in pinLs) {
-          const keys = (pinLs as { Keys?: Record<string, any> }).Keys;
-          if (keys) {
-            const pinCount = Object.keys(keys).length;
-            stats.totalPins += pinCount;
-            loggers.server.info({ pinCount }, `   ✅ IPFS pins: ${pinCount}`);
+        const repoStats = await ipfsRequest("/api/v0/repo/stat?size-only=true&human=false");
+        if (repoStats && typeof repoStats === "object") {
+          let repoSize = 0;
+          let numObjects = 0;
 
-            // Estimate storage from pins (rough estimate: assume average 1MB per pin)
-            // This is a fallback when repo/stat is unavailable
-            if (pinCount > 0 && stats.totalStorageBytes === 0) {
-              const estimatedBytes = pinCount * 1024 * 1024; // 1MB per pin estimate
-              stats.totalStorageBytes = estimatedBytes;
-              loggers.server.debug({ estimatedBytes }, `   📊 Estimated storage from pin count`);
-            }
+          if ("RepoSize" in repoStats) {
+            repoSize = safeParseNumber((repoStats as { RepoSize?: unknown }).RepoSize);
+          } else if ("repoSize" in repoStats) {
+            repoSize = safeParseNumber((repoStats as { repoSize?: unknown }).repoSize);
+          }
+
+          if (repoStats && typeof repoStats === "object" && "NumObjects" in repoStats) {
+            numObjects = safeParseNumber((repoStats as { NumObjects?: unknown }).NumObjects);
+          } else if (repoStats && typeof repoStats === "object" && "numObjects" in repoStats) {
+            numObjects = safeParseNumber((repoStats as { numObjects?: unknown }).numObjects);
+          }
+
+          if (repoSize > 0) {
+            stats.totalStorageBytes += repoSize;
+            loggers.server.info({ repoSize }, `   ✅ IPFS repo size: ${repoSize} bytes`);
+          }
+
+          if (numObjects > 0) {
+            stats.totalPins += numObjects;
+            loggers.server.info({ numObjects }, `   ✅ IPFS objects: ${numObjects}`);
           }
         }
-      } catch (pinError) {
-        loggers.server.debug(`   ⚠️ IPFS pin/ls failed. IPFS may be starting up.`);
+      } catch (repoError) {
+        loggers.server.debug(`   ⚠️ IPFS repo/stat failed. IPFS may be starting up or have config issues.`);
       }
     }
 

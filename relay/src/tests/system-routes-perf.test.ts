@@ -84,7 +84,7 @@ describe("System Routes Performance", () => {
     }
     stream.end();
 
-    await new Promise(resolve => stream.on('finish', resolve));
+    await new Promise(resolve => { stream.on('finish', () => resolve(null)); });
 
     // Mock fs.existsSync to point to our test file
     vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
