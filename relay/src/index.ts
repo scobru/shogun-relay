@@ -710,8 +710,8 @@ async function initializeServer() {
     }
   } else if (relayKeysConfig.seaKeypairPath) {
     try {
-      const fs = await import("fs");
-      const path = await import("path");
+
+
 
       // Determine the actual keypair file path
       let keypairFilePath = relayKeysConfig.seaKeypairPath;
@@ -773,8 +773,8 @@ async function initializeServer() {
     loggers.server.warn(`⚠️ No keypair configured. Attempting to auto-generate...`);
 
     try {
-      const fs = await import("fs");
-      const path = await import("path");
+
+
 
       // Try default locations
       const defaultPaths = [
