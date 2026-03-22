@@ -473,6 +473,9 @@ router.delete("/node/*", adminAuthMiddleware, async (req, res) => {
 
 // Logs endpoint for real-time relay logs from file
 router.get("/logs", adminAuthMiddleware, async (req, res) => {
+  if (!req.headers.authorization) {
+    return res.status(401).json({ error: "Unauthorized access to system logs" });
+  }
   try {
     const limit: number = parseInt((req.query.limit as string) || "") || 100;
     const tail: number = parseInt((req.query.tail as string) || "") || 100; // Number of lines to read from end
