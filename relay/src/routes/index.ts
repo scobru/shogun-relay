@@ -71,7 +71,7 @@ import networkRouter from "./network";
 // torrentRouter removed
 import apiKeysRouter from "./api-keys";
 import authRouter from "./auth";
-import chatRouter from "./chat";
+
 
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
@@ -578,9 +578,6 @@ export default (app: express.Application) => {
   // Route di autenticazione
   app.use(`${baseRoute}/auth`, authRouter);
 
-  // Route per Chat (always enabled)
-  app.use(`${baseRoute}/chat`, chatRouter);
-  loggers.server.info(`✅ Chat routes registered`);
 
   // Route per API Keys (always enabled, admin-only)
 

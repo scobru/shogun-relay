@@ -299,7 +299,7 @@ EXPOSE 8765 5001 8080 4001
 
 # Health check (dynamically uses RELAY_PORT or PORT, falls back to 8765)
 HEALTHCHECK --interval=30s --timeout=30s --start-period=180s --retries=5 \
-    CMD curl -f http://localhost:${RELAY_PORT:-${PORT:-8765}}/health || exit 1
+    CMD curl -f http://127.0.0.1:${RELAY_PORT:-${PORT:-8765}}/health || exit 1
 
 # Use supervisor to manage multiple services
 RUN mkdir -p /etc/supervisor/conf.d

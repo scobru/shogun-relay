@@ -40,13 +40,44 @@ import { secureCompare, hashToken, createProductionErrorHandler } from "./utils/
 import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/peer-discovery";
 
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
-import { chatService } from "./utils/chat-service";
+// Chat service removed
 
 // Route Imports
 
 // Middleware
 
 dotenv.config();
+
+// --- Console Interceptor to Silence GunDB Spam ---
+const originalConsoleLog = console.log;
+const originalConsoleDir = console.dir;
+
+function isGunSpam(args: any[]) {
+  if (args.length === 0) return false;
+  const firstArg = args[0];
+  // Gun unverified data spam usually looks like an object with 'err': 'Unverified data.' or similar raw Gun graph nodes
+  if (typeof firstArg === 'object' && firstArg !== null) {
+    if (firstArg.err === 'Unverified data.' || firstArg.err === 'Signature did not match.') {
+      return true;
+    }
+    // Also ignore raw object dumps that look like Gun graph nodes with '#' and '><'
+    if (firstArg['#'] && (firstArg['><'] || firstArg['@'])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+console.log = function (...args) {
+  if (isGunSpam(args)) return;
+  originalConsoleLog.apply(console, args);
+};
+
+console.dir = function (...args) {
+  if (isGunSpam(args)) return;
+  originalConsoleDir.apply(console, args);
+};
+// -------------------------------------------------
 
 // --- IPFS Configuration ---
 const IPFS_API_URL = ipfsConfig.apiUrl;
@@ -639,8 +670,6 @@ async function initializeServer() {
 
   const gun = (Gun as any)(gunConfig);
 
-  // Initialize chat service
-  chatService.initialize(gun);
 
   // Store gun instance in express app for access from routes
   app.set("gunInstance", gun);
