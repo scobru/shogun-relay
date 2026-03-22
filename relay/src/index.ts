@@ -36,6 +36,7 @@ import {
 } from "./config/env-config";
 
 import { startWormholeCleanup } from "./utils/wormhole-cleanup";
+import { tokenAuthMiddleware } from "./middleware/token-auth";
 import { secureCompare, hashToken, createProductionErrorHandler } from "./utils/security";
 import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/peer-discovery";
 
@@ -387,177 +388,6 @@ async function initializeServer() {
   // IPFS File Upload Endpoint
   const upload = multer({ storage: multer.memoryStorage() });
 
-  // Enhanced authentication with rate limiting and token hashing
-  const failedAuthAttempts = new Map(); // Track failed attempts per IP
-  const AUTH_RATE_LIMIT = 5; // Max failed attempts
-  const AUTH_RATE_WINDOW = 15 * 60 * 1000; // 15 minutes
-  const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-  const activeSessions = new Map(); // Simple in-memory session store
-
-  /**
-   * Hash token for secure comparison (prevents timing attacks)
-   * @param {string} token - The token to hash
-   * @returns {string} SHA-256 hash of the token
-   */
-  /* function hashToken(token: string) {
-    return crypto
-      .createHash("sha256")
-      .update(token || "")
-      .digest("hex");
-  } */
-
-  // Get stored admin password hash (or compute on first use)
-  let adminPasswordHash: string | null = null;
-  /**
-   * Get stored admin password hash (or compute on first use)
-   * @returns {string|null} The admin password hash, or null if not configured
-   */
-  function getAdminPasswordHash() {
-    if (!adminPasswordHash && authConfig.adminPassword) {
-      adminPasswordHash = hashToken(authConfig.adminPassword);
-    }
-    return adminPasswordHash;
-  }
-
-  /**
-   * Check if IP is rate limited based on failed authentication attempts
-   * @param {string} ip - The IP address to check
-   * @returns {boolean} True if the IP is rate limited
-   */
-  function isRateLimited(ip: string) {
-    const attempts = failedAuthAttempts.get(ip);
-    if (!attempts) return false;
-
-    const now = Date.now();
-    // Remove old attempts outside the window
-    const recentAttempts = attempts.filter(
-      (timestamp: number) => now - timestamp < AUTH_RATE_WINDOW
-    );
-
-    if (recentAttempts.length >= AUTH_RATE_LIMIT) {
-      failedAuthAttempts.set(ip, recentAttempts);
-      return true;
-    }
-
-    failedAuthAttempts.set(ip, recentAttempts);
-    return false;
-  }
-
-  /**
-   * Record failed authentication attempt for an IP address
-   * @param {string} ip - The IP address that failed authentication
-   */
-  function recordFailedAttempt(ip: string) {
-    const now = Date.now();
-    const attempts = failedAuthAttempts.get(ip) || [];
-    attempts.push(now);
-    failedAuthAttempts.set(ip, attempts);
-  }
-
-  /**
-   * Create a new session token for an authenticated IP
-   * @param {string} ip - The IP address to create a session for
-   * @returns {string} The session ID
-   */
-  function createSession(ip: string) {
-    const sessionId = crypto.randomBytes(32).toString("hex");
-    const expiresAt = Date.now() + SESSION_DURATION;
-    activeSessions.set(sessionId, { ip, expiresAt });
-    return sessionId;
-  }
-
-  /**
-   * Validate a session token
-   * @param {string} sessionId - The session ID to validate
-   * @param {string} ip - The IP address making the request
-   * @returns {boolean} True if the session is valid
-   */
-  function isValidSession(sessionId: string, ip: string) {
-    const session = activeSessions.get(sessionId);
-    if (!session) return false;
-    if (Date.now() > session.expiresAt) {
-      activeSessions.delete(sessionId);
-      return false;
-    }
-    // Optional: verify IP matches (can be disabled for proxy scenarios)
-    if (authConfig.strictSessionIp && session.ip !== ip) {
-      return false;
-    }
-    return true;
-  }
-
-  // Cleanup expired sessions periodically
-  setInterval(
-    () => {
-      const now = Date.now();
-      for (const [sessionId, session] of activeSessions.entries()) {
-        if (now > session.expiresAt) {
-          activeSessions.delete(sessionId);
-        }
-      }
-    },
-    60 * 60 * 1000
-  ); // Cleanup every hour
-
-  /**
-   * Enhanced authentication middleware with rate limiting and session management
-   * @param {import('express').Request} req - Express request object
-   * @param {import('express').Response} res - Express response object
-   * @param {import('express').NextFunction} next - Express next function
-   */
-  const tokenAuthMiddleware = (req: any, res: any, next: any) => {
-    const clientIp = req.ip || req.connection.remoteAddress || "unknown";
-
-    // Check if IP is rate limited
-    if (isRateLimited(clientIp)) {
-      loggers.server.warn(`Rate limited IP: ${clientIp}`);
-      return res.status(429).json({
-        success: false,
-        error: "Too many failed authentication attempts. Please try again later.",
-      });
-    }
-
-    // Check for session token first (more efficient)
-    const sessionToken = req.headers["x-session-token"] || req.cookies?.sessionToken;
-    if (sessionToken && isValidSession(sessionToken, clientIp)) {
-      return next();
-    }
-
-    // Fallback to password authentication
-    const authHeader = req.headers["authorization"];
-    const bearerToken = authHeader && authHeader.split(" ")[1];
-    const customToken = req.headers["token"];
-    const token = bearerToken || customToken;
-
-    if (!token) {
-      recordFailedAttempt(clientIp);
-      return res.status(401).json({ success: false, error: "Unauthorized - Token required" });
-    }
-
-    // Secure token comparison using hash and timing-safe comparison
-    const tokenHash = hashToken(token);
-    const adminHash = getAdminPasswordHash();
-
-    if (adminHash && secureCompare(tokenHash, adminHash)) {
-      // Create session for future requests
-      const sessionId = createSession(clientIp);
-      res.setHeader("X-Session-Token", sessionId);
-      // Optionally set cookie
-      if (req.headers["accept"]?.includes("text/html")) {
-        res.cookie("sessionToken", sessionId, {
-          httpOnly: true,
-          secure: serverConfig.nodeEnv === "production",
-          maxAge: SESSION_DURATION,
-          sameSite: "strict",
-        });
-      }
-      next();
-    } else {
-      recordFailedAttempt(clientIp);
-      loggers.server.warn(`Auth failed for IP: ${clientIp}`);
-      res.status(401).json({ success: false, error: "Unauthorized - Invalid token" });
-    }
-  };
 
   /**
    * Start the Express server
@@ -1251,13 +1081,13 @@ See docs/RELAY_KEYS.md for more information.
             numObjects: ipfsStats.NumObjects || ipfsStats.numberObjects || 0,
           };
 
-          // Also get pin count (quick query)
+          // Also get pin count (quick query) - changed to O(1) repo stat instead of recursive pins
           const pinCount = await new Promise((resolve) => {
             const timeout = setTimeout(() => resolve(0), 2000);
             const options: any = {
               hostname: "127.0.0.1",
               port: 5001,
-              path: "/api/v0/pin/ls?type=recursive",
+              path: "/api/v0/repo/stat",
               method: "POST",
               headers: { "Content-Length": "0" },
             };
@@ -1270,8 +1100,8 @@ See docs/RELAY_KEYS.md for more information.
               res.on("end", () => {
                 clearTimeout(timeout);
                 try {
-                  const pins = JSON.parse(data);
-                  resolve(pins.Keys ? Object.keys(pins.Keys).length : 0);
+                  const stats = JSON.parse(data);
+                  resolve(stats.NumObjects ? parseInt(stats.NumObjects, 10) : 0);
                 } catch {
                   resolve(0);
                 }

@@ -18,21 +18,27 @@ import { getRelayUser, getRelayKeyPair } from "../utils/relay-user";
 import { authConfig, relayConfig } from "../config";
 import { loggers } from "../utils/logger";
 import { GUN_PATHS } from "../utils/gun-paths";
+import { IGunUserInstance, IGunInstance, ISEAPair } from "gun";
+
+interface RelayUserWithKeyPair extends IGunUserInstance<any, any, any, any> {
+  _keyPair?: ISEAPair;
+}
+
 
 // Helper to get relay keypair safely for reputation tracking
 // Returns null instead of undefined if keypair not available
-function getRelayUserWithKeyPair(): any {
+function getRelayUserWithKeyPair(): RelayUserWithKeyPair | undefined {
   const user = getRelayUser();
   const keyPair = getRelayKeyPair();
   // Return a mock object with the keypair attached for backward compatibility
   if (user && keyPair) {
-    return { ...user, _keyPair: keyPair };
+    return { ...user, _keyPair: keyPair } as unknown as RelayUserWithKeyPair;
   }
-  return user;
+  return user as RelayUserWithKeyPair | undefined;
 }
 
 // Helper to safely get signing keypair
-function getSigningKeyPair(): any {
+function getSigningKeyPair(): ISEAPair | null {
   return getRelayKeyPair() || null;
 }
 
@@ -63,7 +69,7 @@ const router: Router = express.Router();
 
 // Stats cache for faster responses
 interface StatsCache {
-  data: any;
+  data: unknown;
   timestamp: number;
   ttl: number;
 }
@@ -90,14 +96,14 @@ router.get("/relays", async (req, res) => {
     }
 
     const relays: {
-      host: any;
+      host: string;
       endpoint: string | null;
-      lastSeen: any;
-      uptime: any;
-      connections: any;
-      memory: any;
-      ipfs: any; // Extended info if available
-      storage: any;
+      lastSeen: number;
+      uptime: number;
+      connections: unknown;
+      memory: unknown;
+      ipfs: unknown; // Extended info if available
+      storage: unknown;
     }[] = [];
     const timeout = parseInt(String(req.query.timeout)) || 5000;
     const minLastSeen = Date.now() - (parseInt(String(req.query.maxAge)) || 300000); // Default 5 min
@@ -302,7 +308,7 @@ router.get("/stats", async (req, res) => {
       totalPins: 0,
     };
 
-    const relaysFound: Array<{ host: any; hasPulse: boolean }> = [];
+    const relaysFound: Array<{ host: string; hasPulse: boolean }> = [];
     const fiveMinutesAgo = Date.now() - 300000;
     const currentRelayHost =
       relayConfig.endpoint?.replace(/^https?:\/\//, "").replace(/\/$/, "") || relayConfig.name;
@@ -522,7 +528,7 @@ router.get("/stats", async (req, res) => {
           );
         } else if (currentRelayIncluded) {
           // Current relay was included but might not have IPFS data in pulse, try to add it
-          const currentRelayData = await new Promise<{ pulse?: { ipfs?: any } } | null>(
+          const currentRelayData = await new Promise<{ pulse?: { ipfs?: unknown } } | null>(
             (resolve) => {
               gun
                 .get(GUN_PATHS.RELAYS)
@@ -651,7 +657,7 @@ router.get("/stats", async (req, res) => {
       timestamp: Date.now(),
       debug: {
         relaysFound: relaysFound.length,
-        relaysWithPulse: relaysFound.filter((r: { host: any; hasPulse: boolean }) => r.hasPulse)
+        relaysWithPulse: relaysFound.filter((r: { host: string; hasPulse: boolean }) => r.hasPulse)
           .length,
         sources: {
           pulse: stats.activeRelays > 0 ? "pulse data" : "missing/old",
@@ -746,7 +752,7 @@ router.get("/proof/:cid", async (req, res) => {
     try {
       const pinLs = await ipfsRequest(`/pin/ls?arg=${cid}&type=all`);
       if (pinLs && typeof pinLs === "object" && "Keys" in pinLs) {
-        const keys = (pinLs as { Keys?: Record<string, any> }).Keys;
+        const keys = (pinLs as { Keys?: Record<string, unknown> }).Keys;
         isPinned = keys ? Object.keys(keys).length > 0 : false;
       }
     } catch (e) {
@@ -951,7 +957,7 @@ router.get("/pin-requests", async (req, res) => {
       return res.status(500).json({ success: false, error: "Gun instance not available" });
     }
 
-    const requests: any[] = [];
+    const requests: unknown[] = [];
     const maxAgeParam =
       typeof req.query.maxAge === "string" ? req.query.maxAge : String(req.query.maxAge || "");
     const maxAge = Date.now() - (parseInt(maxAgeParam) || 86400000); // 24h default
@@ -1404,7 +1410,7 @@ router.post("/verified/observation", express.json(), async (req, res) => {
       notes: observation.notes || null,
     };
 
-    const gunInstance = gun as any;
+    const gunInstance = gun as IGunInstance<any>;
     const sea = gunInstance?.sea || (relayUser as any)?._?.sea;
     if (!sea) {
       return res.status(503).json({

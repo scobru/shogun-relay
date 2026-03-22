@@ -405,16 +405,18 @@ export default (app: express.Application) => {
     res.redirect(`/admin?error=unauthorized&path=${encodeURIComponent(req.originalUrl)}`);
   });
 
-  app.get("/admin", (req, res) => {
+  app.get("/admin", async (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const adminPath = path.resolve(publicPath, "admin.html");
 
+    const exists = await fs.promises.access(adminPath).then(() => true).catch(() => false);
+
     loggers.server.debug(
-      { publicPath, adminPath, exists: fs.existsSync(adminPath) },
+      { publicPath, adminPath, exists },
       `🔍 Admin route requested`
     );
 
-    if (!fs.existsSync(adminPath)) {
+    if (!exists) {
       loggers.server.error({ adminPath }, `❌ Admin file not found`);
       return res.status(404).json({
         success: false,
@@ -490,20 +492,21 @@ export default (app: express.Application) => {
   });
 
   // Route per servire i file JavaScript dalla directory lib
-  app.get("/lib/:filename", (req, res) => {
+  app.get("/lib/:filename", async (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const filePath = path.resolve(publicPath, "lib", req.params.filename);
+    const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
 
     loggers.server.debug(
       {
         filename: req.params.filename,
         filePath,
-        exists: fs.existsSync(filePath),
+        exists,
       },
       `🔍 Lib file requested`
     );
 
-    if (!fs.existsSync(filePath)) {
+    if (!exists) {
       loggers.server.error({ filePath }, `❌ Lib file not found`);
       return res.status(404).json({
         success: false,
@@ -518,20 +521,21 @@ export default (app: express.Application) => {
   });
 
   // Route per servire i file CSS dalla directory styles
-  app.get("/styles/:filename", (req, res) => {
+  app.get("/styles/:filename", async (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const filePath = path.resolve(publicPath, "styles", req.params.filename);
+    const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
 
     loggers.server.debug(
       {
         filename: req.params.filename,
         filePath,
-        exists: fs.existsSync(filePath),
+        exists,
       },
       `🔍 Styles file requested`
     );
 
-    if (!fs.existsSync(filePath)) {
+    if (!exists) {
       loggers.server.error({ filePath }, `❌ Styles file not found`);
       return res.status(404).json({
         success: false,
@@ -855,24 +859,25 @@ export default (app: express.Application) => {
         const radataDir = path.resolve(process.cwd(), "radata");
 
         // Helper function to get directory size
-        const getDirSize = (dirPath: string): { bytes: number; files: number } => {
+        const getDirSize = async (dirPath: string): Promise<{ bytes: number; files: number }> => {
           let totalSize = 0;
           let fileCount = 0;
 
-          if (!fs.existsSync(dirPath)) {
+          const exists = await fs.promises.access(dirPath).then(() => true).catch(() => false);
+          if (!exists) {
             return { bytes: 0, files: 0 };
           }
 
-          const walkDir = (dir: string) => {
+          const walkDir = async (dir: string): Promise<void> => {
             try {
-              const items = fs.readdirSync(dir, { withFileTypes: true });
+              const items = await fs.promises.readdir(dir, { withFileTypes: true });
               for (const item of items) {
                 const fullPath = path.join(dir, item.name);
                 if (item.isDirectory()) {
-                  walkDir(fullPath);
+                  await walkDir(fullPath);
                 } else if (item.isFile()) {
                   try {
-                    const stats = fs.statSync(fullPath);
+                    const stats = await fs.promises.stat(fullPath);
                     totalSize += stats.size;
                     fileCount++;
                   } catch (e) {
@@ -885,7 +890,7 @@ export default (app: express.Application) => {
             }
           };
 
-          walkDir(dirPath);
+          await walkDir(dirPath);
           return { bytes: totalSize, files: fileCount };
         };
 
@@ -901,9 +906,9 @@ export default (app: express.Application) => {
         };
 
         // Calculate sizes for each directory
-        const dataStats = getDirSize(dataDir);
-        const radataStats = getDirSize(radataDir);
-        const ipfsStats = getDirSize(path.join(dataDir, "ipfs"));
+        const dataStats = await getDirSize(dataDir);
+        const radataStats = await getDirSize(radataDir);
+        const ipfsStats = await getDirSize(path.join(dataDir, "ipfs"));
 
         // Get GunDB storage stats from the configured backend (sqlite, s3, or radisk)
         // Pass the store instance if available for accurate stats
@@ -1226,10 +1231,11 @@ export default (app: express.Application) => {
   });
 
   // Fallback to index.html per tutte le altre route
-  app.get("/*", (req, res) => {
+  app.get("/*", async (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const indexPath = path.resolve(publicPath, "index.html");
-    if (fs.existsSync(indexPath)) {
+    const exists = await fs.promises.access(indexPath).then(() => true).catch(() => false);
+    if (exists) {
       res.sendFile(indexPath);
     } else {
       res.status(404).send("Index file not found");
