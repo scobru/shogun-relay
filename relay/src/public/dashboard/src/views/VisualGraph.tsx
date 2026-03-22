@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import Graph from "react-vis-network-graph";
+import Graph from "../components/Graph";
 import { useAuth } from "../context/AuthContext";
 import { GUN_PATHS } from "../utils/gun-paths";
 
