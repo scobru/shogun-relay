@@ -55,18 +55,6 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
           name: "X-Session-Token",
           description: "Session token after initial authentication",
         },
-        walletSignature: {
-          type: "apiKey",
-          in: "header",
-          name: "X-Wallet-Signature",
-          description: "EIP-191 signature of 'I Love Shogun' message for wallet authentication",
-        },
-        userAddress: {
-          type: "apiKey",
-          in: "header",
-          name: "X-User-Address",
-          description: "Ethereum wallet address for user authentication",
-        },
       },
       schemas: {
         Error: {
@@ -558,14 +546,11 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
           summary: "Upload file to IPFS",
           description: `Upload a single file to IPFS. Supports two authentication methods:
 1. **Admin Upload**: Use \`Authorization: Bearer <ADMIN_PASSWORD>\` (no signature required)
-2. **API Key Upload**: Use \`X-API-Key\` header.
-
-The wallet signature method is deprecated.`,
+2. **API Key Upload**: Use \`X-API-Key\` header.`,
           operationId: "uploadToIPFS",
           security: [
             { bearerAuth: [] },
             { tokenHeader: [] },
-            { userAddress: [], walletSignature: [] },
           ],
           requestBody: {
             required: true,
