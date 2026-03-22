@@ -58,23 +58,24 @@ function formatBytes(bytes: number): { mb: number; gb: number } {
 /**
  * Get radisk (filesystem) storage stats by scanning the radata directory
  */
-function getRadiskStats(dataDir: string): { bytes: number; files: number } {
+async function getRadiskStats(dataDir: string): Promise<{ bytes: number; files: number }> {
   const radataDir = path.join(dataDir, "radata");
   let totalBytes = 0;
   let fileCount = 0;
 
-  const walkDir = (dir: string): void => {
+  const walkDir = async (dir: string): Promise<void> => {
     try {
-      if (!fs.existsSync(dir)) return;
+      const exists = await fs.promises.access(dir).then(() => true).catch(() => false);
+      if (!exists) return;
 
-      const items = fs.readdirSync(dir, { withFileTypes: true });
+      const items = await fs.promises.readdir(dir, { withFileTypes: true });
       for (const item of items) {
         const fullPath = path.join(dir, item.name);
         if (item.isDirectory()) {
-          walkDir(fullPath);
+          await walkDir(fullPath);
         } else if (item.isFile()) {
           try {
-            const stats = fs.statSync(fullPath);
+            const stats = await fs.promises.stat(fullPath);
             totalBytes += stats.size;
             fileCount++;
           } catch {
@@ -87,12 +88,15 @@ function getRadiskStats(dataDir: string): { bytes: number; files: number } {
     }
   };
 
-  walkDir(radataDir);
+  await walkDir(radataDir);
 
   // Also check the old "radata" in cwd for backward compatibility
   const cwdRadataDir = path.resolve(process.cwd(), "radata");
-  if (cwdRadataDir !== radataDir && fs.existsSync(cwdRadataDir)) {
-    walkDir(cwdRadataDir);
+  if (cwdRadataDir !== radataDir) {
+    const cwdExists = await fs.promises.access(cwdRadataDir).then(() => true).catch(() => false);
+    if (cwdExists) {
+      await walkDir(cwdRadataDir);
+    }
   }
 
   return { bytes: totalBytes, files: fileCount };
@@ -187,9 +191,10 @@ export async function getGunStorageStats(store?: any): Promise<GunStorageStats> 
     }
 
     // Default: radisk (filesystem) storage
-    const stats = getRadiskStats(dataDir);
+    const stats = await getRadiskStats(dataDir);
     const formatted = formatBytes(stats.bytes);
     const radataPath = path.join(dataDir, "radata");
+    const radataExists = await fs.promises.access(radataPath).then(() => true).catch(() => false);
 
     return {
       backend: "radisk",
@@ -197,7 +202,7 @@ export async function getGunStorageStats(store?: any): Promise<GunStorageStats> 
       mb: formatted.mb,
       gb: formatted.gb,
       files: stats.files,
-      path: fs.existsSync(radataPath) ? radataPath : path.resolve(process.cwd(), "radata"),
+      path: radataExists ? radataPath : path.resolve(process.cwd(), "radata"),
       description: "GunDB radisk file storage",
     };
   } catch (err) {
