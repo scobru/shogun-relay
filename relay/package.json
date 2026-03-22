@@ -64,7 +64,7 @@
     "vis-network": "^10.0.2"
   },
   "resolutions": {
-    "uuid": "^8.3.2"
+    "uuid": "^7.6.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
