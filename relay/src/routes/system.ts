@@ -490,9 +490,12 @@ router.get("/logs", adminAuthMiddleware, async (req, res) => {
 
     let logFilePath = "";
     for (const loc of logLocations) {
-      if (fs.existsSync(loc)) {
+      try {
+        await fs.promises.access(loc, fs.constants.R_OK);
         logFilePath = loc;
         break;
+      } catch (err) {
+        // Skip and try next location
       }
     }
 
@@ -562,7 +565,7 @@ router.get("/logs", adminAuthMiddleware, async (req, res) => {
         tail: tail,
         parsedEntries: logEntries.length,
         limitedLogs: limitedLogs.length,
-        fileExists: fs.existsSync(logFilePath),
+        fileExists: !!logFilePath,
       },
       "📋 Logs endpoint response"
     );
@@ -700,16 +703,19 @@ router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
     if (normalizedName.includes("ipfs")) {
       // Check common IPFS log locations or PM2
       logFile = "/var/log/supervisor/ipfs.log"; // Supervisor default
-      if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "ipfs.log");
+      const exists = await fs.promises.access(logFile, fs.constants.R_OK).then(() => true).catch(() => false);
+      if (!exists) logFile = path.join(process.cwd(), "logs", "ipfs.log");
     } else if (normalizedName.includes("gun") || normalizedName.includes("relay")) {
       logFile = "/var/log/supervisor/relay.log";
-      if (!fs.existsSync(logFile)) logFile = path.join(process.cwd(), "logs", "relay.log");
+      const exists = await fs.promises.access(logFile, fs.constants.R_OK).then(() => true).catch(() => false);
+      if (!exists) logFile = path.join(process.cwd(), "logs", "relay.log");
     } else {
       // Generic fallback
       logFile = `/var/log/supervisor/${normalizedName.replace(/\s+/g, "-")}.log`;
     }
 
-    if (!fs.existsSync(logFile)) {
+    const logFileExists = await fs.promises.access(logFile, fs.constants.R_OK).then(() => true).catch(() => false);
+    if (!logFileExists) {
       // Try PM2 convention if Supervisor not found
       const pm2Log = path.join(
         process.env.HOME || "/root",
@@ -717,7 +723,8 @@ router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
         "logs",
         `${normalizedName.replace(/\s+/g, "-")}-out.log`
       );
-      if (fs.existsSync(pm2Log)) {
+      const pm2Exists = await fs.promises.access(pm2Log, fs.constants.R_OK).then(() => true).catch(() => false);
+      if (pm2Exists) {
         logFile = pm2Log;
       } else {
         // Try Docker stdout logs - these are captured by Docker, not files

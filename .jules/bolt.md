@@ -1,6 +1,6 @@
-## 2024-03-22 - Node.js Express Event Loop Blocking
-**Learning:** Using synchronous `fs` methods (`fs.existsSync`, `fs.readdirSync`, `fs.readFileSync`) within Express route handlers or global heartbeat functions blocks the main Node.js Event Loop, completely destroying concurrency and performance for a relay.
-**Action:** Always refactor blocking `fs.*Sync` operations to their `fs.promises` equivalents inside `async` route handler wrappers. Specifically, use `await fs.promises.access(path).then(()=>true).catch(()=>false)` as a replacement for `fs.existsSync`.
+## 2026-03-22 - Async File Existence Checks in Express Routes
+**Learning:** Synchronous file system checks (`fs.existsSync`) in `async` Express route handlers block the Node.js event loop, preventing the server from handling other concurrent requests. This is especially problematic in high-traffic endpoints like log retrieval.
+**Action:** Replace `fs.existsSync(path)` with `await fs.promises.access(path).then(() => true).catch(() => false)` or similar asynchronous patterns to ensure the event loop remains non-blocking.
 
 ## 2024-03-22 - V8 Engine Memory Leak with IPFS Queries
 **Learning:** Querying `/api/v0/pin/ls?type=recursive` scales poorly in JSON payload size linearly with the number of IPFS pins. In memory-constrained environments, `JSON.parse` on large payloads causes V8 Out of Memory (OOM) crashes.
