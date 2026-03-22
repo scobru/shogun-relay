@@ -1222,13 +1222,13 @@ See docs/RELAY_KEYS.md for more information.
             numObjects: ipfsStats.NumObjects || ipfsStats.numberObjects || 0,
           };
 
-          // Also get pin count (quick query)
+          // Also get pin count (quick query) - changed to O(1) repo stat instead of recursive pins
           const pinCount = await new Promise((resolve) => {
             const timeout = setTimeout(() => resolve(0), 2000);
             const options: any = {
               hostname: "127.0.0.1",
               port: 5001,
-              path: "/api/v0/pin/ls?type=recursive",
+              path: "/api/v0/repo/stat",
               method: "POST",
               headers: { "Content-Length": "0" },
             };
@@ -1241,8 +1241,8 @@ See docs/RELAY_KEYS.md for more information.
               res.on("end", () => {
                 clearTimeout(timeout);
                 try {
-                  const pins = JSON.parse(data);
-                  resolve(pins.Keys ? Object.keys(pins.Keys).length : 0);
+                  const stats = JSON.parse(data);
+                  resolve(stats.NumObjects ? parseInt(stats.NumObjects, 10) : 0);
                 } catch {
                   resolve(0);
                 }

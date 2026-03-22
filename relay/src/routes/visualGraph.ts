@@ -12,12 +12,13 @@ const router: Router = express.Router();
 const publicPath: string = path.resolve(__dirname, "../public");
 
 // Main visual graph interface
-router.get("/", (req: Request, res: Response): void => {
+router.get("/", async (req: Request, res: Response): Promise<void> => {
   loggers.visualGraph.info("Visual Graph route accessed");
   const filePath: string = path.resolve(publicPath, "visualGraph/visualGraph.html");
   loggers.visualGraph.info({ filePath }, "Serving visualGraph.html");
 
-  if (fs.existsSync(filePath)) {
+  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  if (exists) {
     res.sendFile(filePath);
   } else {
     loggers.visualGraph.error({ filePath }, "Visual Graph HTML not found");
@@ -26,11 +27,12 @@ router.get("/", (req: Request, res: Response): void => {
 });
 
 // Serve specific static files first
-router.get("/visualGraph.js", (req: Request, res: Response): void => {
+router.get("/visualGraph.js", async (req: Request, res: Response): Promise<void> => {
   const filePath: string = path.resolve(publicPath, "visualGraph/visualGraph.js");
   loggers.visualGraph.info({ filePath }, "Serving visualGraph.js");
 
-  if (fs.existsSync(filePath)) {
+  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  if (exists) {
     res.setHeader("Content-Type", "application/javascript");
     res.sendFile(filePath);
   } else {
@@ -39,11 +41,12 @@ router.get("/visualGraph.js", (req: Request, res: Response): void => {
   }
 });
 
-router.get("/abstraction.js", (req: Request, res: Response): void => {
+router.get("/abstraction.js", async (req: Request, res: Response): Promise<void> => {
   const filePath: string = path.resolve(publicPath, "visualGraph/abstraction.js");
   loggers.visualGraph.info({ filePath }, "Serving abstraction.js");
 
-  if (fs.existsSync(filePath)) {
+  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  if (exists) {
     res.setHeader("Content-Type", "application/javascript");
     res.sendFile(filePath);
   } else {
@@ -52,11 +55,12 @@ router.get("/abstraction.js", (req: Request, res: Response): void => {
   }
 });
 
-router.get("/vGmain.css", (req: Request, res: Response): void => {
+router.get("/vGmain.css", async (req: Request, res: Response): Promise<void> => {
   const filePath: string = path.resolve(publicPath, "visualGraph/vGmain.css");
   loggers.visualGraph.info({ filePath }, "Serving vGmain.css");
 
-  if (fs.existsSync(filePath)) {
+  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  if (exists) {
     res.setHeader("Content-Type", "text/css");
     res.sendFile(filePath);
   } else {
@@ -65,11 +69,12 @@ router.get("/vGmain.css", (req: Request, res: Response): void => {
   }
 });
 
-router.get("/visualGraphIcon.svg", (req: Request, res: Response): void => {
+router.get("/visualGraphIcon.svg", async (req: Request, res: Response): Promise<void> => {
   const filePath: string = path.resolve(publicPath, "visualGraph/visualGraphIcon.svg");
   loggers.visualGraph.info({ filePath }, "Serving visualGraphIcon.svg");
 
-  if (fs.existsSync(filePath)) {
+  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  if (exists) {
     res.setHeader("Content-Type", "image/svg+xml");
     res.sendFile(filePath);
   } else {
@@ -79,7 +84,7 @@ router.get("/visualGraphIcon.svg", (req: Request, res: Response): void => {
 });
 
 // Catch-all route for other static files
-router.get("/*", (req: Request, res: Response): void => {
+router.get("/*", async (req: Request, res: Response): Promise<void> => {
   const requestedPath: string = req.path;
   const filePath: string = path.resolve(publicPath, "visualGraph" + requestedPath);
 
@@ -94,7 +99,8 @@ router.get("/*", (req: Request, res: Response): void => {
     return;
   }
 
-  if (fs.existsSync(filePath)) {
+  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  if (exists) {
     loggers.visualGraph.info({ filePath }, "File found, serving");
 
     // Set appropriate MIME types
