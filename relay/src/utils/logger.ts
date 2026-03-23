@@ -6,6 +6,9 @@
  */
 
 import pino from "pino";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 // Determine environment
 const isDev = process.env.NODE_ENV !== "production";
