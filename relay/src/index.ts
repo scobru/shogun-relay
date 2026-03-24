@@ -18,6 +18,7 @@ import { initRelayUser, getRelayUser } from "./utils/relay-user";
 import SQLiteStore from "./utils/sqlite-store";
 import S3Store from "./utils/s3-store";
 import { loggers } from "./utils/logger";
+import { StatsTracker } from "./utils/stats-tracker";
 import {
   config,
   ipfsConfig,
@@ -248,6 +249,10 @@ async function initializeServer() {
 
   // Fix per rate limiting con proxy
   app.set("trust proxy", 1);
+
+  // Stats Tracker Initialize
+  const statsTracker = new StatsTracker();
+  app.set("statsTracker", statsTracker);
 
   // ===== ROOT HEALTH CHECK ENDPOINTS (for load balancers, k8s probes) =====
   // Note: /health endpoint with full details is registered later after initialization
@@ -502,6 +507,14 @@ async function initializeServer() {
   app.set("gunInstance", gun);
   // Store the gun storage adapter for stats access
   app.set("gunStore", store);
+
+  // Hook Stats Tracker to Gun's wire peers
+  gun.on("hi", (peer: any) => {
+    if (!peer || !peer.wire) return;
+    const addr = peer.url || peer.id || "unknown";
+    statsTracker.patchSocket(peer.wire, addr);
+  });
+
   // Start wormhole cleanup scheduler for orphaned transfer cleanup
   if (wormholeConfig.enabled) {
     startWormholeCleanup(gun);

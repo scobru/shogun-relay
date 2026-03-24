@@ -133,60 +133,12 @@ router.get("/alldata", adminAuthMiddleware, (req, res) => {
 // Stats endpoint (Public)
 router.get("/stats", adminAuthMiddleware, (req, res) => {
   try {
-    const now = Date.now();
-    const uptime = process.uptime() * 1000; // Convert to milliseconds
-    const memoryUsage = process.memoryUsage();
+    const statsTracker = req.app.get("statsTracker");
+    if (!statsTracker) {
+      return res.status(503).json({ success: false, error: "Stats tracker not initialized" });
+    }
 
-    // Calculate rates (simplified - you might want to track these over time)
-    const getRate = Math.random() * 10; // Placeholder
-    const putRate = Math.random() * 5; // Placeholder
-
-    const stats = {
-      // Basic system info
-      up: {
-        time: uptime,
-      },
-      memory: {
-        heapUsed: memoryUsage.heapUsed,
-        heapTotal: memoryUsage.heapTotal,
-        external: memoryUsage.external,
-        rss: memoryUsage.rss,
-      },
-      cpu: process.cpuUsage(),
-      timestamp: now,
-      version: packageConfig.version || "1.0.0",
-
-      // Gun-specific stats (placeholders - you might want to track these from Gun)
-      peers: {
-        count: Math.floor(Math.random() * 10) + 1, // Placeholder
-        time: uptime,
-      },
-      node: {
-        count: Math.floor(Math.random() * 100) + 10, // Placeholder
-        memory: {
-          heapUsed: memoryUsage.heapUsed,
-          heapTotal: memoryUsage.heapTotal,
-        },
-      },
-
-      // DAM (Data Access Manager) stats
-      dam: {
-        in: {
-          rate: getRate,
-          count: Math.floor(Math.random() * 1000) + 100,
-        },
-        out: {
-          rate: putRate,
-          count: Math.floor(Math.random() * 500) + 50,
-        },
-      },
-
-      // Additional stats for charts
-      over: 5000, // 5 seconds in milliseconds
-
-      // Time series data (empty for now)
-      all: {},
-    };
+    const stats = statsTracker.getStats();
 
     res.json({
       success: true,
@@ -237,58 +189,12 @@ router.post("/stats/update", adminAuthMiddleware, (req, res) => {
 // Stats JSON endpoint (Public)
 router.get("/stats.json", (req, res) => {
   try {
-    const now = Date.now();
-    const uptime = process.uptime() * 1000; // Convert to milliseconds
+    const statsTracker = req.app.get("statsTracker");
+    if (!statsTracker) {
+      return res.status(503).json({ success: false, error: "Stats tracker not initialized" });
+    }
 
-    // Get memory usage
-    const memoryUsage = process.memoryUsage();
-
-    // Calculate rates (simplified - you might want to track these over time)
-    const getRate = Math.random() * 10; // Placeholder
-    const putRate = Math.random() * 5; // Placeholder
-
-    const stats = {
-      // Basic system info
-      up: {
-        time: uptime,
-      },
-      memory: {
-        heapUsed: memoryUsage.heapUsed,
-        heapTotal: memoryUsage.heapTotal,
-        external: memoryUsage.external,
-        rss: memoryUsage.rss,
-      },
-      cpu: process.cpuUsage(),
-      timestamp: now,
-      version: packageConfig.version || "1.0.0",
-
-      // Gun-specific stats (placeholders - you might want to track these from Gun)
-      peers: {
-        count: Math.floor(Math.random() * 10) + 1, // Placeholder
-        time: uptime,
-      },
-      node: {
-        count: Math.floor(Math.random() * 100) + 10, // Placeholder
-      },
-
-      // DAM (Data Access Manager) stats
-      dam: {
-        in: {
-          rate: getRate,
-          count: Math.floor(Math.random() * 1000) + 100,
-        },
-        out: {
-          rate: putRate,
-          count: Math.floor(Math.random() * 500) + 50,
-        },
-      },
-
-      // Additional stats for charts
-      over: 5000, // 5 seconds in milliseconds
-
-      // Time series data (empty for now)
-      all: {},
-    };
+    const stats = statsTracker.getStats();
 
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Cache-Control", "no-cache");
