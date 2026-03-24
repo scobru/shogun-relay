@@ -14,6 +14,7 @@ function ConsoleLogs() {
   const { isAuthenticated, getAuthHeaders } = useAuth();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -33,12 +34,19 @@ function ConsoleLogs() {
       const res = await fetch("/api/v1/system/logs?tail=500&limit=500", {
         headers: getAuthHeaders(),
       });
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
       const data = await res.json();
       if (data.success && data.logs) {
         setLogs(data.logs);
+        setError(null);
+      } else if (data.error) {
+        setError(data.error);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to fetch logs", e);
+      setError(e.message || "Failed to fetch logs");
     } finally {
       if (loading) setLoading(false);
     }
@@ -140,6 +148,16 @@ function ConsoleLogs() {
           </div>
         </div>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="alert alert-error shadow-sm py-2 px-4">
+          <div className="flex items-center gap-2">
+            <span>❌</span>
+            <span className="text-sm font-medium">{error}</span>
+          </div>
+        </div>
+      )}
 
       {/* Logs View */}
       <div className="card bg-neutral text-neutral-content shadow-xl flex-1 overflow-hidden border border-base-content/10">
