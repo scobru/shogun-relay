@@ -494,7 +494,8 @@ router.get("/logs", adminAuthMiddleware, async (req, res) => {
         await fs.promises.access(loc, fs.constants.R_OK);
         logFilePath = loc;
         break;
-      } catch (err) {
+      } catch (err: any) {
+        loggers.server.debug({ loc, err: err.message }, "Log file not found at location, trying next");
         // Skip and try next location
       }
     }
