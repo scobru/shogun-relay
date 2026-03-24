@@ -6,7 +6,6 @@ const iconMap: Record<string, string> = {
   status: "◉",
   stats: "▤",
   files: "▢",
-  network: "◇",
   apiKeys: "◈",
   charts: "▦",
   visualGraph: "◬",
@@ -26,7 +25,6 @@ const navItems: NavItem[] = [
   { path: "/", icon: iconMap.status, label: "Status", group: "main" },
   { path: "/stats", icon: iconMap.stats, label: "Live Stats", group: "main" },
   { path: "/files", icon: iconMap.files, label: "Files", group: "storage" },
-  { path: "/network", icon: iconMap.network, label: "Network", group: "network" },
   { path: "/api-keys", icon: iconMap.apiKeys, label: "API Keys", group: "tools" },
   { path: "/charts", icon: iconMap.charts, label: "Charts", group: "tools" },
   { path: "/visual-graph", icon: iconMap.visualGraph, label: "Visual Graph", group: "tools" },
@@ -38,13 +36,12 @@ const navItems: NavItem[] = [
 const groupLabels: Record<string, string> = {
   main: "DASHBOARD",
   storage: "STORAGE",
-  network: "NETWORK",
   tools: "TOOLS",
   system: "SYSTEM",
 };
 
 function Sidebar() {
-  const groups = ["main", "storage", "network", "tools", "system"];
+  const groups = ["main", "storage", "tools", "system"];
 
   return (
     <div className="drawer-side z-40">

@@ -4,7 +4,6 @@ import fs from "fs";
 import cors from "cors";
 import dotenv from "dotenv";
 import setSelfAdjustingInterval from "self-adjusting-interval";
-import crypto from "crypto";
 import { fileURLToPath } from "url";
 import Gun from "gun";
 import "gun/sea";
@@ -16,8 +15,6 @@ import "./utils/bullet-catcher";
 
 import multer from "multer";
 import { initRelayUser, getRelayUser } from "./utils/relay-user";
-import * as Reputation from "./utils/relay-reputation";
-import * as FrozenData from "./utils/frozen-data";
 import SQLiteStore from "./utils/sqlite-store";
 import S3Store from "./utils/s3-store";
 import { loggers } from "./utils/logger";
@@ -38,7 +35,6 @@ import {
 import { startWormholeCleanup } from "./utils/wormhole-cleanup";
 import { tokenAuthMiddleware } from "./middleware/token-auth";
 import { secureCompare, hashToken, createProductionErrorHandler } from "./utils/security";
-import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/peer-discovery";
 
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
 // Chat service removed
@@ -500,13 +496,8 @@ async function initializeServer() {
 
   const gun = (Gun as any)(gunConfig);
 
-<<<<<<< HEAD
   // Initialize Gun Alias Guard to prevent duplicate usernames
   gunAliasGuard(gun);
-
-
-=======
->>>>>>> 0e2afc9b6825ccb0789c64c14f714e13a829b678
   // Store gun instance in express app for access from routes
   app.set("gunInstance", gun);
   // Store the gun storage adapter for stats access
@@ -707,14 +698,6 @@ See docs/RELAY_KEYS.md for more information.
     // Not a valid URL, use as-is
   }
 
-  // Initialize reputation tracking for this relay
-  try {
-    Reputation.initReputationTracking(gun, host);
-    loggers.server.info({ host }, `📊 Reputation tracking initialized`);
-  } catch (e: any) {
-    loggers.server.warn({ err: e }, "⚠️ Failed to initialize reputation tracking");
-  }
-
   // Initialize Network Pin Request Listener (auto-replication)
   const autoReplication = replicationConfig.autoReplication;
 
@@ -858,13 +841,6 @@ See docs/RELAY_KEYS.md for more information.
               status: "completed",
             });
 
-            // Record pin fulfillment for reputation tracking
-            try {
-              await Reputation.recordPinFulfillment(gun, host, true);
-            } catch (e: any) {
-              loggers.server.warn({ err: e }, "Failed to record pin fulfillment for reputation");
-            }
-
             // Publish response
             const crypto = await import("crypto");
             const responseId = crypto.randomBytes(8).toString("hex");
@@ -884,15 +860,6 @@ See docs/RELAY_KEYS.md for more information.
               status: "failed",
             });
 
-            // Record failed pin fulfillment
-            try {
-              await Reputation.recordPinFulfillment(gun, host, false);
-            } catch (e: any) {
-              // Silent in production
-              if (loggingConfig.debug) {
-                loggers.server.warn("Failed to record pin fulfillment for reputation:", e.message);
-              }
-            }
           }
         } catch (error: any) {
           if (loggingConfig.debug) {
@@ -906,12 +873,6 @@ See docs/RELAY_KEYS.md for more information.
             status: "failed",
           });
 
-          // Record failed pin fulfillment for reputation tracking
-          try {
-            await Reputation.recordPinFulfillment(gun, host, false);
-          } catch (e: any) {
-            // Silent in production
-          }
         }
       });
   } else {
@@ -1190,92 +1151,7 @@ See docs/RELAY_KEYS.md for more information.
     addTimeSeriesPoint("connections.active", activeWires);
     addTimeSeriesPoint("memory.heapUsed", process.memoryUsage().heapUsed);
 
-    // Record pulse for reputation tracking (own uptime)
-    try {
-      await Reputation.recordPulse(gun, host);
-      // Periodically update stored score (every 10 minutes = 20 pulses)
-      if (Math.random() < 0.05) {
-        // ~5% chance each pulse
-        await Reputation.updateStoredScore(gun, host);
-      }
-    } catch (e: any) {
-      // Non-critical, don't log every time
-    }
-
-    // Create frozen (immutable, signed) announcement every ~5 minutes
-    // Only if relay user is initialized (has keypair for signing)
-    try {
-      const relayUser = getRelayUser();
-      if (relayUser && relayUser.is && Math.random() < 0.1) {
-        // ~10% chance = every ~5 min
-        const announcement = {
-          type: "relay-announcement",
-          host,
-          port,
-          name: relayConfig.name,
-          version: packageConfig.version,
-          uptime: process.uptime(),
-          connections: pulse.connections,
-          ipfs: pulse.ipfs,
-          // Use object instead of array for GunDB compatibility
-          capabilities: {
-            "ipfs-pin": true,
-            "storage-proof": true,
-            "x402-subscription": true,
-            "storage-deals": true,
-          },
-        };
-
-        await FrozenData.createFrozenEntry(
-          gun,
-          announcement,
-          (relayUser as any)?._?.sea, // SEA keypair
-          "relay-announcements",
-          host
-        );
-      }
-    } catch (e: any) {
-      // Non-critical, frozen announcements are optional
-      if (loggingConfig.debug) loggers.server.debug({ err: e }, "Frozen announcement skipped");
-    }
   }, 30000); // 30 seconds
-
-  // ============================================================================
-  // GUNDB PEER DISCOVERY
-  // ============================================================================
-
-  try {
-    const ownEndpoint = process.env.RELAY_HOST
-      ? `https://${process.env.RELAY_HOST}`
-      : `http://localhost:${port}`;
-
-    // Start GunDB-based peer discovery
-    syncGunDBPeers(gun, ownEndpoint);
-    syncMulePeers(gun);
-
-    // Announce presence on GunDB
-    if (relayKeyPair && relayKeyPair.pub) {
-      const relayInfo = {
-        endpoint: ownEndpoint,
-        version: packageConfig.version,
-        alias: relayConfig.name,
-      };
-
-      // Announce immediately
-      announceRelayPresence(gun, relayInfo, relayKeyPair.pub);
-
-      // And periodically to update 'lastSeen'
-      setInterval(() => {
-        announceRelayPresence(gun, relayInfo, relayKeyPair.pub);
-      }, 60 * 1000); // Every minute
-
-      loggers.server.info({ pubKey: relayKeyPair.pub }, "📢 Relay presence announced on GunDB");
-    }
-
-    loggers.server.info("🔗 Started GunDB peer discovery");
-  } catch (error: any) {
-    loggers.server.warn({ err: error }, "⚠️ Failed to start peer discovery");
-  }
 
   // Shutdown function
   async function shutdown() {

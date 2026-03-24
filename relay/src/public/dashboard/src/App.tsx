@@ -3,7 +3,6 @@ import Layout from "./components/Layout";
 import Status from "./views/Status";
 import LiveStats from "./views/LiveStats";
 import Files from "./views/Files";
-import Network from "./views/Network";
 // Torrents import removed
 import Settings from "./views/Settings";
 import ApiKeys from "./views/ApiKeys";
@@ -19,7 +18,6 @@ function App() {
         <Route index element={<Status />} />
         <Route path="stats" element={<LiveStats />} />
         <Route path="files" element={<Files />} />
-        <Route path="network" element={<Network />} />
         {/* Torrents route removed */}
         <Route path="api-keys" element={<ApiKeys />} />
         <Route path="charts" element={<Charts />} />

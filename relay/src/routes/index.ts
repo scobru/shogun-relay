@@ -67,7 +67,6 @@ import systemRouter from "./system";
 import debugRouter from "./debug";
 import servicesRouter from "./services";
 import visualGraphRouter from "./visualGraph";
-import networkRouter from "./network";
 // torrentRouter removed
 import apiKeysRouter from "./api-keys";
 import authRouter from "./auth";
@@ -474,10 +473,7 @@ export default (app: express.Application) => {
     res.sendFile(path.resolve(publicPath, "graph.html"));
   });
 
-  app.get("/network-stats", (req, res) => {
-    const publicPath = path.resolve(__dirname, "../public");
-    res.sendFile(path.resolve(publicPath, "network-stats.html"));
-  });
+
 
   app.get("/rpc-console", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
@@ -580,8 +576,6 @@ export default (app: express.Application) => {
   // Route per il grafico visivo (always enabled)
   app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
 
-  // Route per network federation, discovery e storage proofs (always enabled)
-  app.use(`${baseRoute}/network`, networkRouter);
 
   // Route di autenticazione
   app.use(`${baseRoute}/auth`, authRouter);

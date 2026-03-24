@@ -1,7 +1,6 @@
 import { ApiClient, ApiClientConfig } from "./client";
 import { SystemModule } from "./modules/system";
 import { IpfsModule } from "./modules/ipfs";
-import { NetworkModule } from "./modules/network";
 import { UploadsModule } from "./modules/uploads";
 
 import { DriveModule } from "./modules/drive";
@@ -10,8 +9,6 @@ import { AuthModule } from "./modules/auth";
 import { ChatModule } from "./modules/chat";
 import { VisualGraphModule } from "./modules/visualGraph";
 
-// Export types
-export * from "./types";
 export * from "./modules/drive";
 export * from "./modules/api-keys";
 export * from "./modules/auth";
@@ -24,7 +21,6 @@ export class ShogunRelaySDK {
 
   public system: SystemModule;
   public ipfs: IpfsModule;
-  public network: NetworkModule;
   public uploads: UploadsModule;
 
   public drive: DriveModule;
@@ -38,7 +34,6 @@ export class ShogunRelaySDK {
 
     this.system = new SystemModule(this.client);
     this.ipfs = new IpfsModule(this.client);
-    this.network = new NetworkModule(this.client);
     this.uploads = new UploadsModule(this.client);
 
     this.drive = new DriveModule(this.client);
