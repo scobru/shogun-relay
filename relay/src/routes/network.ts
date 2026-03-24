@@ -24,7 +24,6 @@ interface RelayUserWithKeyPair extends IGunUserInstance<any, any, any, any> {
   _keyPair?: ISEAPair;
 }
 
-
 // Helper to get relay keypair safely for reputation tracking
 // Returns null instead of undefined if keypair not available
 function getRelayUserWithKeyPair(): RelayUserWithKeyPair | undefined {

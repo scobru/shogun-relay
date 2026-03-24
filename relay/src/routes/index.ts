@@ -72,7 +72,6 @@ import networkRouter from "./network";
 import apiKeysRouter from "./api-keys";
 import authRouter from "./auth";
 
-
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
@@ -409,12 +408,12 @@ export default (app: express.Application) => {
     const publicPath = path.resolve(__dirname, "../public");
     const adminPath = path.resolve(publicPath, "admin.html");
 
-    const exists = await fs.promises.access(adminPath).then(() => true).catch(() => false);
+    const exists = await fs.promises
+      .access(adminPath)
+      .then(() => true)
+      .catch(() => false);
 
-    loggers.server.debug(
-      { publicPath, adminPath, exists },
-      `🔍 Admin route requested`
-    );
+    loggers.server.debug({ publicPath, adminPath, exists }, `🔍 Admin route requested`);
 
     if (!exists) {
       loggers.server.error({ adminPath }, `❌ Admin file not found`);
@@ -465,7 +464,6 @@ export default (app: express.Application) => {
     res.sendFile(path.resolve(publicPath, "upload.html"));
   });
 
-
   app.get("/api-keys", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "api-keys.html"));
@@ -495,7 +493,10 @@ export default (app: express.Application) => {
   app.get("/lib/:filename", async (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const filePath = path.resolve(publicPath, "lib", req.params.filename);
-    const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+    const exists = await fs.promises
+      .access(filePath)
+      .then(() => true)
+      .catch(() => false);
 
     loggers.server.debug(
       {
@@ -524,7 +525,10 @@ export default (app: express.Application) => {
   app.get("/styles/:filename", async (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const filePath = path.resolve(publicPath, "styles", req.params.filename);
-    const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+    const exists = await fs.promises
+      .access(filePath)
+      .then(() => true)
+      .catch(() => false);
 
     loggers.server.debug(
       {
@@ -582,7 +586,6 @@ export default (app: express.Application) => {
   // Route di autenticazione
   app.use(`${baseRoute}/auth`, authRouter);
 
-
   // Route per API Keys (always enabled, admin-only)
 
   // Initialize API Keys Manager lazily on first request
@@ -609,7 +612,6 @@ export default (app: express.Application) => {
 
   app.use(`${baseRoute}/api-keys`, apiKeysRouter);
   loggers.server.info(`✅ API Keys routes registered`);
-
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
@@ -863,7 +865,10 @@ export default (app: express.Application) => {
           let totalSize = 0;
           let fileCount = 0;
 
-          const exists = await fs.promises.access(dirPath).then(() => true).catch(() => false);
+          const exists = await fs.promises
+            .access(dirPath)
+            .then(() => true)
+            .catch(() => false);
           if (!exists) {
             return { bytes: 0, files: 0 };
           }
@@ -1234,7 +1239,10 @@ export default (app: express.Application) => {
   app.get("/*", async (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const indexPath = path.resolve(publicPath, "index.html");
-    const exists = await fs.promises.access(indexPath).then(() => true).catch(() => false);
+    const exists = await fs.promises
+      .access(indexPath)
+      .then(() => true)
+      .catch(() => false);
     if (exists) {
       res.sendFile(indexPath);
     } else {
