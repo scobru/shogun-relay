@@ -497,7 +497,7 @@ async function initializeServer() {
     }
   }
 
-  (Gun as any).serve(app);
+
 
   const gun = (Gun as any)(gunConfig);
 
