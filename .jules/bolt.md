@@ -5,3 +5,7 @@
 ## 2024-03-22 - V8 Engine Memory Leak with IPFS Queries
 **Learning:** Querying `/api/v0/pin/ls?type=recursive` scales poorly in JSON payload size linearly with the number of IPFS pins. In memory-constrained environments, `JSON.parse` on large payloads causes V8 Out of Memory (OOM) crashes.
 **Action:** Replace `pin/ls` with `/api/v0/repo/stat` and extract the `NumObjects` property to achieve an O(1) performance measurement for data sizes and pinned items counts.
+
+## 2024-03-24 - Optimizing GunDB Record Fetching
+**Learning:** Fetching an entire list of user uploads from GunDB using `.map()` just to `.find()` a single known hash is highly inefficient (O(N) network/memory cost) and unnecessarily slow as data grows.
+**Action:** Always fetch specific items from GunDB directly by chaining `.get(key)` and using `.once()` to retrieve the single node in O(1) time. Include a short timeout as a fallback mechanism to prevent hanging on missing data.

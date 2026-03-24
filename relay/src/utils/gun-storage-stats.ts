@@ -65,7 +65,10 @@ async function getRadiskStats(dataDir: string): Promise<{ bytes: number; files: 
 
   const walkDir = async (dir: string): Promise<void> => {
     try {
-      const exists = await fs.promises.access(dir).then(() => true).catch(() => false);
+      const exists = await fs.promises
+        .access(dir)
+        .then(() => true)
+        .catch(() => false);
       if (!exists) return;
 
       const items = await fs.promises.readdir(dir, { withFileTypes: true });
@@ -93,7 +96,10 @@ async function getRadiskStats(dataDir: string): Promise<{ bytes: number; files: 
   // Also check the old "radata" in cwd for backward compatibility
   const cwdRadataDir = path.resolve(process.cwd(), "radata");
   if (cwdRadataDir !== radataDir) {
-    const cwdExists = await fs.promises.access(cwdRadataDir).then(() => true).catch(() => false);
+    const cwdExists = await fs.promises
+      .access(cwdRadataDir)
+      .then(() => true)
+      .catch(() => false);
     if (cwdExists) {
       await walkDir(cwdRadataDir);
     }
@@ -194,7 +200,10 @@ export async function getGunStorageStats(store?: any): Promise<GunStorageStats> 
     const stats = await getRadiskStats(dataDir);
     const formatted = formatBytes(stats.bytes);
     const radataPath = path.join(dataDir, "radata");
-    const radataExists = await fs.promises.access(radataPath).then(() => true).catch(() => false);
+    const radataExists = await fs.promises
+      .access(radataPath)
+      .then(() => true)
+      .catch(() => false);
 
     return {
       backend: "radisk",

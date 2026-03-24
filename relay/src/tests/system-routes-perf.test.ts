@@ -115,7 +115,9 @@ describe("System Routes Performance", () => {
 
   it("should benchmark /logs endpoint performance", async () => {
     const startTime = Date.now();
-    const res = await fetch(`${baseUrl}/system/logs?limit=10&tail=10`, { headers: { authorization: "Bearer valid-token" } });
+    const res = await fetch(`${baseUrl}/system/logs?limit=10&tail=10`, {
+      headers: { authorization: "Bearer valid-token" },
+    });
     const endTime = Date.now();
 
     expect(res.status).toBe(200);
@@ -127,7 +129,9 @@ describe("System Routes Performance", () => {
 
   it("should benchmark /services/:name/logs endpoint performance", async () => {
     const startTime = Date.now();
-    const res = await fetch(`${baseUrl}/system/services/ipfs/logs?limit=10&tail=10`, { headers: { authorization: "Bearer valid-token" } });
+    const res = await fetch(`${baseUrl}/system/services/ipfs/logs?limit=10&tail=10`, {
+      headers: { authorization: "Bearer valid-token" },
+    });
     const endTime = Date.now();
 
     expect(res.status).toBe(200);

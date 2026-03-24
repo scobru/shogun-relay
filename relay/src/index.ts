@@ -59,12 +59,12 @@ function isGunSpam(args: any[]) {
   if (args.length === 0) return false;
   const firstArg = args[0];
   // Gun unverified data spam usually looks like an object with 'err': 'Unverified data.' or similar raw Gun graph nodes
-  if (typeof firstArg === 'object' && firstArg !== null) {
-    if (firstArg.err === 'Unverified data.' || firstArg.err === 'Signature did not match.') {
+  if (typeof firstArg === "object" && firstArg !== null) {
+    if (firstArg.err === "Unverified data." || firstArg.err === "Signature did not match.") {
       return true;
     }
     // Also ignore raw object dumps that look like Gun graph nodes with '#' and '><'
-    if (firstArg['#'] && (firstArg['><'] || firstArg['@'])) {
+    if (firstArg["#"] && (firstArg["><"] || firstArg["@"])) {
       return true;
     }
   }
@@ -120,7 +120,6 @@ async function initializeServer() {
   console.log(welcomeMessage);
   loggers.server.info("🚀 Initializing Shogun Relay Server...");
   loggers.server.info("🚀 Shogun Relay v1.0.1 - FORCE UPDATE");
-
 
   /**
    * System logging function (console only, no GunDB storage)
@@ -390,7 +389,6 @@ async function initializeServer() {
   // IPFS File Upload Endpoint
   const upload = multer({ storage: multer.memoryStorage() });
 
-
   /**
    * Start the Express server
    * @returns {Promise<import('http').Server>} The HTTP server instance
@@ -502,10 +500,13 @@ async function initializeServer() {
 
   const gun = (Gun as any)(gunConfig);
 
+<<<<<<< HEAD
   // Initialize Gun Alias Guard to prevent duplicate usernames
   gunAliasGuard(gun);
 
 
+=======
+>>>>>>> 0e2afc9b6825ccb0789c64c14f714e13a829b678
   // Store gun instance in express app for access from routes
   app.set("gunInstance", gun);
   // Store the gun storage adapter for stats access

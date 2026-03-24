@@ -24,7 +24,6 @@ interface RelayUserWithKeyPair extends IGunUserInstance<any, any, any, any> {
   _keyPair?: ISEAPair;
 }
 
-
 // Helper to get relay keypair safely for reputation tracking
 // Returns null instead of undefined if keypair not available
 function getRelayUserWithKeyPair(): RelayUserWithKeyPair | undefined {
@@ -1103,6 +1102,7 @@ router.get("/reputation/:host", async (req, res) => {
               }
             }
           } catch (e) {
+            loggers.server.warn({ err: e, relayHost }, 'Failed to parse relay endpoint URL');
             // Ignore URL parsing errors
           }
         }

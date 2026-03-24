@@ -166,7 +166,6 @@ export const config = {
     debug: process.env.DEBUG === "true" || !!process.env.DEBUG,
   },
 
-
   package: {
     version: process.env.npm_package_version || "1.0.0",
   },
