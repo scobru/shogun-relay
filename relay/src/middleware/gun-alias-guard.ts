@@ -8,7 +8,7 @@ const log = loggers.server;
  */
 export function gunAliasGuard(gun: any) {
   // Use 'in' listener to intercept incoming data
-  gun.on('in', async function(msg: any) {
+  gun.on('in', async function(this: any, msg: any) {
     const to = this.to;
     
     // Check if message has a 'put' property
