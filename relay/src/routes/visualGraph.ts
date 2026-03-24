@@ -17,7 +17,10 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
   const filePath: string = path.resolve(publicPath, "visualGraph/visualGraph.html");
   loggers.visualGraph.info({ filePath }, "Serving visualGraph.html");
 
-  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  const exists = await fs.promises
+    .access(filePath)
+    .then(() => true)
+    .catch(() => false);
   if (exists) {
     res.sendFile(filePath);
   } else {
@@ -31,7 +34,10 @@ router.get("/visualGraph.js", async (req: Request, res: Response): Promise<void>
   const filePath: string = path.resolve(publicPath, "visualGraph/visualGraph.js");
   loggers.visualGraph.info({ filePath }, "Serving visualGraph.js");
 
-  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  const exists = await fs.promises
+    .access(filePath)
+    .then(() => true)
+    .catch(() => false);
   if (exists) {
     res.setHeader("Content-Type", "application/javascript");
     res.sendFile(filePath);
@@ -45,7 +51,10 @@ router.get("/abstraction.js", async (req: Request, res: Response): Promise<void>
   const filePath: string = path.resolve(publicPath, "visualGraph/abstraction.js");
   loggers.visualGraph.info({ filePath }, "Serving abstraction.js");
 
-  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  const exists = await fs.promises
+    .access(filePath)
+    .then(() => true)
+    .catch(() => false);
   if (exists) {
     res.setHeader("Content-Type", "application/javascript");
     res.sendFile(filePath);
@@ -59,7 +68,10 @@ router.get("/vGmain.css", async (req: Request, res: Response): Promise<void> => 
   const filePath: string = path.resolve(publicPath, "visualGraph/vGmain.css");
   loggers.visualGraph.info({ filePath }, "Serving vGmain.css");
 
-  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  const exists = await fs.promises
+    .access(filePath)
+    .then(() => true)
+    .catch(() => false);
   if (exists) {
     res.setHeader("Content-Type", "text/css");
     res.sendFile(filePath);
@@ -73,7 +85,10 @@ router.get("/visualGraphIcon.svg", async (req: Request, res: Response): Promise<
   const filePath: string = path.resolve(publicPath, "visualGraph/visualGraphIcon.svg");
   loggers.visualGraph.info({ filePath }, "Serving visualGraphIcon.svg");
 
-  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  const exists = await fs.promises
+    .access(filePath)
+    .then(() => true)
+    .catch(() => false);
   if (exists) {
     res.setHeader("Content-Type", "image/svg+xml");
     res.sendFile(filePath);
@@ -99,7 +114,10 @@ router.get("/*", async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  const exists = await fs.promises.access(filePath).then(() => true).catch(() => false);
+  const exists = await fs.promises
+    .access(filePath)
+    .then(() => true)
+    .catch(() => false);
   if (exists) {
     loggers.visualGraph.info({ filePath }, "File found, serving");
 

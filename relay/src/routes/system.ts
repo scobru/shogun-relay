@@ -703,18 +703,27 @@ router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
     if (normalizedName.includes("ipfs")) {
       // Check common IPFS log locations or PM2
       logFile = "/var/log/supervisor/ipfs.log"; // Supervisor default
-      const exists = await fs.promises.access(logFile, fs.constants.R_OK).then(() => true).catch(() => false);
+      const exists = await fs.promises
+        .access(logFile, fs.constants.R_OK)
+        .then(() => true)
+        .catch(() => false);
       if (!exists) logFile = path.join(process.cwd(), "logs", "ipfs.log");
     } else if (normalizedName.includes("gun") || normalizedName.includes("relay")) {
       logFile = "/var/log/supervisor/relay.log";
-      const exists = await fs.promises.access(logFile, fs.constants.R_OK).then(() => true).catch(() => false);
+      const exists = await fs.promises
+        .access(logFile, fs.constants.R_OK)
+        .then(() => true)
+        .catch(() => false);
       if (!exists) logFile = path.join(process.cwd(), "logs", "relay.log");
     } else {
       // Generic fallback
       logFile = `/var/log/supervisor/${normalizedName.replace(/\s+/g, "-")}.log`;
     }
 
-    const logFileExists = await fs.promises.access(logFile, fs.constants.R_OK).then(() => true).catch(() => false);
+    const logFileExists = await fs.promises
+      .access(logFile, fs.constants.R_OK)
+      .then(() => true)
+      .catch(() => false);
     if (!logFileExists) {
       // Try PM2 convention if Supervisor not found
       const pm2Log = path.join(
@@ -723,7 +732,10 @@ router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
         "logs",
         `${normalizedName.replace(/\s+/g, "-")}-out.log`
       );
-      const pm2Exists = await fs.promises.access(pm2Log, fs.constants.R_OK).then(() => true).catch(() => false);
+      const pm2Exists = await fs.promises
+        .access(pm2Log, fs.constants.R_OK)
+        .then(() => true)
+        .catch(() => false);
       if (pm2Exists) {
         logFile = pm2Log;
       } else {

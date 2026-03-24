@@ -90,14 +90,17 @@ export function isValidSession(sessionId: string, ip: string): boolean {
 }
 
 // Cleanup expired sessions periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [sessionId, session] of activeSessions.entries()) {
-    if (now > session.expiresAt) {
-      activeSessions.delete(sessionId);
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [sessionId, session] of activeSessions.entries()) {
+      if (now > session.expiresAt) {
+        activeSessions.delete(sessionId);
+      }
     }
-  }
-}, 60 * 60 * 1000); // Cleanup every hour
+  },
+  60 * 60 * 1000
+); // Cleanup every hour
 
 /**
  * Enhanced authentication middleware with rate limiting and session management

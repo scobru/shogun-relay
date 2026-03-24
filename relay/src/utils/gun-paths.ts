@@ -15,7 +15,6 @@ export const GUN_PATHS = {
   PEERS: "shogun/network/peers",
   // TORRENTS removed
 
-
   // Search index
   SEARCH: "shogun/network/search",
 
