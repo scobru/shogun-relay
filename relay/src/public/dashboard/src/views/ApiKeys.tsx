@@ -38,13 +38,13 @@ function ApiKeys() {
       const data = await res.json()
       if (data.success && data.token) { setCreatedToken(data.token); setNewName(''); setNewExpires(''); setShowCreate(false); loadKeys() }
       else setStatus(data.error || 'Failed to create key')
-    } catch { setStatus('Failed to create key') }
+    } catch (error) { console.error('Failed to create key:', error); setStatus('Failed to create key') }
   }
 
   const revokeKey = async (keyId: string) => {
     if (!confirm('Revoke this API key?')) return
     try { const res = await fetch(`/api/v1/api-keys/${keyId}`, { method: 'DELETE', headers: getAuthHeaders() }); const data = await res.json(); if (data.success) loadKeys() }
-    catch { console.error('Failed to revoke key') }
+    catch (error) { console.error('Failed to revoke key:', error) }
   }
 
   const formatDate = (ts: number) => new Date(ts).toLocaleDateString()
