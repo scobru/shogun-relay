@@ -18,7 +18,6 @@ export const GUN_PATHS = {
   PEERS: "shogun/network/peers",
   TORRENTS: "shogun/network/torrents",
 
-
   // Search index
   SEARCH: "shogun/network/search",
 

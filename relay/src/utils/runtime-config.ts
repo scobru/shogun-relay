@@ -69,7 +69,6 @@ export const RESTART_REQUIRED_KEYS = [
   "DATA_DIR",
   "STORAGE_TYPE",
   "DISABLE_RADISK",
-
 ] as const;
 
 export type RestartRequiredKey = (typeof RESTART_REQUIRED_KEYS)[number];

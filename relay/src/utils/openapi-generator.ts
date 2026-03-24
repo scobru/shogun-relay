@@ -548,10 +548,7 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
 1. **Admin Upload**: Use \`Authorization: Bearer <ADMIN_PASSWORD>\` (no signature required)
 2. **API Key Upload**: Use \`X-API-Key\` header.`,
           operationId: "uploadToIPFS",
-          security: [
-            { bearerAuth: [] },
-            { tokenHeader: [] },
-          ],
+          security: [{ bearerAuth: [] }, { tokenHeader: [] }],
           requestBody: {
             required: true,
             content: {
