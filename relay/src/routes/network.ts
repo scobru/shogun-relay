@@ -1102,6 +1102,7 @@ router.get("/reputation/:host", async (req, res) => {
               }
             }
           } catch (e) {
+            loggers.server.warn({ err: e, relayHost }, 'Failed to parse relay endpoint URL');
             // Ignore URL parsing errors
           }
         }
