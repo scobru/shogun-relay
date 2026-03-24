@@ -18,6 +18,16 @@ export class AuthModule {
   }
 
   /**
+   * Check if a username is already taken on the relay
+   * @param username User alias to check
+   */
+  public async checkUsername(username: string): Promise<{ available: boolean; message: string }> {
+    return this.client.get<{ available: boolean; message: string }>(
+      `/api/v1/auth/check-username/${username}`
+    );
+  }
+
+  /**
    * Register a new user on the relay
    * @param username User alias
    * @param password User password

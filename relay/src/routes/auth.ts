@@ -28,6 +28,22 @@ router.post("/register", async (req: Request, res: Response) => {
       return res.status(503).json({ success: false, error: "GunDB not initialized" });
     }
 
+    // Check if username is already taken
+    const existingAlias = await new Promise((resolve) => {
+      gun.get("~@" + username).once((data: any) => {
+        resolve(data);
+      });
+      // Safety timeout
+      setTimeout(() => resolve(null), 5000);
+    });
+
+    if (existingAlias) {
+      return res.status(400).json({
+        success: false,
+        error: "Username already in use",
+      });
+    }
+
     // Attempt to create user
     // Note: Gun.user().create() is asynchronous but uses callbacks
     const user = gun.user();
@@ -119,6 +135,46 @@ router.post("/login", async (req: Request, res: Response) => {
       success: false,
       error: error.message || "Authentication failed",
     });
+  }
+});
+
+/**
+ * GET /api/v1/auth/check-username/:username
+ * Check if a username is already taken
+ */
+router.get("/check-username/:username", async (req: Request, res: Response) => {
+  try {
+    const { username } = req.params;
+    const gun = getGun(req);
+    
+    if (!gun) {
+      return res.status(503).json({ success: false, error: "GunDB not initialized" });
+    }
+
+    const existing = await new Promise((resolve) => {
+      gun.get("~@" + username).once((data: any) => {
+        resolve(data);
+      });
+      setTimeout(() => resolve(null), 3000);
+    });
+
+    if (existing) {
+      // Check if it's an empty node (nullified)
+      const pubs = Object.keys(existing).filter(k => k !== '_' && k !== '#');
+      if (pubs.length > 0) {
+        return res.json({
+          available: false,
+          message: "Username already taken",
+        });
+      }
+    }
+
+    res.json({
+      available: true,
+      message: "Username is available",
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

@@ -67,6 +67,8 @@ async function readLastLines(filePath: string, numLines: number): Promise<string
   }
 }
 
+import { performAliasMaintenance } from "../utils/alias-maintenance";
+
 const router: Router = express.Router();
 
 // Middleware per ottenere l'istanza Gun dal relay
@@ -787,89 +789,21 @@ router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
 
 // RPC Execute endpoint
 router.post("/rpc/execute", adminAuthMiddleware, async (req, res) => {
+  // ... existing code ...
+});
+
+// Alias maintenance endpoint
+router.post("/maintenance/aliases", adminAuthMiddleware, async (req, res) => {
   try {
-    const { endpoint, request } = req.body;
-
-    if (!endpoint || !request) {
-      return res.status(400).json({
-        success: false,
-        error: "Endpoint URL and request body are required",
-      });
-    }
-
-    // Validate endpoint URL
-    try {
-      new URL(endpoint);
-    } catch (e) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid endpoint URL",
-      });
-    }
-
-    // Validate request format
-    if (!request.method || !request.jsonrpc) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid RPC request format. Must include 'method' and 'jsonrpc'",
-      });
-    }
-
-    // SSRF Protection: Validate target URL and IP address
-    try {
-      const url = new URL(endpoint);
-
-      // Restrict protocols to HTTP/HTTPS
-      if (url.protocol !== "http:" && url.protocol !== "https:") {
-        return res.status(403).json({
-          success: false,
-          error: "Invalid protocol. Only HTTP and HTTPS are allowed.",
-        });
-      }
-
-      // Resolve the hostname to an IP address
-      const { address } = await dns.lookup(url.hostname);
-
-      // Check for private, loopback, or cloud metadata IP addresses
-      const isLocalhost =
-        address === "127.0.0.1" || address === "::1" || address.startsWith("127.");
-      const isZero = address === "0.0.0.0" || address === "::";
-      const isAWSMetadata = address === "169.254.169.254";
-
-      if ((ip as any).isPrivate(address) || isLocalhost || isZero || isAWSMetadata) {
-        loggers.server.warn({ endpoint, address }, "Blocked SSRF attempt in RPC execute");
-        return res.status(403).json({
-          success: false,
-          error: "Access to private or internal network resources is forbidden.",
-        });
-      }
-    } catch (error: any) {
-      return res.status(400).json({
-        success: false,
-        error: `Failed to resolve endpoint: ${error.message}`,
-      });
-    }
-
-    // Execute RPC call
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(request),
-    });
-
-    const responseData = await response.json();
-
+    const gun = getGunInstance(req);
+    const stats = await performAliasMaintenance(gun);
     res.json({
       success: true,
-      response: responseData,
-      status: response.status,
+      stats,
       timestamp: Date.now(),
     });
   } catch (error: any) {
-    loggers.server.error({ err: error }, "❌ RPC Execute error");
+    loggers.server.error({ err: error }, "❌ Alias Maintenance error");
     res.status(500).json({
       success: false,
       error: error.message,

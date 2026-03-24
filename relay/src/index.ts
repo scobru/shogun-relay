@@ -43,6 +43,8 @@ import { announceRelayPresence, syncGunDBPeers, syncMulePeers } from "./utils/pe
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
 // Chat service removed
 
+import { gunAliasGuard } from "./middleware/gun-alias-guard";
+
 // Route Imports
 
 // Middleware
@@ -499,6 +501,9 @@ async function initializeServer() {
   (Gun as any).serve(app);
 
   const gun = (Gun as any)(gunConfig);
+
+  // Initialize Gun Alias Guard to prevent duplicate usernames
+  gunAliasGuard(gun);
 
 
   // Store gun instance in express app for access from routes
