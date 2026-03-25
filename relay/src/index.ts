@@ -508,11 +508,32 @@ async function initializeServer() {
   // Store the gun storage adapter for stats access
   app.set("gunStore", store);
 
+  // Initialize connection counters
+  let totalConnections = 0;
+  let activeWires = 0;
+
   // Hook Stats Tracker to Gun's wire peers
   gun.on("hi", (peer: any) => {
     if (!peer || !peer.wire) return;
     const addr = peer.url || peer.id || "unknown";
     statsTracker.patchSocket(peer.wire, addr);
+
+    // Synchronize local counters
+    totalConnections += 1;
+    activeWires = statsTracker.getStats().connectedPeers;
+    app.set("totalConnections", totalConnections);
+    app.set("activeWires", activeWires);
+    
+    loggers.server.debug({ activeWires, addr }, `Connection opened`);
+  });
+
+  gun.on("bye", (peer: any) => {
+    // Small delay to let StatsTracker update its map
+    setTimeout(() => {
+      activeWires = statsTracker.getStats().connectedPeers;
+      app.set("activeWires", activeWires);
+      loggers.server.debug({ activeWires }, `Connection closed`);
+    }, 100);
   });
 
   // Start wormhole cleanup scheduler for orphaned transfer cleanup
@@ -927,12 +948,6 @@ See docs/RELAY_KEYS.md for more information.
   // Esponi l'istanza Gun globalmente per le route
   (global as any).gunInstance = gun;
 
-  // Initialize connection counters (before health endpoint)
-  let totalConnections = 0;
-  let activeWires = 0;
-  app.set("totalConnections", 0);
-  app.set("activeWires", 0);
-
   // --- Modular Routes ---
   try {
     const { default: registerRoutes } = await import("./routes/index");
@@ -958,33 +973,7 @@ See docs/RELAY_KEYS.md for more information.
   // Set up relay stats database
   const db = getGunNode(gun, GUN_PATHS.RELAYS).get(host);
 
-  let activeWiresUpdateTimer: NodeJS.Timeout | null = null;
-  const updateActiveWires = (total: number, active: number) => {
-    if (activeWiresUpdateTimer) clearTimeout(activeWiresUpdateTimer);
-    activeWiresUpdateTimer = setTimeout(() => {
-      db?.get("totalConnections").put(total);
-      db?.get("activeWires").put(active);
-    }, 2000);
-  };
-
-  gun.on("hi", () => {
-    totalConnections += 1;
-    activeWires += 1;
-    app.set("totalConnections", totalConnections);
-    app.set("activeWires", activeWires);
-    updateActiveWires(totalConnections, activeWires);
-    loggers.server.debug({ activeWires }, `Connection opened`);
-  });
-
-  gun.on("bye", () => {
-    // Prevent negative counter (can happen on startup cleanup)
-    if (activeWires > 0) {
-      activeWires -= 1;
-    }
-    app.set("activeWires", activeWires);
-    updateActiveWires(totalConnections, activeWires);
-    loggers.server.debug({ activeWires }, `Connection closed`);
-  });
+  // Pulse stats are now driven by StatsTracker
 
   // Set up pulse interval for health monitoring (extended with IPFS stats)
   setSelfAdjustingInterval(async () => {

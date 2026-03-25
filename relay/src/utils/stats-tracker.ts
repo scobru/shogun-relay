@@ -84,11 +84,21 @@ export class StatsTracker {
       this.totalBytes += bytes;
       this.tickBytes += bytes;
 
+      // OPTIMIZATION: Avoid full JSON.parse for every message
+      // GunDB messages usually start with {"put":, {"get":, or contain "@" for acks
+      // This reduces CPU load significantly under high traffic
       try {
-        const msg = typeof raw === "string" ? JSON.parse(raw) : raw;
-        if (msg.put) this.putCount++;
-        if (msg.get) this.getCount++;
-        if (msg["@"]) this.ackCount++;
+        if (typeof raw === "string") {
+          // Peek into the string instead of full parse
+          const start = raw.substring(0, 20); // Get enough to check common keys
+          if (start.includes('"put"')) this.putCount++;
+          else if (start.includes('"get"')) this.getCount++;
+          else if (raw.includes('"@"')) this.ackCount++;
+        } else if (raw && typeof raw === "object") {
+          if (raw.put) this.putCount++;
+          if (raw.get) this.getCount++;
+          if (raw["@"]) this.ackCount++;
+        }
       } catch (_) {
         this.errorCount++;
       }
