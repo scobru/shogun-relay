@@ -52,7 +52,7 @@ function Sidebar() {
           <img src={logoSvg} alt="Shogun Relay" className="w-10 h-10" />
           <div>
             <span className="font-bold text-lg">Relay</span>
-            <p className="text-xs text-base-content/60">Relay Dashboard v1.2.1-clean</p>
+            <p className="text-xs text-base-content/60">Relay Dashboard v1.2.0</p>
           </div>
         </div>
 
