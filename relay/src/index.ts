@@ -7,6 +7,7 @@ import setSelfAdjustingInterval from "self-adjusting-interval";
 import { fileURLToPath } from "url";
 import Gun from "gun";
 import "gun/sea";
+import "gun/lib/yson";
 import "gun/lib/store";
 import "gun/lib/rfs";
 import "gun/lib/wire";
