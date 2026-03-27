@@ -55,13 +55,7 @@ export const config = {
       }
       // Default public Gun peers
       return [
-        "https://gun-manhattan.herokuapp.com/gun",
-        "https://peer.wallie.io/gun",
-        "https://gundb-relay-mlccl.ondigitalocean.app/gun",
-        "https://plankton-app-6qfp3.ondigitalocean.app/gun",
-        "https://gun.defucc.me/gun",
-        "https://shogun-relay.scobrudot.dev/gun",
-        "https://shogun-relay-2.scobrudot.dev/gun",
+        "http://localhost:8765/gun"
       ];
     })(),
   },

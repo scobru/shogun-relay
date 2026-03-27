@@ -530,7 +530,7 @@ async function initializeServer() {
     activeWires = statsTracker.getStats().connectedPeers;
     app.set("totalConnections", totalConnections);
     app.set("activeWires", activeWires);
-    
+
     loggers.server.debug({ activeWires, addr }, `Connection opened`);
   });
 
@@ -1174,7 +1174,7 @@ See docs/RELAY_KEYS.md for more information.
       loggers.server.error({ err: err.message }, "❌ Scheduled Alias Maintenance failed");
     }
   }, ALIAS_MAINTENANCE_INTERVAL);
-  
+
   // Also run once on startup after 1 minute to clean legacy data
   setTimeout(async () => {
     loggers.server.info("🧹 Starting startup Alias Maintenance...");
