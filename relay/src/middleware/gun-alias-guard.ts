@@ -24,37 +24,38 @@ export function gunAliasGuard(gun: any) {
         const newPubKeys = Object.keys(aliasData).filter(k => k !== '_' && k !== '#');
         
         if (newPubKeys.length > 0) {
-          const newPubKey = newPubKeys[0];
           const alias = aliasSoul.slice(2);
-          
-          log.debug({ alias, newPubKey }, "Intercepted alias registration attempt");
+          log.debug({ alias, newPubKeys }, "Intercepted alias registration attempt");
           
           try {
             // Check existing data for this alias
-            // We use .once() which is relatively fast if cached
             const existing = await new Promise((resolve) => {
+              const timeout = setTimeout(() => resolve(null), 1000);
               gun.get(aliasSoul).once((data: any) => {
+                clearTimeout(timeout);
                 resolve(data);
               });
-              // Safety timeout
-              setTimeout(() => resolve(null), 1000);
             });
             
             if (existing) {
               const existingPubs = Object.keys(existing).filter(k => k !== '_' && k !== '#');
               
-              if (existingPubs.length > 0 && !existingPubs.includes(newPubKey)) {
-                log.warn(
-                  { alias, existingPubs, newPubKey },
-                  "Blocked duplicate alias creation attempt"
-                );
+              if (existingPubs.length > 0) {
+                // Check if any of the new public keys are NOT in the existing set
+                const unauthorizedPubs = newPubKeys.filter(pub => !existingPubs.includes(pub));
                 
-                // Block the message by not calling to.next(msg)
-                // We can also send back an error acknowledgement if requested
-                if (msg['#']) {
-                  gun.on('in', { '@': msg['#'], err: "Alias already taken" });
+                if (unauthorizedPubs.length > 0) {
+                  log.warn(
+                    { alias, existingPubs, unauthorizedPubs },
+                    "Blocked unauthorized alias registration attempt"
+                  );
+                  
+                  // Block the message
+                  if (msg['#']) {
+                    gun.on('in', { '@': msg['#'], err: "Alias already taken" });
+                  }
+                  return;
                 }
-                return;
               }
             }
           } catch (err: any) {

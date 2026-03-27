@@ -47,6 +47,7 @@ import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
 // Chat service removed
 
 import { gunAliasGuard } from "./middleware/gun-alias-guard";
+import { performAliasMaintenance } from "./utils/alias-maintenance";
 
 // Route Imports
 
@@ -1160,6 +1161,29 @@ See docs/RELAY_KEYS.md for more information.
     addTimeSeriesPoint("memory.heapUsed", process.memoryUsage().heapUsed);
 
   }, 30000); // 30 seconds
+
+  // --- AUTOMATIC ALIAS MAINTENANCE ---
+  // Run every 6 hours to ensure identity uniqueness and clean up duplicates
+  const ALIAS_MAINTENANCE_INTERVAL = 6 * 60 * 60 * 1000;
+  setInterval(async () => {
+    loggers.server.info("🧹 Starting scheduled Alias Maintenance...");
+    try {
+      const stats = await performAliasMaintenance(gun);
+      loggers.server.info(stats, "✅ Scheduled Alias Maintenance completed");
+    } catch (err: any) {
+      loggers.server.error({ err: err.message }, "❌ Scheduled Alias Maintenance failed");
+    }
+  }, ALIAS_MAINTENANCE_INTERVAL);
+  
+  // Also run once on startup after 1 minute to clean legacy data
+  setTimeout(async () => {
+    loggers.server.info("🧹 Starting startup Alias Maintenance...");
+    try {
+      await performAliasMaintenance(gun);
+    } catch (err: any) {
+      loggers.server.error({ err: err.message }, "❌ Startup Alias Maintenance failed");
+    }
+  }, 60000);
 
   // Shutdown function
   async function shutdown() {

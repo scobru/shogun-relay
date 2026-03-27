@@ -56,38 +56,51 @@ export async function performAliasMaintenance(gun: any): Promise<MaintenanceStat
               
               if (pubKeys.length > 1) {
                 stats.duplicatesFound++;
-                log.warn({ alias: aliasName, count: pubKeys.length }, "Found duplicate alias");
+                log.warn({ alias: aliasName, count: pubKeys.length, pubKeys }, "Found duplicate alias registrations");
 
                 // 3. Strategy: Keep the most "valid" one
-                // For simplicity, we keep the one that actually exists in our USERS path
-                // or the first one if none are in USERS.
+                // We prioritize:
+                // a. The one that exists in USERS path
+                // b. The one that was most recently 'put' (if we had timestamps, but Gun nodes are graphs)
+                // For now, we'll check existence in USERS or just take the first one.
                 
                 let bestPub: string | null = null;
                 
                 for (const pub of pubKeys) {
                   const existsInUsers = await new Promise((res) => {
+                    const timeout = setTimeout(() => res(false), 1000);
                     getGunNode(gun, GUN_PATHS.USERS).get(pub).once((userData: any) => {
-                      res(!!userData);
+                      clearTimeout(timeout);
+                      res(!!userData && userData !== null);
                     });
-                    setTimeout(() => res(false), 500);
                   });
                   
                   if (existsInUsers) {
                     bestPub = pub;
+                    log.info({ alias: aliasName, bestPub }, "Found valid identity for alias in users index");
                     break;
                   }
                 }
                 
-                if (!bestPub) bestPub = pubKeys[0];
+                if (!bestPub) {
+                  bestPub = pubKeys[0];
+                  log.info({ alias: aliasName, bestPub }, "No identity found in users index, keeping first found");
+                }
 
                 // 4. Remove other references
-                for (const pub of pubKeys) {
+                // We use a promise to ensure all are processed
+                await Promise.all(pubKeys.map(async (pub) => {
                   if (pub !== bestPub) {
-                    log.info({ alias: aliasName, pub }, "Removing orphan alias reference");
-                    gun.get(aliasSoul).get(pub).put(null);
-                    stats.orphansRemoved++;
+                    log.info({ alias: aliasName, pub }, "Removing redundant identity association");
+                    return new Promise((resolve) => {
+                      gun.get(aliasSoul).get(pub).put(null, (ack: any) => {
+                        stats.orphansRemoved++;
+                        resolve(ack);
+                      });
+                      setTimeout(resolve, 2000); // Safety timeout for put
+                    });
                   }
-                }
+                }));
               }
               nextAlias();
             });
