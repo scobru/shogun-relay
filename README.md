@@ -136,11 +136,10 @@ shogun-relay/
 
 ## Troubleshooting
 
-| Issue                       | Solution                           |
-| --------------------------- | ---------------------------------- |
-| Gun clients fail to connect | `wscat -c ws://localhost:8765/gun` |
-| IPFS API unauthorized       | Check `IPFS_API_TOKEN`             |
-| Admin UI "token required"   | Enter token at `/admin` first      |
+| IPFS UDP buffer warning     | Increase host `net.core.rmem_max` to 7500000 |
+| Gun clients fail to connect | `wscat -c ws://localhost:8765/gun`            |
+| IPFS API unauthorized       | Check `IPFS_API_TOKEN`                        |
+| Admin UI "token required"   | Enter token at `/admin` first                 |
 
 ---
 
