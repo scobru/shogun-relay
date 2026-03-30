@@ -7,13 +7,6 @@ import setSelfAdjustingInterval from "self-adjusting-interval";
 import { fileURLToPath } from "url";
 import Gun from "gun";
 import "gun/sea";
-import "gun/lib/yson";
-import "gun/lib/store";
-import "gun/lib/rfs";
-import "gun/lib/wire";
-import "gun/lib/webrtc";
-import "gun/lib/evict";
-import "gun/lib/multicast";
 import "gun/lib/stats";
 
 // import "gun/axe"; // Disabled: causes infinite event-loop blocks / 504 Gateway Timeouts on writes in cyclic nets
