@@ -50,6 +50,7 @@ class S3Store {
   private bucket: string;
   private isClosed: boolean;
   private initialized: boolean;
+  private initializationPromise: Promise<void> | null = null;
   private cache: { p: Record<string, string>; g: Record<string, GetCallback[]> };
 
   constructor(options: S3StoreOptions) {
@@ -94,31 +95,40 @@ class S3Store {
     log.info({ endpoint: options.endpoint, bucket: this.bucket }, "🪣 S3Store initialized");
 
     // Initialize bucket in background
-    this.ensureBucket();
+    this.ensureBucket().catch((err) => {
+      log.error({ err, bucket: this.bucket }, "🪣 S3 bucket auto-initialization failed");
+    });
   }
 
   private async ensureBucket(): Promise<void> {
     if (this.initialized) return;
+    if (this.initializationPromise) return this.initializationPromise;
 
-    try {
-      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
-      log.info({ bucket: this.bucket }, "🪣 S3 bucket exists");
-    } catch (error: any) {
-      if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
-        try {
-          await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
-          log.info({ bucket: this.bucket }, "🪣 S3 bucket created");
-        } catch (createError: any) {
-          log.error({ err: createError, bucket: this.bucket }, "Failed to create S3 bucket");
-          throw createError;
+    this.initializationPromise = (async () => {
+      try {
+        await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+        log.info({ bucket: this.bucket }, "🪣 S3 bucket exists");
+        this.initialized = true;
+      } catch (error: any) {
+        if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+          try {
+            await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+            log.info({ bucket: this.bucket }, "🪣 S3 bucket created");
+            this.initialized = true;
+          } catch (createError: any) {
+            log.error({ err: createError, bucket: this.bucket }, "Failed to create S3 bucket");
+            throw createError;
+          }
+        } else {
+          log.error({ err: error, bucket: this.bucket }, "Failed to check S3 bucket");
+          throw error;
         }
-      } else {
-        log.error({ err: error, bucket: this.bucket }, "Failed to check S3 bucket");
-        throw error;
+      } finally {
+        this.initializationPromise = null;
       }
-    }
+    })();
 
-    this.initialized = true;
+    return this.initializationPromise;
   }
 
   /**
@@ -263,7 +273,10 @@ class S3Store {
     }
 
     try {
-      await this.ensureBucket();
+      // Ensure bucket exists before proceeding
+      if (!this.initialized) {
+        await this.ensureBucket();
+      }
 
       let totalBytes = 0;
       let fileCount = 0;
