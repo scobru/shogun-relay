@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 interface PeerStats {
   id: string
   addr: string
+  engine: "gun" | "zen"
   connectedAt: number
   msgCount: number
   bytesSent: number
@@ -18,6 +19,8 @@ interface SystemStats {
   cpu?: { user: number; system: number }
   peers?: PeerStats[] | any
   connectedPeers?: number
+  gunPeers?: number
+  zenPeers?: number
   peakPeers?: number
   totalMessages?: number
   totalBytes?: number
@@ -139,7 +142,7 @@ function LiveStats() {
           <div className="stat-figure text-primary text-2xl">🌐</div>
           <div className="stat-title">Connected Peers</div>
           <div className="stat-value text-primary">{stats?.connectedPeers || 0}</div>
-          <div className="stat-desc">Peak: {stats?.peakPeers || 0}</div>
+          <div className="stat-desc">Gun: {stats?.gunPeers || 0} / ZEN: {stats?.zenPeers || 0}</div>
         </div>
         <div className="stat">
           <div className="stat-figure text-secondary text-2xl">📈</div>
@@ -196,6 +199,7 @@ function LiveStats() {
                  <tr>
                    <th>#</th>
                    <th>Address / ID</th>
+                   <th>Engine</th>
                    <th>Status</th>
                    <th>Messages</th>
                    <th>Bytes Sent</th>
@@ -204,12 +208,17 @@ function LiveStats() {
                </thead>
                <tbody>
                  {stats.peers.length === 0 && (
-                   <tr><td colSpan={6} className="text-center text-base-content/50">No peers connected over wire.</td></tr>
+                   <tr><td colSpan={7} className="text-center text-base-content/50">No peers connected over wire.</td></tr>
                  )}
                  {stats.peers.map((p: PeerStats, i: number) => (
                    <tr key={i}>
                      <td className="text-base-content/50">{i + 1}</td>
                      <td className="font-mono text-xs">{p.addr || p.id}</td>
+                     <td>
+                        <span className={`badge badge-xs ${p.engine === 'zen' ? 'badge-secondary' : 'badge-success'}`}>
+                          {p.engine?.toUpperCase() || 'GUN'}
+                        </span>
+                      </td>
                      <td><span className="badge badge-success badge-sm p-2">LIVE</span></td>
                      <td>{(p.msgCount || 0).toLocaleString()}</td>
                      <td>{formatBytes(p.bytesSent || 0)}</td>
@@ -277,4 +286,3 @@ function LiveStats() {
 }
 
 export default LiveStats
-

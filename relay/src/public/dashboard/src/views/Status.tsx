@@ -10,7 +10,9 @@ interface HealthData {
 }
 
 interface StatsData {
-  peers?: { count: number };
+  connectedPeers?: number;
+  gunPeers?: number;
+  zenPeers?: number;
   memory?: { heapUsed: number };
 }
 
@@ -83,7 +85,8 @@ function Status() {
         <div className="stat">
           <div className="stat-figure text-primary text-3xl">🌐</div>
           <div className="stat-title">Connected Peers</div>
-          <div className="stat-value text-primary">{stats?.peers?.count || 0}</div>
+          <div className="stat-value text-primary">{stats?.connectedPeers || 0}</div>
+          <div className="stat-desc">Gun: {stats?.gunPeers || 0} / ZEN: {stats?.zenPeers || 0}</div>
         </div>
         <div className="stat">
           <div className="stat-figure text-secondary text-3xl">💾</div>
@@ -102,8 +105,12 @@ function Status() {
         </div>
         <div className="stat">
           <div className="stat-figure text-info text-3xl">📦</div>
-          <div className="stat-title">Version</div>
-          <div className="stat-value text-info text-xl">{health?.version || "--"}</div>
+          <div className="stat-title">Engines</div>
+          <div className="stat-value text-info text-xl">
+             <span className="badge badge-success badge-sm mr-1">Gun</span>
+             <span className="badge badge-secondary badge-sm">ZEN</span>
+          </div>
+          <div className="stat-desc">v{health?.version || "1.0.0"}</div>
         </div>
       </div>
 

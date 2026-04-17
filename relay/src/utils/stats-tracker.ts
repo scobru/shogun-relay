@@ -4,6 +4,7 @@ import { packageConfig } from "../config/env-config";
 export interface PeerStats {
   id: string;
   addr: string;
+  engine: "gun" | "zen";
   connectedAt: number;
   msgCount: number;
   bytesSent: number;
@@ -28,6 +29,10 @@ export class StatsTracker {
   private ackCount = 0;
   private errorCount = 0;
 
+  // Engine specific stats
+  private zenPeers = 0;
+  private gunPeers = 0;
+
   private tickMsgs = 0;
   private tickBytes = 0;
   private timer: NodeJS.Timeout;
@@ -48,7 +53,7 @@ export class StatsTracker {
     this.tickBytes = 0;
   }
 
-  public patchSocket(socket: any, addr: string) {
+  public patchSocket(socket: any, addr: string, engine: "gun" | "zen" = "gun") {
     if (!socket) return;
     
     // Check if already patched
@@ -56,8 +61,11 @@ export class StatsTracker {
     socket.__patchedStats = true;
 
     const id = addr + "_" + Date.now();
-    const peer: PeerStats = { id, addr, connectedAt: Date.now(), msgCount: 0, bytesSent: 0, uptime: 0 };
+    const peer: PeerStats = { id, addr, engine, connectedAt: Date.now(), msgCount: 0, bytesSent: 0, uptime: 0 };
     this.peers.set(id, peer);
+    
+    if (engine === "zen") this.zenPeers++;
+    else this.gunPeers++;
 
     if (this.peers.size > this.peakPeers) {
       this.peakPeers = this.peers.size;
@@ -108,7 +116,9 @@ export class StatsTracker {
     
     socket.on("close", () => {
       this.peers.delete(id);
-      loggers.server.info(`[-] Peer disconnected: ${addr} (Total: ${this.peers.size})`);
+      if (engine === "zen") this.zenPeers--;
+      else this.gunPeers--;
+      loggers.server.info(`[-] Peer disconnected: ${addr} (Total: ${this.peers.size}, Gun: ${this.gunPeers}, Zen: ${this.zenPeers})`);
     });
 
     socket.on("error", () => {
@@ -135,6 +145,8 @@ export class StatsTracker {
       totalMessages: this.totalMessages,
       totalBytes: this.totalBytes,
       connectedPeers: this.peers.size,
+      gunPeers: this.gunPeers,
+      zenPeers: this.zenPeers,
       peakPeers: this.peakPeers,
       putCount: this.putCount,
       getCount: this.getCount,

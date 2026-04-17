@@ -76,6 +76,11 @@ const getGunInstance = (req: Request): any => {
   return req.app.get("gunInstance");
 };
 
+// Middleware per ottenere l'istanza ZEN dal relay
+const getZenInstance = (req: Request): any => {
+  return req.app.get("zenInstance");
+};
+
 // Health check endpoint
 router.get("/health", (req, res) => {
   // Get relay public key from app context if available
@@ -252,6 +257,86 @@ router.get("/node/*", adminAuthMiddleware, async (req, res) => {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     });
+  }
+});
+
+// ZEN node operations
+router.get("/zen/node/*", adminAuthMiddleware, async (req, res) => {
+  try {
+    // @ts-ignore
+    const path: string = req.params[0] as string;
+    const zen = getZenInstance(req);
+
+    if (!zen) return res.status(503).json({ success: false, error: "ZEN not enabled" });
+
+    const node = getGunNode(zen, path);
+    const data = await new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(undefined), 5000);
+      node.once((data: any) => {
+        clearTimeout(timer);
+        resolve(data);
+      });
+    });
+
+    res.json({
+      success: true,
+      path,
+      data: data || null,
+      message: data === undefined ? "Node not found or timed out" : "Success",
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post("/zen/node/*", adminAuthMiddleware, async (req, res) => {
+  try {
+    // @ts-ignore
+    const path: string = req.params[0] as string;
+    const { data } = req.body;
+    const zen = getZenInstance(req);
+
+    if (!zen) return res.status(503).json({ success: false, error: "ZEN not enabled" });
+    if (!path) return res.status(400).json({ success: false, error: "Path required" });
+
+    const node = getGunNode(zen, path);
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Timeout")), 10000);
+      node.put(data, (ack: any) => {
+        clearTimeout(timeout);
+        if (ack.err) reject(new Error(ack.err));
+        else resolve(ack);
+      });
+    });
+
+    res.json({ success: true, path, data });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.delete("/zen/node/*", adminAuthMiddleware, async (req, res) => {
+  try {
+    // @ts-ignore
+    const path: string = req.params[0] as string;
+    const zen = getZenInstance(req);
+
+    if (!zen) return res.status(503).json({ success: false, error: "ZEN not enabled" });
+
+    const node = getGunNode(zen, path);
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Timeout")), 10000);
+      node.put(null, (ack: any) => {
+        clearTimeout(timeout);
+        if (ack.err) reject(new Error(ack.err));
+        else resolve(ack);
+      });
+    });
+
+    res.json({ success: true, path, message: "Deleted" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

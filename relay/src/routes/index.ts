@@ -773,6 +773,7 @@ export default (app: express.Application) => {
         },
         services: {
           gun: gunInstance ? "active" : "inactive",
+          zen: app.get("zenInstance") ? "active" : "inactive",
           holster: holsterInstance ? "active" : "inactive",
           ipfs: ipfsConfig.enabled ? "enabled" : "disabled",
         },

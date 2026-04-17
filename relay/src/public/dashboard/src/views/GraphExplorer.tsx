@@ -10,6 +10,7 @@ function GraphExplorer() {
   const { isAuthenticated, getAuthHeaders } = useAuth();
   const [currentPath, setCurrentPath] = useState<string>(GUN_PATHS.SHOGUN);
   const [data, setData] = useState<NodeData | null>(null);
+  const [engine, setEngine] = useState<"gun" | "zen">("zen"); // Default to ZEN as per user request
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [newKey, setNewKey] = useState("");
@@ -28,7 +29,8 @@ function GraphExplorer() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/v1/system/node/${encodeURIComponent(path)}`, {
+      const apiPath = engine === "zen" ? "zen/node" : "node";
+      const response = await fetch(`/api/v1/system/${apiPath}/${encodeURIComponent(path)}`, {
         headers: getAuthHeaders(),
       });
 
@@ -76,7 +78,8 @@ function GraphExplorer() {
         },
       };
 
-      const response = await fetch(`/api/v1/system/node/${encodeURIComponent(currentPath)}`, {
+      const apiPath = engine === "zen" ? "zen/node" : "node";
+      const response = await fetch(`/api/v1/system/${apiPath}/${encodeURIComponent(currentPath)}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -171,6 +174,20 @@ function GraphExplorer() {
               <p className="text-base-content/70">Inspect GunDB nodes and properties</p>
             </div>
             <div className="flex gap-2">
+              <div className="join mr-4">
+                <button 
+                  className={`btn btn-sm join-item ${engine === 'gun' ? 'btn-success' : 'btn-outline opacity-50'}`}
+                  onClick={() => setEngine('gun')}
+                >
+                  Gun
+                </button>
+                <button 
+                  className={`btn btn-sm join-item ${engine === 'zen' ? 'btn-secondary' : 'btn-outline opacity-50'}`}
+                  onClick={() => setEngine('zen')}
+                >
+                  ZEN
+                </button>
+              </div>
               <button
                 className="btn btn-neutral btn-sm"
                 onClick={handleBack}

@@ -26,6 +26,7 @@ function VisualGraph() {
   });
   const [loading, setLoading] = useState(false);
   const [path, setPath] = useState<string>(GUN_PATHS.SHOGUN);
+  const [engine, setEngine] = useState<"gun" | "zen">("zen"); // Default to ZEN as per user request
   const [peerUrl, setPeerUrl] = useState("");
   const [nodeCount, setNodeCount] = useState(0);
 
@@ -70,7 +71,8 @@ function VisualGraph() {
 
     try {
       // Use the generic node endpoint
-      const response = await fetch(`/api/v1/system/node/${encodeURIComponent(nodePath)}`, {
+      const apiPath = engine === "zen" ? "zen/node" : "node";
+      const response = await fetch(`/api/v1/system/${apiPath}/${encodeURIComponent(nodePath)}`, {
         headers: getAuthHeaders(),
       });
 
@@ -181,6 +183,20 @@ function VisualGraph() {
             </div>
 
             <div className="flex flex-col items-end gap-2">
+              <div className="join">
+                <button 
+                  className={`btn btn-sm join-item ${engine === 'gun' ? 'btn-success' : 'btn-outline opacity-50'}`}
+                  onClick={() => setEngine('gun')}
+                >
+                  Gun
+                </button>
+                <button 
+                  className={`btn btn-sm join-item ${engine === 'zen' ? 'btn-secondary' : 'btn-outline opacity-50'}`}
+                  onClick={() => setEngine('zen')}
+                >
+                  ZEN
+                </button>
+              </div>
               <div className="flex gap-2">
                 <span className="badge badge-lg">Nodes: {nodeCount}</span>
                 <span className="badge badge-lg badge-outline">Path: {path}</span>

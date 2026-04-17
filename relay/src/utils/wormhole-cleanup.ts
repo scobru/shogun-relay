@@ -78,6 +78,7 @@ async function runWormholeCleanup(gun: IGunInstance): Promise<void> {
   }
 
   isProcessing = true;
+  const zen = (global as any).zenInstance;
 
   try {
     const now = Date.now();
@@ -90,9 +91,20 @@ async function runWormholeCleanup(gun: IGunInstance): Promise<void> {
     );
 
     // Read all transfers from Gun
-    const transfers = await getWormholeTransfers(gun);
+    const gunTransfers = await getWormholeTransfers(gun);
+    const zenTransfers = zen ? await getWormholeTransfers(zen) : [];
+    
+    // Combine and deduplicate by code
+    const allTransfers = [...gunTransfers];
+    const seenCodes = new Set(gunTransfers.map(t => t.code));
+    for (const t of zenTransfers) {
+      if (!seenCodes.has(t.code)) {
+        allTransfers.push(t);
+        seenCodes.add(t.code);
+      }
+    }
 
-    if (transfers.length === 0) {
+    if (allTransfers.length === 0) {
       log.debug({}, "🔄 No wormhole transfers found");
       return;
     }
@@ -100,7 +112,7 @@ async function runWormholeCleanup(gun: IGunInstance): Promise<void> {
     let cleaned = 0;
     let errors = 0;
 
-    for (const { code, data } of transfers) {
+    for (const { code, data } of allTransfers) {
       try {
         // Skip if no createdAt timestamp
         if (!data.createdAt) {
@@ -112,9 +124,11 @@ async function runWormholeCleanup(gun: IGunInstance): Promise<void> {
           continue;
         }
 
-        // Skip if already completed
-        const completionStatus = await checkTransferCompleted(gun, code);
-        if (completionStatus) {
+        // Skip if already completed (check both)
+        const gunCompleted = await checkTransferCompleted(gun, code);
+        const zenCompleted = zen ? await checkTransferCompleted(zen, code) : false;
+        
+        if (gunCompleted || zenCompleted) {
           continue;
         }
 
@@ -141,6 +155,15 @@ async function runWormholeCleanup(gun: IGunInstance): Promise<void> {
 
         // Remove transfer metadata
         gun.get(code).put(null as any);
+        
+        // Remove from ZEN too if present
+        if (zen) {
+          getGunNode(zen, GUN_PATHS.SHOGUN_WORMHOLE)
+            .get(GUN_PATHS.WORMHOLE_TRANSFERS)
+            .get(code)
+            .put(null as any);
+          zen.get(code).put(null as any);
+        }
 
         cleaned++;
       } catch (err) {

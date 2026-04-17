@@ -535,6 +535,44 @@ async function initializeServer() {
     zen._graph; // Force relay initialization as per examples
     app.set("zenInstance", zen);
     (global as any).zenInstance = zen;
+    
+    // Hook ZEN to StatsTracker
+    zen.on("hi", (peer: any) => {
+      if (!peer || !peer.wire) return;
+      const addr = peer.url || peer.id || "unknown";
+      statsTracker.patchSocket(peer.wire, addr, "zen");
+    });
+    
+    // ZEN Pin Request Listener
+    if (replicationConfig.autoReplication) {
+      loggers.server.info("🔄 ZEN Auto-replication enabled - listening for pin requests");
+      zen.get(GUN_PATHS.PIN_REQUESTS).map().on(async (data: any, requestId: any) => {
+        if (!data || typeof data !== "object" || !data.cid) return;
+        if (data.status !== "pending") return;
+        if (data.timestamp && Date.now() - data.timestamp > 3600000) return;
+        
+        const cached = processedPinRequests.get(requestId);
+        if (cached && Date.now() - cached.processedAt < PIN_REQUEST_CACHE_TTL_MS) return;
+        
+        loggers.server.info({ cid: data.cid, requestId }, "🔁 Received PIN request via ZEN");
+        processedPinRequests.set(requestId, { processedAt: Date.now(), status: "processing" });
+        
+        try {
+          const response = await fetch(`${ipfsConfig.apiUrl}/api/v0/pin/add?arg=${data.cid}`, {
+            method: "POST",
+            headers: ipfsConfig.apiToken ? { Authorization: `Bearer ${ipfsConfig.apiToken}` } : {},
+          });
+          
+          if (response.ok) {
+            loggers.server.info({ cid: data.cid }, "✅ Successfully pinned via ZEN auto-replication");
+            zen.get(GUN_PATHS.PIN_REQUESTS).get(requestId).get("status").put("completed");
+          }
+        } catch (err) {
+          loggers.server.error({ err, cid: data.cid }, "❌ ZEN auto-replication pin failed");
+        }
+      });
+    }
+
     loggers.server.info("✅ ZEN Instance initialized alongside Gun");
   }
 
