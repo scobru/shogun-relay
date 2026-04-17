@@ -522,7 +522,7 @@ async function initializeServer() {
     const zenOptions = {
       super: true,
       web: server,
-      path: zenConfig.path,
+      ws: { path: zenConfig.path }, // Nest path for zen wire
       file: zenDataDir,
       radisk: true,
       localStorage: false,
@@ -532,6 +532,7 @@ async function initializeServer() {
 
     loggers.server.info({ path: zenConfig.path, dataDir: zenDataDir }, "🚀 Initializing ZEN Instance...");
     const zen = new ZEN(zenOptions);
+    zen._graph; // Force relay initialization as per examples
     app.set("zenInstance", zen);
     (global as any).zenInstance = zen;
     loggers.server.info("✅ ZEN Instance initialized alongside Gun");
