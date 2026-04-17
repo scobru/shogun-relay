@@ -11,6 +11,8 @@ import "gun/lib/stats";
 
 // import "gun/axe"; // Disabled: causes infinite event-loop blocks / 504 Gateway Timeouts on writes in cyclic nets
 import "./utils/bullet-catcher";
+// @ts-ignore
+import ZEN from "zen";
 
 import multer from "multer";
 import { initRelayUser, getRelayUser } from "./utils/relay-user";
@@ -30,6 +32,7 @@ import {
   replicationConfig,
   loggingConfig,
   packageConfig,
+  zenConfig,
 } from "./config/env-config";
 
 import { startWormholeCleanup } from "./utils/wormhole-cleanup";
@@ -507,6 +510,32 @@ async function initializeServer() {
   app.set("gunInstance", gun);
   // Store the gun storage adapter for stats access
   app.set("gunStore", store);
+
+  // Initialize ZEN alongside Gun
+  if (zenConfig.enabled) {
+    const zenDataDir = zenConfig.dataDir;
+    // Ensure directory exists
+    if (!fs.existsSync(zenDataDir)) {
+      fs.mkdirSync(zenDataDir, { recursive: true });
+    }
+
+    const zenOptions = {
+      super: true,
+      web: server,
+      path: zenConfig.path,
+      file: zenDataDir,
+      radisk: true,
+      localStorage: false,
+      axe: false,
+      peers: peers, // Share the same peers
+    };
+
+    loggers.server.info({ path: zenConfig.path, dataDir: zenDataDir }, "🚀 Initializing ZEN Instance...");
+    const zen = new ZEN(zenOptions);
+    app.set("zenInstance", zen);
+    (global as any).zenInstance = zen;
+    loggers.server.info("✅ ZEN Instance initialized alongside Gun");
+  }
 
   // Initialize connection counters
   let totalConnections = 0;

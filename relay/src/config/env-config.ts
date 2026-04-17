@@ -163,6 +163,16 @@ export const config = {
   package: {
     version: process.env.npm_package_version || "1.0.0",
   },
+
+  // ============================================================================
+  // ZEN CONFIGURATION
+  // ============================================================================
+
+  zen: {
+    path: process.env.ZEN_PATH || "/zen",
+    dataDir: process.env.ZEN_DATA_DIR || path.join(process.env.DATA_DIR || "data", "zendata"),
+    enabled: process.env.ZEN_ENABLED !== "false",
+  },
 };
 
 // ============================================================================
@@ -179,6 +189,7 @@ export const wormholeConfig = config.wormhole;
 export const replicationConfig = config.replication;
 export const loggingConfig = config.logging;
 export const packageConfig = config.package;
+export const zenConfig = config.zen;
 
 // ============================================================================
 // EXPORT DEFAULT
