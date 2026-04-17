@@ -70,6 +70,7 @@ router.post("/register", async (req: Request, res: Response) => {
             success: true,
             username: username,
             pub: ack.pub,
+            epub: ack.epub,
             alias: ack.sea.alias, // Typically same as username
             message: "User registered successfully",
           });
@@ -122,7 +123,6 @@ router.post("/login", async (req: Request, res: Response) => {
             pub: ack.pub,
             epub: ack.epub,
             alias: ack.sea.alias,
-            sea: ack.sea, // Return the SEA pair so client can use it if needed (be careful!)
           });
           user.leave(); // Don't leave session open on server
           resolve(ack);
