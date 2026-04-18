@@ -74,7 +74,7 @@ import authRouter from "./auth";
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
 import { loggers } from "../utils/logger";
-import { authConfig, ipfsConfig, packageConfig, relayConfig } from "../config";
+import { authConfig, ipfsConfig, packageConfig, relayConfig, zenConfig } from "../config";
 
 // Rate limiting generale
 const generalLimiter = rateLimit({
@@ -904,13 +904,14 @@ export default (app: express.Application) => {
         const dataStats = await getDirSize(dataDir);
         const radataStats = await getDirSize(radataDir);
         const ipfsStats = await getDirSize(path.join(dataDir, "ipfs"));
+        const zenStats = await getDirSize(zenConfig.dataDir || path.join(dataDir, "zendata"));
 
         // Get GunDB storage stats from the configured backend (sqlite, s3, or radisk)
         // Pass the store instance if available for accurate stats
         const gunStore = req.app.get("gunStore");
         const gundbStats = await getGunStorageStats(gunStore);
 
-        const totalBytes = dataStats.bytes + radataStats.bytes;
+        const totalBytes = dataStats.bytes + radataStats.bytes + zenStats.bytes;
 
         res.json({
           success: true,
@@ -942,6 +943,12 @@ export default (app: express.Application) => {
                 ...(gundbStats.bucket
                   ? { bucket: gundbStats.bucket, endpoint: gundbStats.endpoint }
                   : {}),
+              },
+              zen: {
+                ...formatSize(zenStats.bytes),
+                path: zenConfig.dataDir || path.join(dataDir, "zendata"),
+                files: zenStats.files,
+                description: "ZEN storage (radata)",
               },
             },
           },
