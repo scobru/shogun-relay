@@ -53,18 +53,21 @@ export class StatsTracker {
     this.tickBytes = 0;
   }
 
-  public patchSocket(socket: any, addr: string, engine: "gun" | "zen" = "gun") {
+  public patchSocket(socket: any, addr: string, engine?: "gun" | "zen") {
     if (!socket) return;
     
     // Check if already patched
     if (socket.__patchedStats) return;
     socket.__patchedStats = true;
 
+    // Auto-detect engine if not provided
+    const resolvedEngine: "gun" | "zen" = engine || (addr.includes('/zen') ? 'zen' : 'gun');
+
     const id = addr + "_" + Date.now();
-    const peer: PeerStats = { id, addr, engine, connectedAt: Date.now(), msgCount: 0, bytesSent: 0, uptime: 0 };
+    const peer: PeerStats = { id, addr, engine: resolvedEngine, connectedAt: Date.now(), msgCount: 0, bytesSent: 0, uptime: 0 };
     this.peers.set(id, peer);
     
-    if (engine === "zen") this.zenPeers++;
+    if (resolvedEngine === "zen") this.zenPeers++;
     else this.gunPeers++;
 
     if (this.peers.size > this.peakPeers) {
@@ -116,7 +119,7 @@ export class StatsTracker {
     
     socket.on("close", () => {
       this.peers.delete(id);
-      if (engine === "zen") this.zenPeers--;
+      if (resolvedEngine === "zen") this.zenPeers--;
       else this.gunPeers--;
       loggers.server.info(`[-] Peer disconnected: ${addr} (Total: ${this.peers.size}, Gun: ${this.gunPeers}, Zen: ${this.zenPeers})`);
     });
