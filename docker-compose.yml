@@ -14,6 +14,8 @@ services:
       - ipfs-data:/data/ipfs
       # Persist GunDB data (SQLite DB or radata files)
       - relay-data:/app/relay/data
+      # Persist ZEN sync engine data
+      - zen-data:/app/relay/data/zendata
       # Persist relay keys (SEA keypair for relay user)
       - relay-keys:/app/keys
       # Persist relay keys (SEA keypair for relay user)
@@ -100,6 +102,11 @@ services:
       - CORS_ORIGINS=https://shogun-deals.vercel.app,https://shogun-l2.vercel.app
       - CORS_CREDENTIALS=true
       # ============================================================================
+      # ZEN SYNC ENGINE
+      # ============================================================================
+      - ZEN_ENABLED=true
+      - ZEN_PATH=/zen
+      - ZEN_DATA_DIR=/app/relay/data/zendata
       # ============================================================================
       # ============================================================================
       # ============================================================================
@@ -129,6 +136,9 @@ volumes:
     driver: local
   # Relay keys - contains relay SEA keypair (RELAY_SEA_KEYPAIR_PATH)
   relay-keys:
+    driver: local
+  # ZEN sync engine data
+  zen-data:
     driver: local
 
 networks:
