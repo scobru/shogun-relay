@@ -1192,36 +1192,33 @@ See docs/RELAY_KEYS.md for more information.
       // Also save to a separate pulse namespace for easier querying
       getGunNode(gun, GUN_PATHS.RELAYS).get(host).get("pulse").put(pulse);
 
-      if (loggingConfig.debug) {
-        loggers.server.info(
-          {
-            host,
-            connections: activeWires,
-            ipfsConnected: pulse.ipfs?.connected,
-            numPins: pulse.ipfs?.numPins || 0,
-          },
-          `📡 Pulse saved to relays`
-        );
-      }
+      // Log pulse only in debug mode to avoid console spam
+      loggers.server.debug(
+        {
+          host,
+          connections: activeWires,
+          ipfsConnected: pulse.ipfs?.connected,
+          numPins: pulse.ipfs?.numPins || 0,
+        },
+        `📡 Pulse saved to relays`
+      );
     } catch (e: any) {
       loggers.server.warn({ err: e.message }, "Failed to save pulse to GunDB relays namespace");
-      if (loggingConfig.debug) {
-        loggers.server.debug(
-          {
-            host,
-            connections: activeWires,
-            ipfsConnected: pulse.ipfs?.connected,
-            numPins: pulse.ipfs?.numPins || 0,
-          },
-          `📡 Pulse saved to relays`
-        );
-      }
+      loggers.server.debug(
+        {
+          host,
+          connections: activeWires,
+          ipfsConnected: pulse.ipfs?.connected,
+          numPins: pulse.ipfs?.numPins || 0,
+        },
+        `📡 Pulse saved to relays`
+      );
     }
 
     addTimeSeriesPoint("connections.active", activeWires);
     addTimeSeriesPoint("memory.heapUsed", process.memoryUsage().heapUsed);
 
-  }, 30000); // 30 seconds
+  }, 300000); // 5 minutes
 
   // --- AUTOMATIC ALIAS MAINTENANCE ---
   // Run every 6 hours to ensure identity uniqueness and clean up duplicates

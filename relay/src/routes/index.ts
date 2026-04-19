@@ -70,6 +70,7 @@ import visualGraphRouter from "./visualGraph";
 // torrentRouter removed
 import apiKeysRouter from "./api-keys";
 import authRouter from "./auth";
+import tpreRouter from "./tpre";
 
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
@@ -579,6 +580,10 @@ export default (app: express.Application) => {
 
   // Route di autenticazione
   app.use(`${baseRoute}/auth`, authRouter);
+
+  // Route TPRE per Threshold Proxy Re-Encryption
+  app.use(`${baseRoute}/tpre`, tpreRouter);
+  loggers.server.info(`✅ TPRE routes registered`);
 
   // Route per API Keys (always enabled, admin-only)
 
