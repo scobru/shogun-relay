@@ -289,9 +289,14 @@ async function initializeServer() {
     }
   });
 
-  // Root route - redirect to dashboard (registered early to avoid conflicts)
+  // Root route - redirect to dashboard or show welcome message
   app.get("/", (req, res) => {
-    res.redirect("/dashboard/");
+    // If the request accepts HTML, redirect to dashboard
+    if (req.accepts("html")) {
+      return res.redirect("/dashboard/");
+    }
+    // For other requests (like curl or simple clients), return a text message
+    res.status(200).send("Shogun Relay è attivo! Connettiti tramite WebSocket a /zen o usa l'API /api/v1");
   });
 
   // Route specifica per /admin - redirect to new dashboard

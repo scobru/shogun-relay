@@ -1,6 +1,7 @@
 import express from "express";
 import { loggers } from "../utils/logger";
 import * as umbral from "@nucypher/umbral-pre";
+import { waitForZenData } from "../utils/zen-utils";
 
 const router = express.Router();
 
@@ -10,9 +11,12 @@ const router = express.Router();
  */
 router.post("/reencrypt", async (req, res) => {
   const { groupId, memberPub, capsuleB64 } = req.body;
+  
   if (!groupId || !memberPub || !capsuleB64) {
     return res.status(400).json({ error: "Missing required parameters" });
   }
+
+  loggers.server.info(`[TPRE] 📥 Request for Group: ${groupId?.substring(0, 8)} | Member: ${memberPub?.substring(0, 12)}...`);
 
   const gun = req.app.get("gunInstance");
   if (!gun) {
@@ -20,16 +24,13 @@ router.post("/reencrypt", async (req, res) => {
   }
 
   try {
-    // Look up this relay's kfrag for this (group, member) pair
-    const kfragString: string | null = await new Promise((resolve) => {
-      gun.get("signal_rooms").get(groupId).get("relay_kfrags").get(memberPub).once((data: any) => {
-        resolve(data);
-      });
-      // Safety timeout
-      setTimeout(() => resolve(null), 5000);
-    });
+    // 1. Look up this relay's kfrag for this (group, member) pair
+    // Using waitForZenData to handle P2P sync latency
+    const kfragNode = gun.get("signal_rooms").get(groupId).get("relay_kfrags").get(memberPub);
+    const kfragString: string | null = await waitForZenData(kfragNode);
     
     if (!kfragString || typeof kfragString !== 'string') {
+      loggers.server.warn(`[TPRE] ❌ Kfrag NOT FOUND for member ${memberPub?.substring(0, 8)}`);
       return res.status(404).json({ error: "No relay kfrag found for this member" });
     }
 
@@ -44,9 +45,10 @@ router.post("/reencrypt", async (req, res) => {
     const cfrag = umbral.reencrypt(capsule, kfrag);
     const cfragB64 = Buffer.from(cfrag.toBytes()).toString('base64');
 
+    loggers.server.info(`[TPRE] ✅ Re-encryption successful`);
     res.json({ cfrag: cfragB64 });
   } catch (err: any) {
-    loggers.server.error({ err, groupId, memberPub }, "Error during Proxy Re-Encryption");
+    loggers.server.error({ err: err.message, groupId, memberPub }, "Error during Proxy Re-Encryption");
     res.status(500).json({ error: "Failed to perform re-encryption", details: err.message });
   }
 });
