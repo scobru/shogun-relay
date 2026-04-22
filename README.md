@@ -23,7 +23,17 @@
 
 ## Quick Start
 
-### Docker
+### SDK Usage
+
+To connect your application to a Delay hub, use the official SDK:
+
+```bash
+npm install @delay/sdk
+```
+
+See the [SDK Documentation](./sdk/README.md) for full usage examples, authentication, and IPFS operations.
+
+### Docker Deployment
 
 ```bash
 git clone <repository-url>
@@ -122,15 +132,20 @@ Full API documentation at `/endpoints` or see **[API Reference](./docs/API.md)**
 
 ## Project Structure
 
+This monorepo consists of two primary components:
+
+- **[`relay/`](./relay)**: The core server application (Zen, GunDB, IPFS connection hub).
+- **[`sdk/`](./sdk)**: The TypeScript/JavaScript Client SDK (`@delay/sdk`) for building apps that connect to the relay.
+
 ```
 delay/
-├── relay/
-│   ├── src/
-│   │   ├── index.ts       # Express + Gun bootstrap
-│   │   ├── routes/        # REST endpoints
-│   │   └── public/        # Admin frontends
-├── docs/                  # Documentation
-└── docker/                # Docker utilities
+├── relay/                 # Server Application
+│   ├── src/               # Express + Gun bootstrap, REST endpoints, Admin UI
+│   └── docs/              # API and Node operator documentation
+├── sdk/                   # TypeScript/JavaScript SDK
+│   ├── src/               # SDK source code
+│   └── README.md          # SDK usage documentation
+└── docker/                # Docker deployment utilities
 ```
 
 ---
