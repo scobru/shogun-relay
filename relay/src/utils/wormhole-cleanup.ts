@@ -100,53 +100,61 @@ async function runWormholeCleanup(gun: IGunInstance): Promise<void> {
     let cleaned = 0;
     let errors = 0;
 
-    for (const { code, data } of transfers) {
-      try {
-        // Skip if no createdAt timestamp
-        if (!data.createdAt) {
-          continue;
-        }
+    // Process in chunks of 10 to balance speed and system load
+    const CHUNK_SIZE = 10;
+    for (let i = 0; i < transfers.length; i += CHUNK_SIZE) {
+      const chunk = transfers.slice(i, i + CHUNK_SIZE);
 
-        // Skip if not old enough
-        if (data.createdAt > cutoffTime) {
-          continue;
-        }
+      await Promise.all(
+        chunk.map(async ({ code, data }) => {
+          try {
+            // Skip if no createdAt timestamp
+            if (!data.createdAt) {
+              return;
+            }
 
-        // Skip if already completed
-        const completionStatus = await checkTransferCompleted(gun, code);
-        if (completionStatus) {
-          continue;
-        }
+            // Skip if not old enough
+            if (data.createdAt > cutoffTime) {
+              return;
+            }
 
-        log.info(
-          {
-            code,
-            ipfsHash: data.ipfsHash,
-            createdAt: new Date(data.createdAt).toISOString(),
-            ageHours: Math.round((now - data.createdAt) / (1000 * 60 * 60)),
-          },
-          "🧹 Cleaning up orphaned wormhole transfer"
-        );
+            // Skip if already completed
+            const completionStatus = await checkTransferCompleted(gun, code);
+            if (completionStatus) {
+              return;
+            }
 
-        // Unpin from IPFS
-        if (data.ipfsHash) {
-          await unpinFromIPFS(data.ipfsHash);
-        }
+            log.info(
+              {
+                code,
+                ipfsHash: data.ipfsHash,
+                createdAt: new Date(data.createdAt).toISOString(),
+                ageHours: Math.round((now - data.createdAt) / (1000 * 60 * 60)),
+              },
+              "🧹 Cleaning up orphaned wormhole transfer"
+            );
 
-        // Remove from Gun index
-        getGunNode(gun, GUN_PATHS.SHOGUN_WORMHOLE)
-          .get(GUN_PATHS.WORMHOLE_TRANSFERS)
-          .get(code)
-          .put(null as any);
+            // Unpin from IPFS
+            if (data.ipfsHash) {
+              await unpinFromIPFS(data.ipfsHash);
+            }
 
-        // Remove transfer metadata
-        gun.get(code).put(null as any);
+            // Remove from Gun index
+            getGunNode(gun, GUN_PATHS.SHOGUN_WORMHOLE)
+              .get(GUN_PATHS.WORMHOLE_TRANSFERS)
+              .get(code)
+              .put(null as any);
 
-        cleaned++;
-      } catch (err) {
-        log.error({ err, code }, "❌ Failed to clean up wormhole transfer");
-        errors++;
-      }
+            // Remove transfer metadata
+            gun.get(code).put(null as any);
+
+            cleaned++;
+          } catch (err) {
+            log.error({ err, code }, "❌ Failed to clean up wormhole transfer");
+            errors++;
+          }
+        })
+      );
     }
 
     if (cleaned > 0 || errors > 0) {
