@@ -12,6 +12,7 @@
 import { loggers } from "./logger";
 const log = loggers.relayUser;
 import { authConfig } from "../config/env-config";
+import { secureCompare, hashToken } from "./security";
 import { GUN_PATHS, getGunNode } from "./gun-paths";
 
 // Module state
@@ -281,7 +282,10 @@ export const adminAuthMiddleware = (req: any, res: any, next: any) => {
     return res.status(401).json({ success: false, error: "Unauthorized - Token required" });
   }
 
-  if (token === authConfig.adminPassword) {
+  const tokenHash = hashToken(token);
+  const adminHash = hashToken(authConfig.adminPassword || "");
+
+  if (secureCompare(tokenHash, adminHash)) {
     next();
   } else {
     return res.status(401).json({ success: false, error: "Unauthorized - Invalid token" });

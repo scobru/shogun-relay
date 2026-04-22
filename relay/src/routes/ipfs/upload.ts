@@ -4,6 +4,7 @@ import multer from "multer";
 import FormData from "form-data";
 import { loggers } from "../../utils/logger";
 import { authConfig, ipfsConfig } from "../../config";
+import { secureCompare, hashToken } from "../../utils/security";
 import { ipfsUpload } from "../../utils/ipfs-client";
 import type { CustomRequest, IpfsRequestOptions } from "./types";
 import { IPFS_API_TOKEN, verifyWalletSignature } from "./utils";
@@ -39,7 +40,10 @@ router.post(
 
     if (adminTokenStr && typeof adminTokenStr === "string") {
       // Check admin password
-      if (adminTokenStr === authConfig.adminPassword) {
+      const tokenHash = hashToken(adminTokenStr);
+      const adminHash = hashToken(authConfig.adminPassword || "");
+
+      if (secureCompare(tokenHash, adminHash)) {
         isAdmin = true;
       } else if (adminTokenStr.startsWith("shogun-api-")) {
         // Check API key
