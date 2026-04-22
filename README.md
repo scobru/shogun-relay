@@ -9,10 +9,11 @@
 
 ----
 
-**Delay** is a production-ready connection hub that unifies **GunDB** and **IPFS** into a single solution.
+**Delay** is a production-ready connection hub that unifies **Zen**, **GunDB**, and **IPFS** into a single decentralized solution.
 
 ## Features
 
+- **Zen-Native** — Deep integration with Zen's cryptographic primitives, DataBase wrapper, and identity resolution
 - **GunDB Relay** — WebSocket relay with SQLite/RADISK persistence and WebRTC support
 - **IPFS Integration** — Upload, pin, manage, and preview IPFS content via REST API
 - **Admin Dashboard** — Modern React-based UI for monitoring and management
