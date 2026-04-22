@@ -9,3 +9,7 @@
 ## 2024-03-24 - Optimizing GunDB Record Fetching
 **Learning:** Fetching an entire list of user uploads from GunDB using `.map()` just to `.find()` a single known hash is highly inefficient (O(N) network/memory cost) and unnecessarily slow as data grows.
 **Action:** Always fetch specific items from GunDB directly by chaining `.get(key)` and using `.once()` to retrieve the single node in O(1) time. Include a short timeout as a fallback mechanism to prevent hanging on missing data.
+
+## 2026-03-28 - Optimized Recursive Directory Traversal
+**Learning:** Sequential processing of directory entries in a recursive `walkDir` function using `for...of` with `await` leads to high cumulative I/O latency as each `stat` or recursive call blocks the next.
+**Action:** Use `Promise.all` with `Array.prototype.map` to initiate file system operations concurrently. This significantly reduces total execution time, especially for directories with many small files.
