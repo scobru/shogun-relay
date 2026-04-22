@@ -308,7 +308,7 @@ function Files() {
   }
 
   const formatBytes = (bytes: number) => {
-    if (!bytes) return 'Unknown size'
+    if (!bytes) return '0 B'
     if (bytes < 1024) return bytes + ' B'
     const k = 1024
     const sizes = ['B', 'KB', 'MB', 'GB']
@@ -317,202 +317,281 @@ function Files() {
   }
 
   if (!isAuthenticated) return (
-    <div className="alert alert-warning">
+    <div className="alert alert-warning glass-card border-warning/20">
       <span className="text-2xl">🔒</span>
-      <span>Authentication required to access Files. Please enter admin password in Settings.</span>
+      <div className="flex flex-col">
+        <span className="font-bold">Authentication Required</span>
+        <span className="text-xs opacity-70">Access to File Manager is restricted. Please authenticate in Settings.</span>
+      </div>
     </div>
   )
 
   return (
-    <div className="flex flex-col gap-6 max-w-6xl">
-      {/* Header */}
-      <div className="card bg-base-100 shadow">
-        <div className="card-body flex-row items-center justify-between flex-wrap gap-4">
-          <div>
-            <h2 className="card-title text-2xl">🗄️ File Manager</h2>
-            <p className="text-base-content/70">Managed IPFS Storage & Pins</p>
+    <div className="flex flex-col gap-8 max-w-6xl animate-in fade-in duration-500">
+      {/* Premium Header */}
+      <div className="card gradient-secondary shadow-xl border-0 overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+           <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15.5 2H8.6c-.4 0-.8.2-1.1.5L4.5 5.5c-.3.3-.5.7-.5 1.1V20c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V6.5L15.5 2z"/><path d="M15 2v5h5"/></svg>
+        </div>
+        <div className="card-body py-8 flex-row items-center justify-between flex-wrap gap-4 relative z-10">
+          <div className="flex items-center gap-5">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-3xl shadow-inner">
+               🗄️
+            </div>
+            <div>
+              <h2 className="card-title text-2xl font-black tracking-tight mb-0.5">File Manager</h2>
+              <p className="text-secondary-content/70 text-sm font-medium">Decentralized Storage & IPFS Pinning</p>
+            </div>
           </div>
           <div className="flex gap-2">
-            <button className="btn btn-ghost btn-sm" onClick={handleGarbageCollection}>🧹 Run GC</button>
-            <button className="btn btn-error btn-sm" onClick={handleRemoveAll}>🗑️ Remove All</button>
+            <button className="btn btn-sm bg-white/20 border-0 text-white font-bold hover:bg-white/30" onClick={handleGarbageCollection}>
+               🧹 CLEAN REPO
+            </button>
+            <button className="btn btn-sm bg-error/20 border-0 text-white font-bold hover:bg-error/40" onClick={handleRemoveAll}>
+               🗑️ PURGE ALL
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Upload Section */}
-      <div className="card bg-base-100 shadow">
-        <div className="card-body">
-          <h3 className="font-bold text-lg mb-4">Upload Files</h3>
+      {/* Modern Upload Section */}
+      <div className="glass-card overflow-hidden rounded-3xl">
+        <div className="p-8">
+          <div className="flex items-center gap-2 mb-6">
+             <div className="w-2 h-6 bg-primary rounded-full"></div>
+             <h3 className="font-black text-lg uppercase tracking-widest opacity-80">Ingest Data</h3>
+          </div>
           
           <div 
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${dragActive ? 'border-primary bg-primary/5' : 'border-base-300'}`}
+            className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all duration-300 ${dragActive ? 'border-primary bg-primary/10 scale-[0.99] shadow-inner' : 'border-base-content/10 bg-base-200/30'}`}
             onDragOver={e => { e.preventDefault(); setDragActive(true) }}
             onDragLeave={() => setDragActive(false)}
             onDrop={e => { e.preventDefault(); setDragActive(false) }}
           >
-            {/* Upload Mode Selection */}
-            <div className="flex flex-wrap justify-center gap-4 mb-4">
-              <label className="label cursor-pointer gap-2">
-                <input 
-                  type="radio" 
-                  className="radio radio-primary" 
-                  checked={uploadMode === 'single'} 
-                  onChange={() => setUploadMode('single')} 
-                />
-                <span>Single File</span>
-              </label>
-              <label className="label cursor-pointer gap-2">
-                <input 
-                  type="radio" 
-                  className="radio radio-primary" 
-                  checked={uploadMode === 'directory'} 
-                  onChange={() => setUploadMode('directory')} 
-                />
-                <span>Directory</span>
-              </label>
+            {/* Mode Switcher */}
+            <div className="flex justify-center mb-8">
+               <div className="bg-base-300/50 p-1.5 rounded-2xl flex gap-1 shadow-inner">
+                  <button 
+                     onClick={() => setUploadMode('single')}
+                     className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${uploadMode === 'single' ? 'bg-primary text-primary-content shadow-lg' : 'hover:bg-base-300 opacity-50'}`}
+                  >
+                     SINGLE FILE
+                  </button>
+                  <button 
+                     onClick={() => setUploadMode('directory')}
+                     className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${uploadMode === 'directory' ? 'bg-primary text-primary-content shadow-lg' : 'hover:bg-base-300 opacity-50'}`}
+                  >
+                     DIRECTORY
+                  </button>
+               </div>
             </div>
             
-            {uploadMode === 'single' && (
-              <div className="flex flex-wrap justify-center gap-4 mb-4">
-                <input 
-                  type="text" 
-                  className="input input-bordered input-sm" 
-                  placeholder="Filename Override (optional)" 
-                  value={fileNameOverride}
-                  onChange={e => setFileNameOverride(e.target.value)}
-                />
-                <label className="label cursor-pointer gap-2">
-                  <input 
-                    type="checkbox" 
-                    className="checkbox checkbox-primary checkbox-sm" 
-                    checked={encryptUpload} 
-                    onChange={e => setEncryptUpload(e.target.checked)} 
-                  />
-                  <span className="text-sm">Encrypt (AES-GCM)</span>
-                </label>
-              </div>
-            )}
-            
-            {uploadMode === 'single' ? (
-              <input 
-                ref={fileInputRef} 
-                type="file" 
-                className="file-input file-input-bordered file-input-primary w-full max-w-xs"
-                onChange={e => handleUpload(e)} 
-              />
-            ) : (
-              <input 
-                ref={dirInputRef} 
-                type="file" 
-                className="file-input file-input-bordered file-input-primary w-full max-w-xs"
-                // @ts-ignore
-                webkitdirectory="" 
-                directory="" 
-                onChange={e => handleUpload(e)} 
-              />
-            )}
+            <div className="flex flex-col items-center gap-6">
+               <div className="w-20 h-20 rounded-full bg-base-100 shadow-xl flex items-center justify-center text-4xl mb-2 animate-bounce-slow">
+                  {uploadMode === 'single' ? '📄' : '📁'}
+               </div>
+               
+               {uploadMode === 'single' && (
+                 <div className="flex flex-col gap-4 w-full max-w-md">
+                   <input 
+                     type="text" 
+                     className="input input-bordered bg-base-100/50 border-base-content/10 focus:border-primary w-full text-center font-medium" 
+                     placeholder="Customize filename (optional)" 
+                     value={fileNameOverride}
+                     onChange={e => setFileNameOverride(e.target.value)}
+                   />
+                   <label className="label cursor-pointer justify-center gap-3 group">
+                     <input 
+                       type="checkbox" 
+                       className="checkbox checkbox-primary checkbox-sm shadow-sm" 
+                       checked={encryptUpload} 
+                       onChange={e => setEncryptUpload(e.target.checked)} 
+                     />
+                     <span className="text-xs font-bold opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-widest">Enable AES-GCM Encryption</span>
+                   </label>
+                 </div>
+               )}
+               
+               <div className="relative group">
+                  {uploadMode === 'single' ? (
+                    <input 
+                      ref={fileInputRef} 
+                      type="file" 
+                      className="file-input file-input-bordered file-input-primary w-full max-w-xs shadow-lg rounded-2xl"
+                      onChange={e => handleUpload(e)} 
+                    />
+                  ) : (
+                    <input 
+                      ref={dirInputRef} 
+                      type="file" 
+                      className="file-input file-input-bordered file-input-primary w-full max-w-xs shadow-lg rounded-2xl"
+                      // @ts-ignore
+                      webkitdirectory="" 
+                      directory="" 
+                      onChange={e => handleUpload(e)} 
+                    />
+                  )}
+                  <div className="text-[10px] uppercase font-black tracking-widest opacity-30 mt-4">
+                     Maximum file size depends on node configuration
+                  </div>
+               </div>
+            </div>
             
             {uploading && (
-              <div className="mt-4">
-                <progress className="progress progress-primary w-full" value={uploadProgress} max="100"></progress>
-                <p className="text-sm mt-1">{Math.round(uploadProgress)}%</p>
+              <div className="mt-8 max-w-md mx-auto animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex justify-between text-[10px] font-black tracking-widest opacity-60 mb-2 uppercase">
+                   <span>Uploading to IPFS...</span>
+                   <span>{Math.round(uploadProgress)}%</span>
+                </div>
+                <progress className="progress progress-primary w-full h-3 shadow-inner" value={uploadProgress} max="100"></progress>
               </div>
             )}
-            {statusMessage && <p className="mt-2 text-sm">{statusMessage}</p>}
+            {statusMessage && (
+               <div className={`mt-6 text-xs font-bold px-4 py-2 rounded-full inline-block ${statusMessage.includes('❌') ? 'bg-error/10 text-error' : 'bg-success/10 text-success'}`}>
+                  {statusMessage}
+               </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Pins List */}
-      <div className="card bg-base-100 shadow">
-        <div className="card-body">
-          {/* Search & Filter */}
-          <div className="flex flex-wrap gap-4 mb-4">
-            <input 
-              type="text" 
-              className="input input-bordered flex-1 min-w-[200px]" 
-              placeholder="Search pins by name or CID..." 
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-            <select 
-              className="select select-bordered" 
-              value={filterType} 
-              onChange={e => setFilterType(e.target.value)}
-            >
-              <option value="all">All Types</option>
-              <option value="recursive">Recursive</option>
-              <option value="direct">Direct</option>
-            </select>
-          </div>
+      {/* Modern Search & Pins Grid */}
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 px-2">
+           <div className="flex items-center gap-3">
+              <h3 className="font-black text-xl tracking-tight">Active Pins</h3>
+              <div className="badge bg-primary/10 text-primary border-0 font-black">{filteredPins.length}</div>
+           </div>
+           
+           <div className="flex gap-3 flex-1 md:flex-none justify-end">
+              <div className="relative flex-1 md:w-80">
+                 <svg className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                 <input 
+                   type="text" 
+                   className="input input-bordered bg-base-100/50 border-base-content/10 pl-11 w-full rounded-2xl text-sm" 
+                   placeholder="Filter by name or CID..." 
+                   value={searchQuery}
+                   onChange={e => setSearchQuery(e.target.value)}
+                 />
+              </div>
+              <select 
+                className="select select-bordered bg-base-100/50 border-base-content/10 rounded-2xl text-sm font-bold" 
+                value={filterType} 
+                onChange={e => setFilterType(e.target.value)}
+              >
+                <option value="all">ALL OBJECTS</option>
+                <option value="recursive">RECURSIVE</option>
+                <option value="direct">DIRECT</option>
+              </select>
+           </div>
+        </div>
 
-          {loading ? (
-            <div className="flex justify-center p-8">
-              <span className="loading loading-spinner loading-lg"></span>
-            </div>
-          ) : filteredPins.length === 0 ? (
-            <div className="text-center p-8 text-base-content/50">
-              <span className="text-4xl block mb-2">📭</span>
-              <p>No pins found</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredPins.map(pin => (
-                <div key={pin.cid} className="card card-compact bg-base-200">
-                  <div className="card-body">
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">{pin.type === 'recursive' ? '📁' : '📄'}</span>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium truncate" title={pin.name}>{pin.name}</h4>
-                        <p className="text-xs text-base-content/60 font-mono truncate" title={pin.cid}>{pin.cid.substring(0, 16)}...</p>
-                        <p className="text-xs text-base-content/50">
-                          {new Date(pin.timestamp).toLocaleDateString()} • {formatBytes(pin.size || 0)}
-                        </p>
+        {loading ? (
+          <div className="glass-card p-20 flex flex-col items-center justify-center rounded-3xl">
+            <span className="loading loading-spinner loading-lg text-primary mb-4"></span>
+            <span className="text-xs font-black tracking-[0.2em] opacity-30 uppercase">Scanning Repository</span>
+          </div>
+        ) : filteredPins.length === 0 ? (
+          <div className="glass-card p-20 text-center rounded-3xl border-dashed border-2">
+            <span className="text-6xl block mb-6 filter grayscale opacity-20">📭</span>
+            <h4 className="text-xl font-black opacity-30 uppercase tracking-widest">No objects found</h4>
+            <p className="text-sm opacity-20 mt-2 font-medium uppercase tracking-tight">Try a different filter or upload new files</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredPins.map(pin => (
+              <div key={pin.cid} className="glass-card group hover:border-primary/40 transition-all duration-300 rounded-2xl overflow-hidden flex flex-col">
+                <div className="p-6 flex-1">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-base-300/50 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-inner">
+                      {pin.type === 'recursive' ? '📁' : '📄'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-base truncate group-hover:text-primary transition-colors" title={pin.name}>{pin.name}</h4>
+                      <div className="flex items-center gap-1.5 mt-1">
+                         <span className={`text-[10px] font-black px-1.5 py-0.5 rounded bg-base-300 uppercase tracking-tight ${pin.type === 'recursive' ? 'text-secondary' : 'text-primary'}`}>{pin.type}</span>
+                         <span className="text-[10px] font-medium opacity-40 font-mono truncate tracking-tighter">{pin.cid}</span>
                       </div>
                     </div>
-                    <div className="card-actions justify-end mt-2">
-                      <button className="btn btn-ghost btn-xs" onClick={() => handlePreview(pin)} title="Preview">👁️</button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => {
-                        navigator.clipboard.writeText(pin.cid)
-                        setStatusMessage('CID Copied!')
-                        setTimeout(() => setStatusMessage(''), 2000)
-                      }} title="Copy CID">📋</button>
-                      <button className="btn btn-ghost btn-xs text-error" onClick={() => handleRemove(pin.cid)} title="Delete">🗑️</button>
-                    </div>
+                  </div>
+                  
+                  <div className="mt-6 flex items-center justify-between pt-4 border-t border-base-content/5">
+                     <div className="flex flex-col">
+                        <span className="text-[10px] font-black opacity-20 uppercase tracking-widest">Size</span>
+                        <span className="text-xs font-bold opacity-60">{formatBytes(pin.size || 0)}</span>
+                     </div>
+                     <div className="flex flex-col items-end">
+                        <span className="text-[10px] font-black opacity-20 uppercase tracking-widest">Pinned</span>
+                        <span className="text-xs font-bold opacity-60">{new Date(pin.timestamp).toLocaleDateString()}</span>
+                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                
+                <div className="bg-base-300/30 p-3 flex gap-2 justify-end">
+                  <button className="btn btn-ghost btn-xs rounded-lg hover:bg-primary/10 hover:text-primary" onClick={() => handlePreview(pin)} title="Preview Content">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                  <button className="btn btn-ghost btn-xs rounded-lg hover:bg-info/10 hover:text-info" onClick={() => {
+                    navigator.clipboard.writeText(pin.cid)
+                    setStatusMessage('CID Copied!')
+                    setTimeout(() => setStatusMessage(''), 2000)
+                  }} title="Copy CID">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                  </button>
+                  <div className="flex-1" />
+                  <button className="btn btn-ghost btn-xs rounded-lg text-error hover:bg-error/10" onClick={() => handleRemove(pin.cid)} title="Unpin Object">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Preview Modal */}
+      {/* Modern Preview Modal */}
       {preview && (
-        <dialog className="modal modal-open">
-          <div className="modal-box max-w-3xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg truncate">{preview.name}</h3>
-              <button className="btn btn-sm btn-circle btn-ghost" onClick={closePreview}>✕</button>
+        <dialog className="modal modal-open backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="modal-box max-w-4xl glass-card rounded-3xl p-0 overflow-hidden border-white/20 shadow-2xl">
+            <div className="flex justify-between items-center p-6 bg-base-300/50 border-b border-base-content/5">
+              <div className="flex items-center gap-4">
+                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl">🔍</div>
+                 <div>
+                    <h3 className="font-black text-lg truncate leading-none mb-1">{preview.name}</h3>
+                    <p className="text-[10px] font-mono opacity-40 leading-none">{preview.cid}</p>
+                 </div>
+              </div>
+              <button className="btn btn-circle btn-sm btn-ghost hover:bg-error/10 hover:text-error" onClick={closePreview}>
+                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
             </div>
             
-            <div className="max-h-96 overflow-auto">
-              {preview.type.startsWith('image/') && <img src={preview.url} alt="preview" className="max-w-full" />}
-              {preview.type.startsWith('video/') && <video src={preview.url} controls className="max-w-full" />}
-              {preview.type.startsWith('audio/') && <audio src={preview.url} controls className="w-full" />}
-              {preview.type === 'application/pdf' && <iframe src={preview.url} title="PDF Preview" className="w-full h-96" />}
-              {(preview.type.startsWith('text/') || preview.type.includes('json')) && (
-                <iframe src={preview.url} title="Text Preview" className="w-full h-96" />
-              )}
-              {!preview.type.match(/image|video|audio|pdf|text|json/) && (
-                <div className="text-center p-8">
-                  <p className="mb-4">Preview not available for this file type.</p>
-                  <a href={preview.url} download={preview.name} className="btn btn-primary">Download File</a>
-                </div>
-              )}
+            <div className="p-8 flex justify-center bg-base-100/30">
+              <div className="max-h-[60vh] w-full overflow-auto rounded-xl shadow-inner bg-base-200/50">
+                {preview.type.startsWith('image/') && <img src={preview.url} alt="preview" className="max-w-full mx-auto" />}
+                {preview.type.startsWith('video/') && <video src={preview.url} controls className="max-w-full mx-auto" />}
+                {preview.type.startsWith('audio/') && <div className="p-10"><audio src={preview.url} controls className="w-full" /></div>}
+                {preview.type === 'application/pdf' && <iframe src={preview.url} title="PDF Preview" className="w-full h-[60vh]" />}
+                {(preview.type.startsWith('text/') || preview.type.includes('json')) && (
+                  <iframe src={preview.url} title="Text Preview" className="w-full h-[60vh] bg-transparent" />
+                )}
+                {!preview.type.match(/image|video|audio|pdf|text|json/) && (
+                  <div className="text-center py-20 px-10">
+                    <div className="text-6xl mb-6">📦</div>
+                    <h4 className="font-black text-xl uppercase tracking-widest opacity-30 mb-2">Binary Object</h4>
+                    <p className="text-sm opacity-30 mb-8 max-w-xs mx-auto">This object type cannot be previewed in the browser.</p>
+                    <a href={preview.url} download={preview.name} className="btn gradient-primary border-0 rounded-2xl px-10 font-black tracking-widest">
+                       DOWNLOAD DATA
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
             
-            <div className="mt-4 text-xs text-base-content/60 font-mono">CID: {preview.cid}</div>
+            <div className="p-4 bg-base-300/50 flex items-center justify-between text-[10px] font-black tracking-widest opacity-30 px-8 uppercase">
+               <span>Object MIME: {preview.type}</span>
+               <span>Shogun IPFS Node v1.2.0</span>
+            </div>
           </div>
           <form method="dialog" className="modal-backdrop">
             <button onClick={closePreview}>close</button>

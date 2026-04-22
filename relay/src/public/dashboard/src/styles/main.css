@@ -70,3 +70,24 @@ body {
 .font-mono {
   font-family: var(--font-mono);
 }
+
+/* Premium UI Utilities */
+.glass-card {
+  @apply bg-base-100/60 backdrop-blur-md border border-white/10 shadow-xl;
+}
+
+.gradient-primary {
+  @apply bg-gradient-to-br from-primary to-primary-focus text-primary-content;
+}
+
+.gradient-secondary {
+  @apply bg-gradient-to-br from-secondary to-secondary-focus text-secondary-content;
+}
+
+.gradient-accent {
+  @apply bg-gradient-to-br from-accent to-accent-focus text-accent-content;
+}
+
+.shogun-logo {
+  filter: drop-shadow(0 0 8px oklch(var(--p)));
+}

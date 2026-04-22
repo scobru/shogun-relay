@@ -131,155 +131,249 @@ function LiveStats() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-64"><span className="loading loading-spinner loading-lg"></span></div>
+    return (
+      <div className="flex flex-col items-center justify-center min-h-64 gap-4">
+         <span className="loading loading-spinner loading-lg text-secondary"></span>
+         <span className="text-[10px] font-black tracking-widest opacity-30 uppercase">Syncing Real-time Telemetry</span>
+      </div>
+    )
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-6xl">
-      {/* Metric Cards - Telemetry Style */}
-      <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
-        <div className="stat">
-          <div className="stat-figure text-primary text-2xl">🌐</div>
-          <div className="stat-title">Connected Peers</div>
-          <div className="stat-value text-primary">{stats?.connectedPeers || 0}</div>
-          <div className="stat-desc">Gun: {stats?.gunPeers || 0} / ZEN: {stats?.zenPeers || 0}</div>
+    <div className="flex flex-col gap-8 max-w-6xl animate-in fade-in duration-500">
+      {/* Telemetry Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 px-2">
+         <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary">
+               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+            </div>
+            <div>
+               <h2 className="text-2xl font-black tracking-tight leading-none mb-1">Live Telemetry</h2>
+               <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em]">P2P Network Performance & System Health</p>
+            </div>
+         </div>
+         {lastUpdated && (
+           <div className="badge bg-base-300/50 border-0 py-3 px-4 gap-2 font-mono text-[10px] opacity-60">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
+              SYNCED: {lastUpdated.toLocaleTimeString()}
+           </div>
+         )}
+      </div>
+
+      {/* Main Metric Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="glass-card p-6 rounded-2xl relative overflow-hidden group">
+          <div className="stat-title text-[10px] font-black opacity-30 uppercase tracking-[0.15em] mb-1">Active Peers</div>
+          <div className="text-4xl font-black tracking-tighter text-primary">{stats?.connectedPeers || 0}</div>
+          <div className="text-[10px] font-bold opacity-40 mt-2 uppercase tracking-wide">
+             Gun: <span className="text-success">{stats?.gunPeers || 0}</span> / ZEN: <span className="text-secondary">{stats?.zenPeers || 0}</span>
+          </div>
+          <div className="absolute -right-2 -bottom-2 opacity-5 scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-500">
+             <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16z"/><path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
+          </div>
         </div>
-        <div className="stat">
-          <div className="stat-figure text-secondary text-2xl">📈</div>
-          <div className="stat-title">Msg Rate</div>
-          <div className="stat-value text-secondary">{stats?.dam?.in?.rate || 0}</div>
-          <div className="stat-desc">messages per second</div>
+
+        <div className="glass-card p-6 rounded-2xl relative overflow-hidden group border-secondary/10">
+          <div className="stat-title text-[10px] font-black opacity-30 uppercase tracking-[0.15em] mb-1">Message Rate</div>
+          <div className="text-4xl font-black tracking-tighter text-secondary">{stats?.dam?.in?.rate || 0}</div>
+          <div className="text-[10px] font-bold opacity-40 mt-2 uppercase tracking-wide">Messages per second</div>
+          <div className="absolute -right-2 -bottom-2 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-500">
+             <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8 8"/><path d="m19 21-8-8-8 8"/></svg>
+          </div>
         </div>
-        <div className="stat">
-          <div className="stat-figure text-accent text-2xl">📦</div>
-          <div className="stat-title">Total Messages</div>
-          <div className="stat-value text-accent">{stats?.totalMessages?.toLocaleString() || 0}</div>
-          <div className="stat-desc">{formatBytes(stats?.totalBytes || 0)} transferred</div>
+
+        <div className="glass-card p-6 rounded-2xl relative overflow-hidden group border-accent/10">
+          <div className="stat-title text-[10px] font-black opacity-30 uppercase tracking-[0.15em] mb-1">Ingested Data</div>
+          <div className="text-4xl font-black tracking-tighter text-accent">{formatBytes(stats?.totalBytes || 0)}</div>
+          <div className="text-[10px] font-bold opacity-40 mt-2 uppercase tracking-wide">Across all sessions</div>
+          <div className="absolute -right-2 -bottom-2 opacity-5 scale-150 group-hover:translate-x-2 transition-transform duration-500">
+             <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
         </div>
-        <div className="stat">
-          <div className="stat-figure text-info text-2xl">⏱️</div>
-          <div className="stat-title">Uptime</div>
-          <div className="stat-value text-info">{stats?.uptime ? formatUptime(stats.uptime) : '--'}</div>
-          <div className="stat-desc">Server session</div>
+
+        <div className="glass-card p-6 rounded-2xl relative overflow-hidden group border-info/10">
+          <div className="stat-title text-[10px] font-black opacity-30 uppercase tracking-[0.15em] mb-1">Relay Uptime</div>
+          <div className="text-2xl font-black tracking-tight text-info mt-2">{stats?.uptime ? formatUptime(stats.uptime) : '--'}</div>
+          <div className="text-[10px] font-bold opacity-40 mt-3 uppercase tracking-wide">Continuous uptime</div>
+          <div className="absolute -right-2 -bottom-2 opacity-5 scale-150 group-hover:rotate-45 transition-transform duration-500">
+             <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
         </div>
       </div>
 
-      {/* Operation Metrics */}
-      <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
-        <div className="stat">
-          <div className="stat-title">PUT ops</div>
-          <div className="stat-value">{stats?.putCount?.toLocaleString() || 0}</div>
-          <div className="stat-desc">write operations</div>
-        </div>
-        <div className="stat">
-          <div className="stat-title">GET ops</div>
-          <div className="stat-value">{stats?.getCount?.toLocaleString() || 0}</div>
-          <div className="stat-desc">read operations</div>
-        </div>
-        <div className="stat">
-          <div className="stat-title">ACKs</div>
-          <div className="stat-value">{stats?.ackCount?.toLocaleString() || 0}</div>
-          <div className="stat-desc">acknowledgements</div>
-        </div>
-        <div className={`stat ${stats?.errorCount && stats.errorCount > 0 ? 'text-error' : ''}`}>
-          <div className="stat-title">Errors</div>
-          <div className="stat-value">{stats?.errorCount?.toLocaleString() || 0}</div>
-          <div className="stat-desc">protocol errors</div>
-        </div>
+      {/* Protocol Operations & Memory */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+         {/* Operations Chart/Stats */}
+         <div className="lg:col-span-2 glass-card rounded-3xl overflow-hidden">
+            <div className="p-6 border-b border-base-content/5 flex items-center justify-between">
+               <h3 className="font-black text-xs uppercase tracking-widest opacity-50">Protocol Operations</h3>
+               <div className="badge badge-outline border-base-content/10 font-mono text-[10px] tracking-tight">V{stats?.version || "1.2.0"}</div>
+            </div>
+            <div className="p-8 grid grid-cols-2 md:grid-cols-4 gap-8">
+               <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">PUT OPS</span>
+                  <span className="text-2xl font-black tracking-tight">{stats?.putCount?.toLocaleString() || 0}</span>
+                  <div className="w-full bg-base-300 h-1 rounded-full mt-2 overflow-hidden">
+                     <div className="bg-primary h-full w-[65%]" />
+                  </div>
+               </div>
+               <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">GET OPS</span>
+                  <span className="text-2xl font-black tracking-tight">{stats?.getCount?.toLocaleString() || 0}</span>
+                  <div className="w-full bg-base-300 h-1 rounded-full mt-2 overflow-hidden">
+                     <div className="bg-secondary h-full w-[40%]" />
+                  </div>
+               </div>
+               <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">ACK RATE</span>
+                  <span className="text-2xl font-black tracking-tight">{stats?.ackCount?.toLocaleString() || 0}</span>
+                  <div className="w-full bg-base-300 h-1 rounded-full mt-2 overflow-hidden">
+                     <div className="bg-success h-full w-[85%]" />
+                  </div>
+               </div>
+               <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">ERRORS</span>
+                  <span className={`text-2xl font-black tracking-tight ${stats?.errorCount && stats.errorCount > 0 ? 'text-error' : ''}`}>{stats?.errorCount?.toLocaleString() || 0}</span>
+                  <div className="w-full bg-base-300 h-1 rounded-full mt-2 overflow-hidden">
+                     <div className={`h-full w-[5%] ${stats?.errorCount && stats.errorCount > 0 ? 'bg-error' : 'bg-base-content/10'}`} />
+                  </div>
+               </div>
+            </div>
+         </div>
+
+         {/* Memory Usage */}
+         <div className="glass-card rounded-3xl overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-base-content/5">
+               <h3 className="font-black text-xs uppercase tracking-widest opacity-50">Memory Footprint</h3>
+            </div>
+            <div className="p-8 flex-1 flex flex-col justify-center">
+               <div className="flex items-end justify-between mb-4">
+                  <div className="text-4xl font-black tracking-tighter">
+                     {stats?.memory?.heapUsed ? Math.round(stats.memory.heapUsed / 1024 / 1024) : 0}
+                     <span className="text-sm font-bold opacity-30 ml-2">MB</span>
+                  </div>
+                  <div className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-1">HEAP USED</div>
+               </div>
+               <div className="w-full h-8 bg-base-300 rounded-xl overflow-hidden p-1 shadow-inner flex">
+                  <div className="bg-primary h-full rounded-lg shadow-lg animate-pulse-slow" style={{ width: stats?.memory?.heapUsed && stats?.memory?.heapTotal ? `${(stats.memory.heapUsed / stats.memory.heapTotal) * 100}%` : '40%' }} />
+               </div>
+               <div className="flex justify-between mt-4 text-[10px] font-bold opacity-30 uppercase tracking-widest">
+                  <span>RSS: {stats?.memory?.rss ? Math.round(stats.memory.rss / 1024 / 1024) : 0}MB</span>
+                  <span>TOTAL: {stats?.memory?.heapTotal ? Math.round(stats.memory.heapTotal / 1024 / 1024) : 0}MB</span>
+               </div>
+            </div>
+         </div>
       </div>
 
-      {/* Active Peer Wire Stats */}
+      {/* Peer Wire Stats Table */}
       {isAuthenticated && stats?.peers && Array.isArray(stats.peers) && (
-         <div className="card bg-base-100 shadow">
-         <div className="card-body">
-           <h3 className="card-title">🔌 Active Wire Peers</h3>
-           <div className="overflow-x-auto mt-4">
-             <table className="table table-zebra table-sm">
+         <div className="glass-card rounded-3xl overflow-hidden border-0">
+           <div className="p-8 bg-base-200/50 border-b border-base-content/5 flex items-center justify-between">
+             <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary text-sm font-bold shadow-sm">P</div>
+                <h3 className="font-black text-lg tracking-tight">Active Wire Peers</h3>
+             </div>
+             <div className="badge bg-primary text-primary-content border-0 font-black px-4">{stats.peers.length} NODES</div>
+           </div>
+           <div className="overflow-x-auto">
+             <table className="table table-md w-full border-collapse">
                <thead>
-                 <tr>
-                   <th>#</th>
-                   <th>Address / ID</th>
-                   <th>Engine</th>
-                   <th>Status</th>
-                   <th>Messages</th>
-                   <th>Bytes Sent</th>
-                   <th>Uptime</th>
+                 <tr className="bg-base-300/30 text-[10px] font-black uppercase tracking-widest opacity-40">
+                   <th className="px-8 py-4">Node Identity</th>
+                   <th className="py-4">Engine</th>
+                   <th className="py-4">Status</th>
+                   <th className="py-4 text-right">Messages</th>
+                   <th className="py-4 text-right">Traffic</th>
+                   <th className="px-8 py-4 text-right">Uptime</th>
                  </tr>
                </thead>
-               <tbody>
+               <tbody className="divide-y divide-base-content/5">
                  {stats.peers.length === 0 && (
-                   <tr><td colSpan={7} className="text-center text-base-content/50">No peers connected over wire.</td></tr>
+                   <tr><td colSpan={6} className="text-center py-20 text-xs font-black opacity-20 uppercase tracking-widest">No active wire connections.</td></tr>
                  )}
                  {stats.peers.map((p: PeerStats, i: number) => (
-                   <tr key={i}>
-                     <td className="text-base-content/50">{i + 1}</td>
-                     <td className="font-mono text-xs">{p.addr || p.id}</td>
-                     <td>
-                        <span className={`badge badge-xs ${p.engine === 'zen' ? 'badge-secondary' : 'badge-success'}`}>
+                   <tr key={i} className="hover:bg-primary/5 transition-colors group">
+                     <td className="px-8 py-4">
+                        <div className="flex flex-col">
+                           <span className="font-mono text-xs font-bold truncate max-w-xs group-hover:text-primary transition-colors">{p.addr || p.id}</span>
+                           <span className="text-[10px] opacity-30 font-black uppercase tracking-tighter">Verified Node</span>
+                        </div>
+                     </td>
+                     <td className="py-4">
+                        <span className={`badge badge-sm border-0 font-black px-3 ${p.engine === 'zen' ? 'bg-secondary/10 text-secondary' : 'bg-success/10 text-success'}`}>
                           {p.engine?.toUpperCase() || 'GUN'}
                         </span>
                       </td>
-                     <td><span className="badge badge-success badge-sm p-2">LIVE</span></td>
-                     <td>{(p.msgCount || 0).toLocaleString()}</td>
-                     <td>{formatBytes(p.bytesSent || 0)}</td>
-                     <td>{formatUptime(p.uptime || 0)}</td>
+                     <td className="py-4">
+                        <div className="flex items-center gap-2">
+                           <span className="w-2 h-2 rounded-full bg-success"></span>
+                           <span className="text-[10px] font-black opacity-60">STABLE</span>
+                        </div>
+                     </td>
+                     <td className="py-4 text-right font-mono text-xs font-bold">{(p.msgCount || 0).toLocaleString()}</td>
+                     <td className="py-4 text-right font-mono text-xs font-bold text-primary">{formatBytes(p.bytesSent || 0)}</td>
+                     <td className="px-8 py-4 text-right font-mono text-xs font-bold opacity-60">{formatUptime(p.uptime || 0)}</td>
                    </tr>
                  ))}
                </tbody>
              </table>
            </div>
          </div>
-       </div>
       )}
 
-      {/* Network Relays Map (Legacy) */}
+      {/* Network Relays Configuration */}
       {isAuthenticated && (
-        <div className="card bg-base-100 shadow">
-          <div className="card-body">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <h3 className="card-title">🌐 Configured Network Relays</h3>
-              <form onSubmit={handleAddPeer} className="join">
-                <input 
-                  type="text" 
-                  className="input input-bordered input-sm join-item w-64"
-                  placeholder="Add Relay URL (http://.../gun)" 
-                  value={newPeerUrl}
-                  onChange={e => setNewPeerUrl(e.target.value)}
-                />
-                <button className="btn btn-primary btn-sm join-item" disabled={addingPeer}>
-                  {addingPeer ? <span className="loading loading-spinner loading-xs"></span> : '➕'} Add
-                </button>
-              </form>
+        <div className="glass-card rounded-3xl overflow-hidden">
+          <div className="p-8 border-b border-base-content/5 flex flex-wrap items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+               <div className="w-8 h-8 rounded-lg bg-secondary/20 flex items-center justify-center text-secondary text-sm font-bold shadow-sm">N</div>
+               <h3 className="font-black text-lg tracking-tight">Discovered Network Relays</h3>
             </div>
-            <div className="overflow-x-auto mt-4">
-              <table className="table table-zebra table-sm">
-                <thead>
-                  <tr>
-                    <th>Host / Key</th>
-                    <th>Endpoint</th>
-                    <th>Last Seen</th>
+            <form onSubmit={handleAddPeer} className="flex gap-2">
+              <input 
+                type="text" 
+                className="input input-bordered bg-base-100/50 border-base-content/10 w-full md:w-80 rounded-2xl text-sm"
+                placeholder="Relay Entrypoint (http://...)" 
+                value={newPeerUrl}
+                onChange={e => setNewPeerUrl(e.target.value)}
+              />
+              <button className="btn gradient-secondary border-0 rounded-2xl px-6 font-black tracking-widest text-xs" disabled={addingPeer}>
+                {addingPeer ? <span className="loading loading-spinner loading-xs"></span> : 'CONNECT'}
+              </button>
+            </form>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="table table-md w-full border-collapse">
+              <thead>
+                <tr className="bg-base-300/30 text-[10px] font-black uppercase tracking-widest opacity-40">
+                  <th className="px-8 py-4">Relay Host / Public Key</th>
+                  <th className="py-4">Endpoint Path</th>
+                  <th className="px-8 py-4 text-right">Synchronization</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-base-content/5">
+                {relays.length === 0 && (
+                  <tr><td colSpan={3} className="text-center py-20 text-xs font-black opacity-20 uppercase tracking-widest">No network relays discovered.</td></tr>
+                )}
+                {relays.map((relay: RelayInfo, i: number) => (
+                  <tr key={i} className="hover:bg-secondary/5 transition-colors group">
+                    <td className="px-8 py-4">
+                       <span className="font-mono text-xs font-bold opacity-60 group-hover:opacity-100 transition-opacity truncate block max-w-md">{relay.host}</span>
+                    </td>
+                    <td className="py-4">
+                       <span className="text-xs font-bold opacity-40">{relay.endpoint || '/gun'}</span>
+                    </td>
+                    <td className="px-8 py-4 text-right">
+                       <span className="text-[10px] font-black px-2 py-1 rounded bg-base-300 opacity-60 uppercase tracking-widest">
+                          {new Date(relay.lastSeen).toLocaleTimeString()}
+                       </span>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {relays.length === 0 && (
-                    <tr><td colSpan={3} className="text-center text-base-content/50">No relays configured.</td></tr>
-                  )}
-                  {relays.map((relay: RelayInfo, i: number) => (
-                    <tr key={i}>
-                      <td className="font-mono text-xs" title={relay.host}>{relay.host.substring(0, 30)}...</td>
-                      <td>{relay.endpoint || '-'}</td>
-                      <td>{new Date(relay.lastSeen).toLocaleTimeString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
-
-      {lastUpdated && (
-        <p className="text-sm text-base-content/50 text-center">Last updated: {lastUpdated.toLocaleTimeString()}</p>
       )}
     </div>
   )
