@@ -371,3 +371,42 @@ export function createProductionErrorHandler(
     });
   };
 }
+
+/**
+ * Validates if an origin is allowed based on an array of allowed origins.
+ * Properly handles wildcards and exact matches to prevent sub-domain or prefix spoofing.
+ */
+export function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
+  if (!allowedOrigins || allowedOrigins.length === 0) return false;
+  if (allowedOrigins.includes("*")) return true;
+
+  return allowedOrigins.some((allowed) => {
+    if (allowed === origin) return true;
+
+    try {
+      const originUrl = new URL(origin);
+
+      // Handle wildcard with explicit protocol (e.g., https://*.example.com)
+      if (allowed.includes("://*.")) {
+        const [scheme, baseDomain] = allowed.split("://*.");
+        if (originUrl.protocol !== `${scheme}:`) return false;
+        return originUrl.hostname === baseDomain || originUrl.hostname.endsWith(`.${baseDomain}`);
+      }
+
+      // Handle wildcard without explicit protocol (e.g., *.example.com)
+      if (allowed.startsWith("*.")) {
+        const baseDomain = allowed.slice(2);
+        return originUrl.hostname === baseDomain || originUrl.hostname.endsWith(`.${baseDomain}`);
+      }
+
+      // Handle exact match without explicit protocol (e.g., example.com)
+      if (!allowed.includes("://")) {
+        return originUrl.hostname === allowed || originUrl.host === allowed;
+      }
+    } catch (e) {
+      // If URL parsing fails, ignore. Exact string match is already handled above.
+    }
+
+    return false;
+  });
+}
