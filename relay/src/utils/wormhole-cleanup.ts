@@ -93,10 +93,10 @@ async function runWormholeCleanup(gun: IGunInstance): Promise<void> {
     // Read all transfers from Gun
     const gunTransfers = await getWormholeTransfers(gun);
     const zenTransfers = zen ? await getWormholeTransfers(zen) : [];
-    
+
     // Combine and deduplicate by code
     const allTransfers = [...gunTransfers];
-    const seenCodes = new Set(gunTransfers.map(t => t.code));
+    const seenCodes = new Set(gunTransfers.map((t) => t.code));
     for (const t of zenTransfers) {
       if (!seenCodes.has(t.code)) {
         allTransfers.push(t);
@@ -127,7 +127,7 @@ async function runWormholeCleanup(gun: IGunInstance): Promise<void> {
         // Skip if already completed (check both)
         const gunCompleted = await checkTransferCompleted(gun, code);
         const zenCompleted = zen ? await checkTransferCompleted(zen, code) : false;
-        
+
         if (gunCompleted || zenCompleted) {
           continue;
         }
@@ -155,7 +155,7 @@ async function runWormholeCleanup(gun: IGunInstance): Promise<void> {
 
         // Remove transfer metadata
         gun.get(code).put(null as any);
-        
+
         // Remove from ZEN too if present
         if (zen) {
           getGunNode(zen, GUN_PATHS.SHOGUN_WORMHOLE)

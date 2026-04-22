@@ -198,20 +198,20 @@ async function initializeServer() {
     origin: authConfig.corsOrigins.includes("*")
       ? true // Allow all origins if '*' is configured
       : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
+          // Allow requests with no origin (like mobile apps or curl requests)
+          if (!origin) return callback(null, true);
 
-        if (
-          authConfig.corsOrigins.some(
-            (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
-          )
-        ) {
-          callback(null, true);
-        } else {
-          loggers.server.warn({ origin }, "CORS blocked request from origin");
-          callback(new Error("Not allowed by CORS"));
-        }
-      },
+          if (
+            authConfig.corsOrigins.some(
+              (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
+            )
+          ) {
+            callback(null, true);
+          } else {
+            loggers.server.warn({ origin }, "CORS blocked request from origin");
+            callback(new Error("Not allowed by CORS"));
+          }
+        },
     credentials: authConfig.corsCredentials,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: [
@@ -296,7 +296,9 @@ async function initializeServer() {
       return res.redirect("/dashboard/");
     }
     // For other requests (like curl or simple clients), return a text message
-    res.status(200).send("Shogun Relay è attivo! Connettiti tramite WebSocket a /zen o usa l'API /api/v1");
+    res
+      .status(200)
+      .send("Shogun Relay è attivo! Connettiti tramite WebSocket a /zen o usa l'API /api/v1");
   });
 
   // Route specifica per /admin - redirect to new dashboard
@@ -505,8 +507,6 @@ async function initializeServer() {
     }
   }
 
-
-
   const gun = (Gun as any)(gunConfig);
 
   // Initialize Gun Alias Guard to prevent duplicate usernames
@@ -535,47 +535,58 @@ async function initializeServer() {
       peers: peers, // Share the same peers
     };
 
-    loggers.server.info({ path: zenConfig.path, dataDir: zenDataDir }, "🚀 Initializing ZEN Instance...");
+    loggers.server.info(
+      { path: zenConfig.path, dataDir: zenDataDir },
+      "🚀 Initializing ZEN Instance..."
+    );
     const zen = new ZEN(zenOptions);
     zen._graph; // Force relay initialization as per examples
     app.set("zenInstance", zen);
     (global as any).zenInstance = zen;
-    
+
     // Hook ZEN to StatsTracker
     zen.on("hi", (peer: any) => {
       if (!peer || !peer.wire) return;
       const addr = peer.url || peer.id || "unknown";
       statsTracker.patchSocket(peer.wire, addr, "zen");
     });
-    
+
     // ZEN Pin Request Listener
     if (replicationConfig.autoReplication) {
       loggers.server.info("🔄 ZEN Auto-replication enabled - listening for pin requests");
-      zen.get(GUN_PATHS.PIN_REQUESTS).map().on(async (data: any, requestId: any) => {
-        if (!data || typeof data !== "object" || !data.cid) return;
-        if (data.status !== "pending") return;
-        if (data.timestamp && Date.now() - data.timestamp > 3600000) return;
-        
-        const cached = processedPinRequests.get(requestId);
-        if (cached && Date.now() - cached.processedAt < PIN_REQUEST_CACHE_TTL_MS) return;
-        
-        loggers.server.info({ cid: data.cid, requestId }, "🔁 Received PIN request via ZEN");
-        processedPinRequests.set(requestId, { processedAt: Date.now(), status: "processing" });
-        
-        try {
-          const response = await fetch(`${ipfsConfig.apiUrl}/api/v0/pin/add?arg=${data.cid}`, {
-            method: "POST",
-            headers: ipfsConfig.apiToken ? { Authorization: `Bearer ${ipfsConfig.apiToken}` } : {},
-          });
-          
-          if (response.ok) {
-            loggers.server.info({ cid: data.cid }, "✅ Successfully pinned via ZEN auto-replication");
-            zen.get(GUN_PATHS.PIN_REQUESTS).get(requestId).get("status").put("completed");
+      zen
+        .get(GUN_PATHS.PIN_REQUESTS)
+        .map()
+        .on(async (data: any, requestId: any) => {
+          if (!data || typeof data !== "object" || !data.cid) return;
+          if (data.status !== "pending") return;
+          if (data.timestamp && Date.now() - data.timestamp > 3600000) return;
+
+          const cached = processedPinRequests.get(requestId);
+          if (cached && Date.now() - cached.processedAt < PIN_REQUEST_CACHE_TTL_MS) return;
+
+          loggers.server.info({ cid: data.cid, requestId }, "🔁 Received PIN request via ZEN");
+          processedPinRequests.set(requestId, { processedAt: Date.now(), status: "processing" });
+
+          try {
+            const response = await fetch(`${ipfsConfig.apiUrl}/api/v0/pin/add?arg=${data.cid}`, {
+              method: "POST",
+              headers: ipfsConfig.apiToken
+                ? { Authorization: `Bearer ${ipfsConfig.apiToken}` }
+                : {},
+            });
+
+            if (response.ok) {
+              loggers.server.info(
+                { cid: data.cid },
+                "✅ Successfully pinned via ZEN auto-replication"
+              );
+              zen.get(GUN_PATHS.PIN_REQUESTS).get(requestId).get("status").put("completed");
+            }
+          } catch (err) {
+            loggers.server.error({ err, cid: data.cid }, "❌ ZEN auto-replication pin failed");
           }
-        } catch (err) {
-          loggers.server.error({ err, cid: data.cid }, "❌ ZEN auto-replication pin failed");
-        }
-      });
+        });
     }
 
     loggers.server.info("✅ ZEN Instance initialized alongside Gun");
@@ -966,7 +977,6 @@ See docs/RELAY_KEYS.md for more information.
               processedAt: Date.now(),
               status: "failed",
             });
-
           }
         } catch (error: any) {
           if (loggingConfig.debug) {
@@ -979,7 +989,6 @@ See docs/RELAY_KEYS.md for more information.
             processedAt: Date.now(),
             status: "failed",
           });
-
         }
       });
   } else {
@@ -1222,7 +1231,6 @@ See docs/RELAY_KEYS.md for more information.
 
     addTimeSeriesPoint("connections.active", activeWires);
     addTimeSeriesPoint("memory.heapUsed", process.memoryUsage().heapUsed);
-
   }, 300000); // 5 minutes
 
   // --- AUTOMATIC ALIAS MAINTENANCE ---

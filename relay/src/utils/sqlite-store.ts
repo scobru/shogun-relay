@@ -190,7 +190,7 @@ class SQLiteStore {
    * Get storage statistics
    * @returns Object with bytes and files count
    */
-  getStorageStats(): { bytes: number; files: number } {
+  async getStorageStats(): Promise<{ bytes: number; files: number }> {
     if (this.isClosed) {
       return { bytes: 0, files: 0 };
     }
@@ -211,7 +211,7 @@ class SQLiteStore {
       // Also get actual database file size
       let dbFileSize = 0;
       try {
-        const stats = fs.statSync(this.dbPath);
+        const stats = await fs.promises.stat(this.dbPath);
         dbFileSize = stats.size;
       } catch {
         // Ignore if file not accessible

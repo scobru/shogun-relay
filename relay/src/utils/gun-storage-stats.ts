@@ -129,7 +129,7 @@ export async function getGunStorageStats(store?: any): Promise<GunStorageStats> 
 
       if (store && typeof store.getStorageStats === "function") {
         // Use existing store instance
-        const stats = store.getStorageStats();
+        const stats = await store.getStorageStats();
         const formatted = formatBytes(stats.bytes);
         return {
           backend: "sqlite",
@@ -145,7 +145,7 @@ export async function getGunStorageStats(store?: any): Promise<GunStorageStats> 
       // Fallback: just get file size if no store instance
       let bytes = 0;
       try {
-        const dbStats = fs.statSync(dbPath);
+        const dbStats = await fs.promises.stat(dbPath);
         bytes = dbStats.size;
       } catch {
         // DB file doesn't exist yet

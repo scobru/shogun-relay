@@ -36,18 +36,18 @@ describe("Auth Security", () => {
               priv: "test-priv-sensitive",
               epub: "test-epub",
               epriv: "test-epriv-sensitive",
-              alias: "test-user"
-            }
+              alias: "test-user",
+            },
           });
         }),
         leave: vi.fn(),
         create: vi.fn((username, password, cb) => {
-            cb({ ok: 0 });
-        })
+          cb({ ok: 0 });
+        }),
       }),
       get: vi.fn().mockReturnValue({
-        once: vi.fn((cb) => cb(null))
-      })
+        once: vi.fn((cb) => cb(null)),
+      }),
     };
 
     app.set("gunInstance", mockGun);

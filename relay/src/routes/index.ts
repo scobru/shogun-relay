@@ -474,8 +474,6 @@ export default (app: express.Application) => {
     res.sendFile(path.resolve(publicPath, "graph.html"));
   });
 
-
-
   app.get("/rpc-console", (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     res.sendFile(path.resolve(publicPath, "rpc-console.html"));
@@ -576,7 +574,6 @@ export default (app: express.Application) => {
 
   // Route per il grafico visivo (always enabled)
   app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
-
 
   // Route di autenticazione
   app.use(`${baseRoute}/auth`, authRouter);

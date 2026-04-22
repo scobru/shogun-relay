@@ -146,7 +146,7 @@ router.get("/check-username/:username", async (req: Request, res: Response) => {
   try {
     const { username } = req.params;
     const gun = getGun(req);
-    
+
     if (!gun) {
       return res.status(503).json({ success: false, error: "GunDB not initialized" });
     }
@@ -160,7 +160,7 @@ router.get("/check-username/:username", async (req: Request, res: Response) => {
 
     if (existing) {
       // Check if it's an empty node (nullified)
-      const pubs = Object.keys(existing).filter(k => k !== '_' && k !== '#');
+      const pubs = Object.keys(existing).filter((k) => k !== "_" && k !== "#");
       if (pubs.length > 0) {
         return res.json({
           available: false,

@@ -36,7 +36,11 @@ async function getUserUploadsFromGun(gun: any, userAddress: string): Promise<any
 /**
  * Helper: Get a single user upload by hash from GunDB
  */
-async function getUserUploadByHashFromGun(gun: any, userAddress: string, hash: string): Promise<any> {
+async function getUserUploadByHashFromGun(
+  gun: any,
+  userAddress: string,
+  hash: string
+): Promise<any> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve(null), 3000);
 
@@ -111,7 +115,11 @@ router.get("/user-uploads/:userAddress/:hash/view", async (req, res) => {
         .json({ success: false, error: "Server error - Gun instance not available" });
     }
 
-    const uploadRecord = await getUserUploadByHashFromGun(gun, userAddress as string, hash as string);
+    const uploadRecord = await getUserUploadByHashFromGun(
+      gun,
+      userAddress as string,
+      hash as string
+    );
 
     if (!uploadRecord) {
       return res.status(404).json({ success: false, error: "File not found for this user" });
@@ -226,7 +234,11 @@ router.get("/user-uploads/:userAddress/:hash/decrypt", async (req: Request, res:
         .json({ success: false, error: "Server error - Gun instance not available" });
     }
 
-    const uploadRecord = await getUserUploadByHashFromGun(gun, userAddress as string, hash as string);
+    const uploadRecord = await getUserUploadByHashFromGun(
+      gun,
+      userAddress as string,
+      hash as string
+    );
 
     if (!uploadRecord) {
       return res.status(404).json({ success: false, error: "File not found for this user" });
@@ -279,7 +291,11 @@ router.delete("/user-uploads/:userAddress/:hash", async (req, res) => {
         .json({ success: false, error: "Server error - Gun instance not available" });
     }
 
-    const uploadRecord = await getUserUploadByHashFromGun(gun, userAddress as string, hash as string);
+    const uploadRecord = await getUserUploadByHashFromGun(
+      gun,
+      userAddress as string,
+      hash as string
+    );
 
     if (!uploadRecord) {
       return res.status(404).json({ success: false, error: "Upload not found" });

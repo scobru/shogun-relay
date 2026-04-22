@@ -54,9 +54,7 @@ export const config = {
           .filter((p) => p.length > 0);
       }
       // Default public Gun peers
-      return [
-        "http://localhost:8765/zen"
-      ];
+      return ["http://localhost:8765/zen"];
     })(),
   },
 

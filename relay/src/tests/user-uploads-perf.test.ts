@@ -14,19 +14,19 @@ class MockGunNode {
 
   put(val: any, cb?: (...args: any[]) => any) {
     Object.assign(this.data, val);
-    this.callbacks.forEach(fn => fn(val, val.hash));
+    this.callbacks.forEach((fn) => fn(val, val.hash));
     if (cb) cb();
   }
 
   map() {
     return {
       on: (cb: (...args: any[]) => any) => {
-        Object.keys(this.data).forEach(k => {
-          if (k !== '_' && this.data[k].data) {
+        Object.keys(this.data).forEach((k) => {
+          if (k !== "_" && this.data[k].data) {
             cb(this.data[k].data, k);
           }
         });
-      }
+      },
     };
   }
 
@@ -37,10 +37,12 @@ class MockGunNode {
 
 class MockGun {
   root = new MockGunNode();
-  get(key: string) { return this.root.get(key); }
+  get(key: string) {
+    return this.root.get(key);
+  }
 }
 
-const GUN_PATHS = { UPLOADS: 'uploads' };
+const GUN_PATHS = { UPLOADS: "uploads" };
 
 async function getUserUploadsFromGun(gun: any, userAddress: string): Promise<any[]> {
   return new Promise((resolve) => {
@@ -63,7 +65,11 @@ async function getUserUploadsFromGun(gun: any, userAddress: string): Promise<any
   });
 }
 
-async function getUserUploadByHashFromGun(gun: any, userAddress: string, hash: string): Promise<any> {
+async function getUserUploadByHashFromGun(
+  gun: any,
+  userAddress: string,
+  hash: string
+): Promise<any> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve(null), 300);
 
@@ -79,8 +85,8 @@ async function getUserUploadByHashFromGun(gun: any, userAddress: string, hash: s
           clearTimeout(timer);
           resolve({ ...data, hash });
         } else {
-            clearTimeout(timer);
-            resolve(null);
+          clearTimeout(timer);
+          resolve(null);
         }
       });
   });
@@ -96,11 +102,15 @@ describe("Uploads Performance", () => {
     gun = new MockGun();
     for (let i = 0; i < numUploads; i++) {
       const hash = i === 5000 ? targetHash : `QmFakeHash${i}`;
-      gun.get(GUN_PATHS.UPLOADS).get(userAddress).get(hash).put({
-        hash,
-        name: `file-${i}.txt`,
-        size: 1024,
-      });
+      gun
+        .get(GUN_PATHS.UPLOADS)
+        .get(userAddress)
+        .get(hash)
+        .put({
+          hash,
+          name: `file-${i}.txt`,
+          size: 1024,
+        });
     }
   });
 
@@ -110,7 +120,9 @@ describe("Uploads Performance", () => {
     const result = uploads.find((u: any) => u.hash === targetHash);
     const end = performance.now();
 
-    console.log(`[Baseline] Found: ${!!result}, Time: ${(end - start).toFixed(2)}ms, Count: ${uploads.length}`);
+    console.log(
+      `[Baseline] Found: ${!!result}, Time: ${(end - start).toFixed(2)}ms, Count: ${uploads.length}`
+    );
     expect(result).toBeDefined();
     expect(result.hash).toBe(targetHash);
   });

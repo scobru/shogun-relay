@@ -55,18 +55,26 @@ export class StatsTracker {
 
   public patchSocket(socket: any, addr: string, engine?: "gun" | "zen") {
     if (!socket) return;
-    
+
     // Check if already patched
     if (socket.__patchedStats) return;
     socket.__patchedStats = true;
 
     // Auto-detect engine if not provided
-    const resolvedEngine: "gun" | "zen" = engine || (addr.includes('/zen') ? 'zen' : 'gun');
+    const resolvedEngine: "gun" | "zen" = engine || (addr.includes("/zen") ? "zen" : "gun");
 
     const id = addr + "_" + Date.now();
-    const peer: PeerStats = { id, addr, engine: resolvedEngine, connectedAt: Date.now(), msgCount: 0, bytesSent: 0, uptime: 0 };
+    const peer: PeerStats = {
+      id,
+      addr,
+      engine: resolvedEngine,
+      connectedAt: Date.now(),
+      msgCount: 0,
+      bytesSent: 0,
+      uptime: 0,
+    };
     this.peers.set(id, peer);
-    
+
     if (resolvedEngine === "zen") this.zenPeers++;
     else this.gunPeers++;
 
@@ -116,12 +124,14 @@ export class StatsTracker {
     };
 
     socket.on("message", onMessage);
-    
+
     socket.on("close", () => {
       this.peers.delete(id);
       if (resolvedEngine === "zen") this.zenPeers--;
       else this.gunPeers--;
-      loggers.server.info(`[-] Peer disconnected: ${addr} (Total: ${this.peers.size}, Gun: ${this.gunPeers}, Zen: ${this.zenPeers})`);
+      loggers.server.info(
+        `[-] Peer disconnected: ${addr} (Total: ${this.peers.size}, Gun: ${this.gunPeers}, Zen: ${this.zenPeers})`
+      );
     });
 
     socket.on("error", () => {
@@ -132,10 +142,10 @@ export class StatsTracker {
   public getStats() {
     const now = Date.now();
     const uptimeMs = now - this.startTime;
-    
-    const peersArr = Array.from(this.peers.values()).map(p => ({
+
+    const peersArr = Array.from(this.peers.values()).map((p) => ({
       ...p,
-      uptime: now - p.connectedAt
+      uptime: now - p.connectedAt,
     }));
 
     const memoryUsage = process.memoryUsage();
@@ -158,7 +168,7 @@ export class StatsTracker {
       msgHistory: this.msgHistory,
       byteHistory: this.byteHistory,
       peers: peersArr,
-      
+
       // Legacy structure for existing React components (mapped to new values)
       up: { time: uptimeMs },
       memory: {
@@ -171,13 +181,13 @@ export class StatsTracker {
       dam: {
         in: {
           rate: this.msgHistory.length > 0 ? this.msgHistory[this.msgHistory.length - 1].v : 0,
-          count: this.totalMessages
+          count: this.totalMessages,
         },
         out: {
           rate: this.byteHistory.length > 0 ? this.byteHistory[this.byteHistory.length - 1].v : 0,
-          count: this.totalBytes
-        }
-      }
+          count: this.totalBytes,
+        },
+      },
     };
   }
 
