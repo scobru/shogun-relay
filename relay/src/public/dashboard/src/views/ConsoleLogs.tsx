@@ -173,7 +173,7 @@ function ConsoleLogs() {
             <div className="p-4 text-center opacity-50">No logs found matching criteria.</div>
           ) : (
             filteredLogs.map((log) => (
-              <div key={log.id} className="flex gap-3 hover:bg-neutral-focus/50 px-2 py-0.5 group">
+              <div key={log.id} className="flex gap-3 hover:bg-neutral/50 px-2 py-0.5 group">
                 <span className="opacity-30 whitespace-nowrap min-w-[140px]">
                   {new Date(log.timestamp).toLocaleTimeString()}
                 </span>

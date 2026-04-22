@@ -77,15 +77,15 @@ body {
 }
 
 .gradient-primary {
-  @apply bg-gradient-to-br from-primary to-primary-focus text-primary-content;
+  @apply bg-gradient-to-br from-primary to-primary text-primary-content;
 }
 
 .gradient-secondary {
-  @apply bg-gradient-to-br from-secondary to-secondary-focus text-secondary-content;
+  @apply bg-gradient-to-br from-secondary to-secondary text-secondary-content;
 }
 
 .gradient-accent {
-  @apply bg-gradient-to-br from-accent to-accent-focus text-accent-content;
+  @apply bg-gradient-to-br from-accent to-accent text-accent-content;
 }
 
 .shogun-logo {
