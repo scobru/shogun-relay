@@ -16,7 +16,7 @@ export * from "./modules/chat";
 export * from "./modules/visualGraph";
 
 
-export class ShogunRelaySDK {
+export class DelaySDK {
   private client: ApiClient;
 
   public system: SystemModule;
@@ -48,4 +48,4 @@ export class ShogunRelaySDK {
   }
 }
 
-export default ShogunRelaySDK;
+export default DelaySDK;

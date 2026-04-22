@@ -113,8 +113,8 @@ async function initializeServer() {
   // Welcome message with ASCII art logo
   const welcomeMessage = serverConfig.welcomeMessage;
   console.log(welcomeMessage);
-  loggers.server.info("🚀 Initializing Shogun Relay Server...");
-  loggers.server.info("🚀 Shogun Relay v1.0.1 - FORCE UPDATE");
+  loggers.server.info("🚀 Initializing Delay Server...");
+  loggers.server.info("🚀 Delay v1.0.1 - FORCE UPDATE");
 
   /**
    * System logging function (console only, no GunDB storage)
@@ -291,7 +291,7 @@ async function initializeServer() {
       return res.redirect("/dashboard/");
     }
     // For other requests (like curl or simple clients), return a text message
-    res.status(200).send("Shogun Relay è attivo! Connettiti tramite WebSocket a /zen o usa l'API /api/v1");
+    res.status(200).send("Delay è attivo! Connettiti tramite WebSocket a /zen o usa l'API /api/v1");
   });
 
   // Route specifica per /admin - redirect to new dashboard
@@ -1030,7 +1030,7 @@ See docs/RELAY_KEYS.md for more information.
 
   // Shutdown function
   async function shutdown() {
-    loggers.server.info("🛑 Shutting down Shogun Relay...");
+    loggers.server.info("🛑 Shutting down Delay...");
 
     // Give a grace period for in-flight operations to complete
     // GunDB may still have pending operations, so we wait a bit longer
@@ -1063,7 +1063,7 @@ See docs/RELAY_KEYS.md for more information.
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 
-  loggers.server.info({ host, port }, `🚀 Shogun Relay Server running`);
+  loggers.server.info({ host, port }, `🚀 Delay Server running`);
 
   return {
     server,

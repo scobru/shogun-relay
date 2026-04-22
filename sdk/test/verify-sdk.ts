@@ -1,11 +1,11 @@
-import { ShogunRelaySDK } from '../src/index';
+import { DelaySDK } from '../src/index';
 
 async function main() {
   console.log('🚀 Starting SDK Verification...');
 
   // Initialize SDK
-  const sdk = new ShogunRelaySDK({
-    baseURL: 'https://shogun-relay.scobrudot.dev',
+  const sdk = new DelaySDK({
+    baseURL: 'https://delay.scobrudot.dev',
     token: 'shogun2025', // Default dev token
   });
 

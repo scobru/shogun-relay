@@ -49,7 +49,7 @@ function Sidebar() {
       <aside className="bg-base-200 min-h-screen w-64 flex flex-col border-r border-base-300">
         {/* Logo */}
         <div className="p-4 flex items-center gap-3 bg-base-300">
-          <img src={logoSvg} alt="Shogun Relay" className="w-10 h-10" />
+          <img src={logoSvg} alt="Delay" className="w-10 h-10" />
           <div>
             <span className="font-bold text-lg">Relay</span>
             <p className="text-xs text-base-content/60">Relay Dashboard v1.2.0</p>

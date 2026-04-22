@@ -126,7 +126,7 @@ function GraphExplorer() {
     const element = document.createElement("a");
     const file = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     element.href = URL.createObjectURL(file);
-    element.download = `shogun-relay-snapshot-${Date.now()}.json`;
+    element.download = `delay-snapshot-${Date.now()}.json`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);

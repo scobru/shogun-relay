@@ -1,5 +1,5 @@
 /**
- * Wallet utility functions for Shogun Relay SDK
+ * Wallet utility functions for Delay SDK
  */
 
 /**
@@ -16,7 +16,7 @@ export const WALLET_AUTH_MESSAGE = "I Love Shogun";
  * @example
  * ```typescript
  * import { ethers } from 'ethers';
- * import { generateWalletSignature } from '@shogun/relay-sdk/utils/wallet';
+ * import { generateWalletSignature } from '@delay/sdk/utils/wallet';
  * 
  * const provider = new ethers.BrowserProvider(window.ethereum);
  * const signer = await provider.getSigner();
@@ -39,7 +39,7 @@ export async function generateWalletSignature(signer: {
  * @example
  * ```typescript
  * import { ethers } from 'ethers';
- * import { verifyWalletSignature } from '@shogun/relay-sdk/utils/wallet';
+ * import { verifyWalletSignature } from '@delay/sdk/utils/wallet';
  * 
  * const isValid = await verifyWalletSignature(address, signature);
  * ```
@@ -65,7 +65,7 @@ export async function verifyWalletSignature(
  * 
  * @example
  * ```typescript
- * import { getAddressFromSignature } from '@shogun/relay-sdk/utils/wallet';
+ * import { getAddressFromSignature } from '@delay/sdk/utils/wallet';
  * 
  * const address = await getAddressFromSignature(signature);
  * ```

@@ -1,5 +1,5 @@
 /**
- * Centralized Logger for Shogun Relay
+ * Centralized Logger for Delay
  *
  * Uses pino for high-performance structured JSON logging.
  * In development, uses pino-pretty for human-readable output.

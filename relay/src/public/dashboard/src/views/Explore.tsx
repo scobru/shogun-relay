@@ -22,7 +22,7 @@ function Explore() {
       <div className="card bg-base-100 shadow-sm">
         <div className="card-body">
           <h2 className="card-title text-2xl">🧭 Data Hub</h2>
-          <p className="text-base-content/70">Central navigation for all Shogun Relay subsystems and data inspectors.</p>
+          <p className="text-base-content/70">Central navigation for all Delay subsystems and data inspectors.</p>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 /**
  * Unified GunDB paths for the Shogun network
  *
- * These paths are shared between shogun-relay and shogun-mule
+ * These paths are shared between delay and shogun-mule
  * to ensure consistent network discovery and communication.
  */
 

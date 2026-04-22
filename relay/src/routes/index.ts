@@ -231,7 +231,7 @@ export default (app: express.Application) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IPFS Content Not Found - Shogun Relay</title>
+  <title>IPFS Content Not Found - Delay</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;

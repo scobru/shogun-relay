@@ -570,7 +570,7 @@ function Settings() {
         <div className="card-body">
           <h3 className="card-title">ℹ️ About</h3>
           <p className="text-base-content/70">
-            Shogun Relay Dashboard — Part of the{" "}
+            Delay Dashboard — Part of the{" "}
             <a
               href="https://github.com/scobru/shogun"
               target="_blank"

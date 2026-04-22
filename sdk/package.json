@@ -1,7 +1,7 @@
 {
-  "name": "shogun-relay-sdk",
+  "name": "delay-sdk",
   "version": "1.4.5",
-  "description": "SDK for interacting with Shogun Relay API - HTTP client for IPFS, deals, registry, and network operations",
+  "description": "SDK for interacting with Delay API - HTTP client for IPFS, deals, registry, and network operations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -25,8 +25,7 @@
     "format:check": "prettier --check \"src/**/*.ts\""
   },
   "keywords": [
-    "shogun",
-    "relay",
+    "delay", "decentralized-relay",
     "sdk",
     "ipfs",
     "gun",
@@ -38,8 +37,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/shogun-network/shogun-2.git",
-    "directory": "shogun-relay/relay-sdk"
+    "url": "https://github.com/scobru/delay.git",
+    "directory": "delay/relay-sdk"
   },
   "dependencies": {
     "axios": "^1.6.0",

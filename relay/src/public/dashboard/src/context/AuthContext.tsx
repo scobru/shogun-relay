@@ -10,7 +10,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const AUTH_KEY = 'shogun-relay-admin-password'
+const AUTH_KEY = 'delay-admin-password'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [password, setPassword] = useState<string>(() => {

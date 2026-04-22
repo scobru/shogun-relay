@@ -88,7 +88,7 @@ router.get("/health", (req, res) => {
 
   res.json({
     success: true,
-    message: "Shogun Relay is running",
+    message: "Delay is running",
     relayName: config.relay.name,
     relay: {
       pub: relayPub,

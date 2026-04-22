@@ -69,7 +69,7 @@ function Status() {
           <div className="flex items-center gap-4">
             <div className="text-5xl">⚡</div>
             <div>
-              <h2 className="card-title text-2xl">{health?.relayName || "Shogun Relay"}</h2>
+              <h2 className="card-title text-2xl">{health?.relayName || "Delay"}</h2>
               <p className="opacity-80">Decentralized infrastructure powered by GunDB & IPFS</p>
             </div>
           </div>

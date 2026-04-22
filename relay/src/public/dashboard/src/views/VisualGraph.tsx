@@ -212,7 +212,7 @@ function VisualGraph() {
                 type="text"
                 value={path}
                 onChange={(e) => setPath(e.target.value)}
-                placeholder="Enter GunDB path (e.g. shogun/relays)"
+                placeholder="Enter GunDB path (e.g. delay/relays)"
                 className="input input-bordered join-item w-full"
               />
               <button type="submit" className="btn btn-primary join-item" disabled={loading}>

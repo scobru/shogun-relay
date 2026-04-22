@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Shogun Relay, please report it responsibly:
+If you discover a security vulnerability in Delay, please report it responsibly:
 
 1. **DO NOT** open a public GitHub issue for security vulnerabilities
 2. Email security concerns to the maintainers directly

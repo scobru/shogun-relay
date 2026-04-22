@@ -1,4 +1,4 @@
-# Shogun Relay Full Stack Container
+# Delay Full Stack Container
 # Includes: IPFS, Relay Server
 
 FROM node:20-slim

@@ -1,9 +1,9 @@
 services:
-  shogun-relay:
+  delay:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: shogun-relay-stack
+    container_name: delay-stack
     ports:
       - "8765:8765" # Relay Server
       - "5001:5001" # IPFS API
@@ -29,7 +29,7 @@ services:
       - NODE_OPTIONS=--max-old-space-size=4096 --expose-gc
       - RELAY_HOST=localhost
       - RELAY_PORT=8765
-      - RELAY_NAME=shogun-relay
+      - RELAY_NAME=delay
       - RELAY_PATH=public
       - RELAY_STORE=true
       - RELAY_QR=true

@@ -41,7 +41,7 @@ export ADMIN_PASSWORD=${ADMIN_PASSWORD:-"shogun-admin-2024"}
 print_status "Building Shogun Relay Docker image..."
 
 # Build the Docker image
-if docker build -t shogun-relay:latest .; then
+if docker build -t delay:latest .; then
     print_success "Docker image built successfully"
 else
     print_error "Failed to build Docker image"
@@ -54,22 +54,22 @@ case "${1:-docker}" in
         print_status "Starting container with Docker..."
         
         # Stop and remove existing container if it exists
-        docker stop shogun-relay-stack 2>/dev/null || true
-        docker rm shogun-relay-stack 2>/dev/null || true
+        docker stop delay-stack 2>/dev/null || true
+        docker rm delay-stack 2>/dev/null || true
         
         # Run the container
         docker run -d \
-            --name shogun-relay-stack \
+            --name delay-stack \
             -p 8765:8765 \
             -p 5001:5001 \
             -p 8080:8080 \
             -p 4001:4001 \
             -v shogun-ipfs-data:/data/ipfs \
             -v shogun-s3-data:/app/fakes3/buckets \
-            -v shogun-relay-data:/app/relay/radata \
+            -v delay-data:/app/relay/radata \
             -v "$(pwd)/logs:/var/log/supervisor" \
             -e "ADMIN_PASSWORD=\"$ADMIN_PASSWORD\"" \
-            shogun-relay:latest
+            delay:latest
         
         if [ $? -eq 0 ]; then
             print_success "Container started successfully"
@@ -87,9 +87,9 @@ case "${1:-docker}" in
             echo "🔐 Admin Password: \"$ADMIN_PASSWORD\""
             echo ""
             echo "📋 Useful commands:"
-            echo "   • View logs:     docker logs -f shogun-relay-stack"
-            echo "   • Stop:          docker stop shogun-relay-stack"
-            echo "   • Start:         docker start shogun-relay-stack"
+            echo "   • View logs:     docker logs -f delay-stack"
+            echo "   • Stop:          docker stop delay-stack"
+            echo "   • Start:         docker start delay-stack"
             
         else
             print_error "Failed to start container"

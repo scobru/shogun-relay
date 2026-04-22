@@ -1,5 +1,5 @@
 {
-  "name": "shogun-relay",
+  "name": "delay",
   "version": "1.2.0",
   "description": "Enhanced Gun.js relay server with robust connection management and real-time sync",
   "type": "module",
@@ -93,9 +93,9 @@
     "vitest": "^2.1.0"
   },
   "bugs": {
-    "url": "https://github.com/your-org/shogun-2/issues"
+    "url": "https://github.com/scobru/delay/issues"
   },
-  "homepage": "https://github.com/your-org/shogun-2#readme",
+  "homepage": "https://github.com/scobru/delay#readme",
   "nodemonConfig": {
     "watch": [
       "src"

@@ -1,7 +1,7 @@
 /**
  * Centralized Environment Variables Configuration
  *
- * This file centralizes all environment variables used throughout the Shogun Relay application.
+ * This file centralizes all environment variables used throughout the Delay application.
  * All environment variables should be imported from this file instead of directly from process.env.
  *
  * Priority: Environment variables > Default values
@@ -34,13 +34,13 @@ export const config = {
     welcomeMessage:
       process.env.WELCOME_MESSAGE ||
       `
-*** WELCOME TO SHOGUN RELAY ***
+*** WELCOME TO DELAY ***
 `,
   },
 
   // Relay Identity
   relay: {
-    name: process.env.RELAY_NAME || "shogun-relay",
+    name: process.env.RELAY_NAME || "delay",
     endpoint: process.env.RELAY_HOST || ip.address(),
     environment: process.env.NODE_ENV || "development",
     protected: process.env.RELAY_PROTECTED === "true",

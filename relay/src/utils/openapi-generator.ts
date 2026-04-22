@@ -1,6 +1,6 @@
 /**
  * OpenAPI Specification Generator
- * Generates a complete OpenAPI 3.0 specification for Shogun Relay API
+ * Generates a complete OpenAPI 3.0 specification for Delay API
  */
 
 // OpenAPI types - using obj for the complex nested structure
@@ -17,10 +17,10 @@ export function generateOpenAPISpec(baseUrl: string = "http://localhost:8765"): 
   return {
     openapi: "3.0.0",
     info: {
-      title: "Shogun Relay API",
+      title: "Delay API",
       version: "1.0.0",
       description:
-        "Complete API documentation for Shogun Relay. Test endpoints directly from the interactive documentation.",
+        "Complete API documentation for Delay. Test endpoints directly from the interactive documentation.",
       contact: {
         name: "Shogun Project",
         url: "https://github.com/scobru/shogun",

@@ -1,25 +1,25 @@
-# Shogun Relay SDK
+# Delay SDK
 
-TypeScript/JavaScript SDK for interacting with Shogun Relay API.
+TypeScript/JavaScript SDK for interacting with Delay API.
 
 ## Installation
 
 ```bash
-npm install @shogun/relay-sdk
+npm install @delay/sdk
 # or
-yarn add @shogun/relay-sdk
+yarn add @delay/sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import ShogunRelaySDK from '@shogun/relay-sdk';
-import { generateWalletSignature } from '@shogun/relay-sdk/utils/wallet';
+import DelaySDK from '@delay/sdk';
+import { generateWalletSignature } from '@delay/sdk/utils/wallet';
 import { ethers } from 'ethers';
 
 // Initialize SDK
-const sdk = new ShogunRelaySDK({
-  baseURL: 'https://shogun-relay.scobrudot.dev',
+const sdk = new DelaySDK({
+  baseURL: 'https://delay.scobrudot.dev',
   token: 'your-admin-token' // Optional: for admin operations
 });
 
@@ -34,8 +34,8 @@ sdk.setToken('your-admin-token');
 For admin operations, use the admin token:
 
 ```typescript
-const sdk = new ShogunRelaySDK({
-  baseURL: 'https://shogun-relay.scobrudot.dev',
+const sdk = new DelaySDK({
+  baseURL: 'https://delay.scobrudot.dev',
   token: 'your-admin-token'
 });
 
@@ -52,7 +52,7 @@ const result = await sdk.ipfs.uploadFile(
 For user operations, you need to sign a message with your wallet:
 
 ```typescript
-import { generateWalletSignature } from '@shogun/relay-sdk/utils/wallet';
+import { generateWalletSignature } from '@delay/sdk/utils/wallet';
 import { ethers } from 'ethers';
 
 // Connect to wallet
@@ -175,7 +175,7 @@ const links = await sdk.drive.listPublicLinks();
 await sdk.drive.revokePublicLink(link.linkId);
 
 // Get public file URL (for direct access)
-const publicUrl = sdk.drive.getPublicFileUrl(link.linkId, 'https://shogun-relay.scobrudot.dev');
+const publicUrl = sdk.drive.getPublicFileUrl(link.linkId, 'https://delay.scobrudot.dev');
 ```
 
 ## IPFS Operations
@@ -327,7 +327,7 @@ import {
   verifyWalletSignature,
   getAddressFromSignature,
   WALLET_AUTH_MESSAGE
-} from '@shogun/relay-sdk/utils/wallet';
+} from '@delay/sdk/utils/wallet';
 
 // Generate signature
 const signature = await generateWalletSignature(signer);
@@ -345,15 +345,15 @@ console.log(WALLET_AUTH_MESSAGE); // "I Love Shogun"
 ## Complete Example
 
 ```typescript
-import ShogunRelaySDK from '@shogun/relay-sdk';
-import { generateWalletSignature } from '@shogun/relay-sdk/utils/wallet';
+import DelaySDK from '@delay/sdk';
+import { generateWalletSignature } from '@delay/sdk/utils/wallet';
 import { ethers } from 'ethers';
 import fs from 'fs';
 
 async function uploadFileExample() {
   // Initialize SDK
-  const sdk = new ShogunRelaySDK({
-    baseURL: 'https://shogun-relay.scobrudot.dev'
+  const sdk = new DelaySDK({
+    baseURL: 'https://delay.scobrudot.dev'
   });
 
   // Connect wallet

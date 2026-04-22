@@ -1,15 +1,15 @@
-# Shogun Relay
+# Delay
 
-[![CI](https://github.com/scobru/shogun-relay/actions/workflows/ci.yml/badge.svg)](https://github.com/scobru/shogun-relay/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/badge/npm-v1.9.4-blue)](https://www.npmjs.com/package/shogun-relay)
+[![CI](https://github.com/scobru/delay/actions/workflows/ci.yml/badge.svg)](https://github.com/scobru/delay/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/badge/npm-v1.9.4-blue)](https://www.npmjs.com/package/delay)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-blue)](https://www.typescriptlang.org/)
 [![Tests](https://img.shields.io/badge/tests-127%20passing-brightgreen)]()
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/scobru/shogun-relay)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/scobru/delay)
 
 ----
 
-**Shogun Relay** is a production-ready connection hub that unifies **GunDB** and **IPFS** into a single solution.
+**Delay** is a production-ready connection hub that unifies **GunDB** and **IPFS** into a single solution.
 
 ## Features
 
@@ -26,7 +26,7 @@
 
 ```bash
 git clone <repository-url>
-cd shogun-relay
+cd delay
 ./docker-start.sh
 
 curl http://localhost:8765/health
@@ -36,7 +36,7 @@ curl http://localhost:8765/health
 
 When deploying via CapRover, you **must** configure the Container HTTP Port in the app settings to correctly route NGINX traffic.
 
-1. Go to your CapRover Dashboard -> **Apps** -> **shogun-relay** -> **HTTP Settings**.
+1. Go to your CapRover Dashboard -> **Apps** -> **delay** -> **HTTP Settings**.
 2. Set **Container HTTP Port** to `8765`.
 3. Click **Save & Update**.
 
@@ -45,7 +45,7 @@ When deploying via CapRover, you **must** configure the Container HTTP Port in t
 ### Manual
 
 ```bash
-cd shogun-relay/relay
+cd delay/relay
 npm install
 npm run start:dev
 ```
@@ -122,7 +122,7 @@ Full API documentation at `/endpoints` or see **[API Reference](./docs/API.md)**
 ## Project Structure
 
 ```
-shogun-relay/
+delay/
 ├── relay/
 │   ├── src/
 │   │   ├── index.ts       # Express + Gun bootstrap
