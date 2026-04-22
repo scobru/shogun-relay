@@ -41,7 +41,7 @@ router.post("/generate", (req: Request, res: Response) => {
 router.delete("/:keyId", (req: Request, res: Response) => {
   try {
     const { keyId } = req.params;
-    const success = revokeApiKey(keyId);
+    const success = revokeApiKey(keyId as string);
     
     if (success) {
       res.json({ success: true, message: "API key revoked successfully" });

@@ -610,8 +610,23 @@ async function initializeServer() {
     }
     */
 
-  // Configura l'istanza Gun per le route di autenticazione
-  app.set("gunInstance", gun);
+  // Initialize Relay Identity
+  let relayKeyPair: any = null;
+  if (relayKeysConfig.seaKeypair) {
+    try {
+      relayKeyPair = JSON.parse(relayKeysConfig.seaKeypair);
+      loggers.server.info("🔑 Relay KeyPair loaded from config");
+    } catch (e: any) {
+      loggers.server.error({ err: e.message }, "❌ Failed to parse RELAY_SEA_KEYPAIR");
+    }
+  }
+
+  if (!relayKeyPair) {
+    loggers.server.warn("⚠️ No Relay KeyPair configured, generating ephemeral pair");
+    relayKeyPair = await (Gun as any).SEA.pair();
+  }
+
+  app.set("relayUserPub", relayKeyPair.pub);
   app.set("relayKeyPair", relayKeyPair); // Make relay keypair available to routes
 
   // Esponi le funzioni helper per le route
