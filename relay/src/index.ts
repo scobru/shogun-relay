@@ -517,16 +517,31 @@ async function initializeServer() {
       fs.mkdirSync(zenDataDir, { recursive: true });
     }
 
-    const zenOptions = {
+    let zenStore: any = null;
+    if (storageType === "sqlite") {
+      const zenDbPath = path.join(zenDataDir, "zen.db");
+      zenStore = new SQLiteStore({
+        dbPath: zenDbPath,
+        file: "radata",
+      });
+      loggers.server.info("📁 Using SQLite storage for ZEN");
+    }
+
+    const zenOptions: any = {
       super: true,
       web: server,
       ws: { path: zenConfig.path }, // Nest path for zen wire
-      file: zenDataDir,
       radisk: true,
+      isValid: hasValidToken,
       localStorage: false,
       axe: false,
       peers: peers, // Share the same peers
+      store: zenStore,
     };
+
+    if (!zenStore) {
+      zenOptions.file = zenDataDir;
+    }
 
     loggers.server.info({ path: zenConfig.path, dataDir: zenDataDir }, "🚀 Initializing ZEN Instance...");
     const zen = new ZEN(zenOptions);
