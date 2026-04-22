@@ -64,22 +64,24 @@ export async function performAliasMaintenance(gun: any): Promise<MaintenanceStat
                 // b. The one that was most recently 'put' (if we had timestamps, but Gun nodes are graphs)
                 // For now, we'll check existence in USERS or just take the first one.
                 
-                let bestPub: string | null = null;
-                
-                for (const pub of pubKeys) {
-                  const existsInUsers = await new Promise((res) => {
+                // Check all public keys in parallel for existence in USERS
+                const existenceResults = await Promise.all(pubKeys.map(async (pub) => {
+                  const exists = await new Promise<boolean>((res) => {
                     const timeout = setTimeout(() => res(false), 1000);
                     getGunNode(gun, GUN_PATHS.USERS).get(pub).once((userData: any) => {
                       clearTimeout(timeout);
                       res(!!userData && userData !== null);
                     });
                   });
-                  
-                  if (existsInUsers) {
-                    bestPub = pub;
-                    log.info({ alias: aliasName, bestPub }, "Found valid identity for alias in users index");
-                    break;
-                  }
+                  return { pub, exists };
+                }));
+
+                // Keep the first one that exists in USERS
+                const validIdentity = existenceResults.find(r => r.exists);
+                let bestPub: string | null = validIdentity ? validIdentity.pub : null;
+
+                if (bestPub) {
+                  log.info({ alias: aliasName, bestPub }, "Found valid identity for alias in users index");
                 }
                 
                 if (!bestPub) {
