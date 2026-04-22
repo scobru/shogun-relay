@@ -89,14 +89,18 @@ function Charts() {
   }
 
   // Map backend history into chart-friendly formats
-  const msgHistoryData = (stats.msgHistory || []).map((pt: MetricPoint) => ({
+  const msgHistoryData = (stats.msgHistory || []).map((pt: any) => ({
     time: new Date(pt.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-    rate: pt.v
+    Total: pt.v,
+    Gun: pt.gun || 0,
+    Zen: pt.zen || 0
   }));
 
-  const byteHistoryData = (stats.byteHistory || []).map((pt: MetricPoint) => ({
+  const byteHistoryData = (stats.byteHistory || []).map((pt: any) => ({
     time: new Date(pt.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-    rate: pt.v
+    Total: pt.v,
+    Gun: pt.gun || 0,
+    Zen: pt.zen || 0
   }));
 
   const opMixData = [
@@ -161,7 +165,10 @@ function Charts() {
                     contentStyle={{ backgroundColor: "#050f14", border: "1px solid #00ffe5", borderRadius: "4px" }}
                     itemStyle={{ color: "#7ecfdf" }}
                   />
-                  <Area type="monotone" dataKey="rate" stroke="#00ffe5" fill="#00ffe5" fillOpacity={0.15} isAnimationActive={false} />
+                  <Legend verticalAlign="top" height={36} />
+                  <Area type="monotone" dataKey="Total" stroke="#00ffe5" fill="#00ffe5" fillOpacity={0.1} isAnimationActive={false} />
+                  <Area type="monotone" dataKey="Gun" stroke="#8884d8" fill="#8884d8" fillOpacity={0.4} isAnimationActive={false} />
+                  <Area type="monotone" dataKey="Zen" stroke="#ff00e5" fill="#ff00e5" fillOpacity={0.4} isAnimationActive={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -182,7 +189,10 @@ function Charts() {
                     contentStyle={{ backgroundColor: "#050f14", border: "1px solid #00b4ff", borderRadius: "4px" }}
                     itemStyle={{ color: "#7ecfdf" }}
                   />
-                  <Area type="monotone" dataKey="rate" stroke="#00b4ff" fill="#00b4ff" fillOpacity={0.15} isAnimationActive={false} />
+                  <Legend verticalAlign="top" height={36} />
+                  <Area type="monotone" dataKey="Total" stroke="#00b4ff" fill="#00b4ff" fillOpacity={0.1} isAnimationActive={false} />
+                  <Area type="monotone" dataKey="Gun" stroke="#8884d8" fill="#8884d8" fillOpacity={0.4} isAnimationActive={false} />
+                  <Area type="monotone" dataKey="Zen" stroke="#ff00e5" fill="#ff00e5" fillOpacity={0.4} isAnimationActive={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

@@ -59,11 +59,9 @@ export const logger = baseLogger;
  */
 export const loggers = {
   server: createLogger("server"),
-  relayUser: createLogger("relay-user"),
   ipfs: createLogger("ipfs-client"),
   sqlite: createLogger("sqlite-store"),
   bullet: createLogger("bullet-catcher"),
-  services: createLogger("services"),
   uploads: createLogger("uploads"),
   visualGraph: createLogger("visual-graph"),
 };

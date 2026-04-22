@@ -14,6 +14,8 @@ export interface PeerStats {
 export interface MetricPoint {
   ts: number;
   v: number;
+  zen: number;
+  gun: number;
 }
 
 export class StatsTracker {
@@ -35,22 +37,30 @@ export class StatsTracker {
 
   private tickMsgs = 0;
   private tickBytes = 0;
+  private zenTickMsgs = 0;
+  private gunTickMsgs = 0;
+  private zenTickBytes = 0;
+  private gunTickBytes = 0;
   private timer: NodeJS.Timeout;
 
   constructor() {
     this.timer = setInterval(() => this.tick(), 1000);
   }
 
-  private pushHistory(arr: MetricPoint[], value: number) {
-    arr.push({ ts: Date.now(), v: value });
+  private pushHistory(arr: MetricPoint[], value: number, zen: number, gun: number) {
+    arr.push({ ts: Date.now(), v: value, zen, gun });
     if (arr.length > 120) arr.shift();
   }
 
   private tick() {
-    this.pushHistory(this.msgHistory, this.tickMsgs);
-    this.pushHistory(this.byteHistory, this.tickBytes);
+    this.pushHistory(this.msgHistory, this.tickMsgs, this.zenTickMsgs, this.gunTickMsgs);
+    this.pushHistory(this.byteHistory, this.tickBytes, this.zenTickBytes, this.gunTickBytes);
     this.tickMsgs = 0;
     this.tickBytes = 0;
+    this.zenTickMsgs = 0;
+    this.gunTickMsgs = 0;
+    this.zenTickBytes = 0;
+    this.gunTickBytes = 0;
   }
 
   public patchSocket(socket: any, addr: string, engine?: "gun" | "zen") {
@@ -83,6 +93,8 @@ export class StatsTracker {
         peer.bytesSent += bytes;
         this.totalBytes += bytes;
         this.tickBytes += bytes;
+        if (resolvedEngine === "zen") this.zenTickBytes += bytes;
+        else this.gunTickBytes += bytes;
         return origSend(data, ...args);
       };
     }
@@ -94,6 +106,13 @@ export class StatsTracker {
       this.tickMsgs += 1;
       this.totalBytes += bytes;
       this.tickBytes += bytes;
+      if (resolvedEngine === "zen") {
+        this.zenTickMsgs += 1;
+        this.zenTickBytes += bytes;
+      } else {
+        this.gunTickMsgs += 1;
+        this.gunTickBytes += bytes;
+      }
 
       // OPTIMIZATION: Avoid full JSON.parse for every message
       // GunDB messages usually start with {"put":, {"get":, or contain "@" for acks

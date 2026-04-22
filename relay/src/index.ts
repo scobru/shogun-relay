@@ -15,7 +15,6 @@ import "./utils/bullet-catcher";
 import ZEN from "zen";
 
 import multer from "multer";
-import { initRelayUser, getRelayUser } from "./utils/relay-user";
 import SQLiteStore from "./utils/sqlite-store";
 import S3Store from "./utils/s3-store";
 import { loggers } from "./utils/logger";
@@ -40,7 +39,6 @@ import { tokenAuthMiddleware } from "./middleware/token-auth";
 import { secureCompare, hashToken, createProductionErrorHandler } from "./utils/security";
 
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
-// Chat service removed
 
 import { gunAliasGuard } from "./middleware/gun-alias-guard";
 import { performAliasMaintenance } from "./utils/alias-maintenance";
@@ -535,14 +533,14 @@ async function initializeServer() {
     zen._graph; // Force relay initialization as per examples
     app.set("zenInstance", zen);
     (global as any).zenInstance = zen;
-    
+
     // Hook ZEN to StatsTracker
     zen.on("hi", (peer: any) => {
       if (!peer || !peer.wire) return;
       const addr = peer.url || peer.id || "unknown";
       statsTracker.patchSocket(peer.wire, addr, "zen");
     });
-    
+
     loggers.server.info("✅ ZEN Instance initialized alongside Gun");
   }
 
@@ -587,175 +585,6 @@ async function initializeServer() {
   // The data is still saved correctly - this is just GunDB's internal verification
   // These warnings don't affect functionality and can be safely ignored
 
-  // Initialize Relay User
-  // This user owns the relay metadata in GunDB
-  // REQUIRED: Must use direct SEA keypair (prevents "Signature did not match" errors)
-
-  let relayKeyPair = null;
-  let relayPub = null;
-
-  // Load SEA keypair from environment variable or file
-  if (relayKeysConfig.seaKeypair) {
-    try {
-      relayKeyPair = JSON.parse(relayKeysConfig.seaKeypair);
-      loggers.server.info("🔑 Using SEA keypair from RELAY_SEA_KEYPAIR env var");
-    } catch (error: any) {
-      loggers.server.error({ err: error }, "❌ Failed to parse RELAY_SEA_KEYPAIR");
-      loggers.server.error("   Make sure the JSON is valid and properly escaped in your env file");
-      throw new Error("Invalid RELAY_SEA_KEYPAIR configuration");
-    }
-  } else if (relayKeysConfig.seaKeypairPath) {
-    try {
-      // Determine the actual keypair file path
-      let keypairFilePath = relayKeysConfig.seaKeypairPath;
-
-      // Check if the path is a directory - if so, append default filename
-      if (fs.existsSync(keypairFilePath) && fs.statSync(keypairFilePath).isDirectory()) {
-        loggers.server.info(`📁 RELAY_SEA_KEYPAIR_PATH is a directory, using default filename`);
-        keypairFilePath = path.join(keypairFilePath, "relay-keypair.json");
-      }
-
-      // Also handle case where path ends with / (directory notation) but doesn't exist
-      if (keypairFilePath.endsWith("/") || keypairFilePath.endsWith("\\")) {
-        keypairFilePath = path.join(keypairFilePath, "relay-keypair.json");
-      }
-
-      // Check if file exists
-      if (!fs.existsSync(keypairFilePath)) {
-        loggers.server.warn({ path: keypairFilePath }, `⚠️ Keypair file not found`);
-        loggers.server.info(`🔑 Generating new keypair automatically...`);
-
-        // Generate new keypair
-        const Gun = (await import("gun")).default;
-        await import("gun/sea");
-        const newKeyPair = await Gun.SEA.pair();
-
-        // Ensure directory exists
-        const keyPairDir = path.dirname(keypairFilePath);
-        if (keyPairDir && keyPairDir !== ".") {
-          if (!fs.existsSync(keyPairDir)) {
-            fs.mkdirSync(keyPairDir, { recursive: true });
-          }
-        }
-
-        // Save to file
-        fs.writeFileSync(keypairFilePath, JSON.stringify(newKeyPair, null, 2), "utf8");
-        relayKeyPair = newKeyPair;
-
-        loggers.server.info(`✅ Generated and saved new keypair to ${keypairFilePath}`);
-        loggers.server.info(
-          { pub: newKeyPair.pub, pubLength: newKeyPair.pub.length },
-          `🔑 Public key (generated)`
-        );
-        loggers.server.warn(`⚠️ IMPORTANT: Save this keypair file securely!`);
-      } else {
-        // File exists, load it
-        const keyPairContent = fs.readFileSync(keypairFilePath, "utf8");
-        relayKeyPair = JSON.parse(keyPairContent);
-        loggers.server.info(`🔑 Loaded SEA keypair from ${keypairFilePath}`);
-      }
-    } catch (error: any) {
-      loggers.server.error(
-        { err: error, path: relayKeysConfig.seaKeypairPath },
-        `❌ Failed to load/generate keypair`
-      );
-      throw new Error(`Failed to load/generate keypair: ${error.message}`);
-    }
-  } else {
-    // No keypair configured - try to auto-generate in default location
-    loggers.server.warn(`⚠️ No keypair configured. Attempting to auto-generate...`);
-
-    try {
-      // Try default locations
-      const defaultPaths = [
-        "/app/keys/relay-keypair.json",
-        path.join(process.cwd(), "relay-keypair.json"),
-        path.join(process.cwd(), "keys", "relay-keypair.json"),
-      ];
-
-      let keyPairPath = null;
-      for (const defaultPath of defaultPaths) {
-        if (fs.existsSync(defaultPath)) {
-          keyPairPath = defaultPath;
-          loggers.server.info(`📁 Found existing keypair at ${defaultPath}`);
-          break;
-        }
-      }
-
-      // If no existing keypair found, generate new one in first default location
-      if (!keyPairPath) {
-        keyPairPath = defaultPaths[0]; // Use /app/keys/relay-keypair.json as default
-
-        loggers.server.info(`🔑 Generating new keypair at ${keyPairPath}...`);
-
-        // Generate new keypair
-        const Gun = (await import("gun")).default;
-        await import("gun/sea");
-        const newKeyPair = await Gun.SEA.pair();
-
-        // Ensure directory exists
-        const keyPairDir = path.dirname(keyPairPath);
-        if (keyPairDir && keyPairDir !== ".") {
-          if (!fs.existsSync(keyPairDir)) {
-            fs.mkdirSync(keyPairDir, { recursive: true });
-          }
-        }
-
-        // Save to file
-        fs.writeFileSync(keyPairPath, JSON.stringify(newKeyPair, null, 2), "utf8");
-        relayKeyPair = newKeyPair;
-
-        loggers.server.info(`✅ Generated new keypair at ${keyPairPath}`);
-        loggers.server.info(
-          { pub: newKeyPair.pub, pubLength: newKeyPair.pub.length },
-          `🔑 Public key (auto-generated)`
-        );
-        loggers.server.warn(
-          `⚠️ IMPORTANT: Save this keypair file securely or set RELAY_SEA_KEYPAIR_PATH!`
-        );
-      } else {
-        // Load existing keypair
-        const keyPairContent = fs.readFileSync(keyPairPath, "utf8");
-        relayKeyPair = JSON.parse(keyPairContent);
-        loggers.server.info(`🔑 Loaded existing keypair from ${keyPairPath}`);
-      }
-    } catch (autoGenError: any) {
-      // Auto-generation failed - provide helpful error
-      const errorMsg = `
-❌ Failed to auto-generate keypair: ${autoGenError.message}
-
-To configure a keypair manually:
-  1. Run: node scripts/generate-relay-keys
-  2. Copy the JSON output
-  3. Add to your .env file as: RELAY_SEA_KEYPAIR='{"pub":"...","priv":"...","epub":"...","epriv":"..."}'
-  OR save to a file and set: RELAY_SEA_KEYPAIR_PATH=/path/to/relay-keypair.json
-
-See docs/RELAY_KEYS.md for more information.
-      `.trim();
-      loggers.server.error({ err: autoGenError }, errorMsg);
-      throw new Error(`Keypair auto-generation failed: ${autoGenError.message}`);
-    }
-  }
-
-  // Validate and initialize with keypair
-  if (!relayKeyPair || !relayKeyPair.pub || !relayKeyPair.priv) {
-    loggers.server.error("❌ Invalid keypair: missing pub or priv fields");
-    throw new Error(
-      "Invalid keypair configuration. Please generate a new keypair using: node scripts/generate-relay-keys"
-    );
-  }
-
-  try {
-    const result = await initRelayUser(gun, relayKeyPair);
-    relayPub = result.pub;
-    app.set("relayUserPub", relayPub);
-    app.set("relayKeyPair", relayKeyPair);
-    loggers.server.info(`✅ Relay GunDB user initialized with SEA keypair`);
-    loggers.server.info({ pub: relayPub, pubLength: relayPub?.length }, `🔑 Relay public key`);
-  } catch (error: any) {
-    loggers.server.error({ err: error }, "❌ Failed to initialize relay with keypair");
-    throw new Error(`Failed to initialize relay user: ${error.message}`);
-  }
 
   // Get relay host identifier
   // Extract hostname from endpoint if it's a URL

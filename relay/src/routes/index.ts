@@ -65,10 +65,8 @@ import uploadsRouter from "./uploads";
 import ipfsRouter from "./ipfs";
 import systemRouter from "./system";
 import debugRouter from "./debug";
-import servicesRouter from "./services";
 import visualGraphRouter from "./visualGraph";
 // torrentRouter removed
-import apiKeysRouter from "./api-keys";
 import authRouter from "./auth";
 import tpreRouter from "./tpre";
 
@@ -571,9 +569,6 @@ export default (app: express.Application) => {
   app.use(`${baseRoute}/system`, systemRouter);
   app.use(`${baseRoute}/debug`, debugRouter);
 
-  // Route per i servizi (always enabled)
-  app.use(`${baseRoute}/services`, servicesRouter);
-
   // Route per il grafico visivo (always enabled)
   app.use(`${baseRoute}/visualGraph`, visualGraphRouter);
 
@@ -585,32 +580,6 @@ export default (app: express.Application) => {
   app.use(`${baseRoute}/tpre`, tpreRouter);
   loggers.server.info(`✅ TPRE routes registered`);
 
-  // Route per API Keys (always enabled, admin-only)
-
-  // Initialize API Keys Manager lazily on first request
-  app.use(`${baseRoute}/api-keys`, async (req: Request, res: Response, next: NextFunction) => {
-    const gun = req.app.get("gunInstance");
-    const relayPub = req.app.get("relayUserPub");
-    if (gun && relayPub) {
-      try {
-        const { initApiKeysManager } = await import("../middleware/api-keys-auth");
-        const { getApiKeysManager } = await import("../middleware/api-keys-auth");
-        if (!getApiKeysManager()) {
-          const { getRelayUser } = await import("../utils/relay-user");
-          const relayUser = getRelayUser();
-          if (relayUser) {
-            initApiKeysManager(gun, relayPub, relayUser);
-          }
-        }
-      } catch (error) {
-        // Ignore if already initialized or not ready
-      }
-    }
-    next();
-  });
-
-  app.use(`${baseRoute}/api-keys`, apiKeysRouter);
-  loggers.server.info(`✅ API Keys routes registered`);
 
   // Route di test per verificare se le route sono registrate correttamente
   app.get(`${baseRoute}/test`, (req, res) => {
@@ -802,45 +771,6 @@ export default (app: express.Application) => {
   // ADMIN ENDPOINTS
   // ============================================================================
 
-  /**
-   * GET /api/v1/admin/relay-keys
-   * Get the relay's SEA keypair (pub, priv, epub, epriv)
-   * Admin only - requires authentication
-   */
-  app.get(
-    `${baseRoute}/admin/relay-keys`,
-    tokenAuthMiddleware,
-    async (req: Request, res: Response) => {
-      try {
-        const { getRelayKeyPair, getRelayPub } = await import("../utils/relay-user");
-        const keyPair = getRelayKeyPair();
-        const pub = getRelayPub();
-
-        if (!keyPair || !pub) {
-          return res.status(503).json({
-            success: false,
-            error: "Relay user not initialized",
-          });
-        }
-
-        res.json({
-          success: true,
-          keys: {
-            pub: keyPair.pub,
-            priv: keyPair.priv,
-            epub: keyPair.epub,
-            epriv: keyPair.epriv,
-          },
-        });
-      } catch (error: any) {
-        loggers.server.error({ err: error }, "Failed to get relay keys");
-        res.status(500).json({
-          success: false,
-          error: error.message || "Internal server error",
-        });
-      }
-    }
-  );
 
   /**
    * GET /api/v1/admin/storage-stats
