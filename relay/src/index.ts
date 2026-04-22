@@ -89,11 +89,6 @@ const IPFS_GATEWAY_URL = ipfsConfig.gatewayUrl;
 const IPFS_API_HOST = ipfsConfig.apiHost;
 const IPFS_API_PORT = ipfsConfig.apiPort;
 
-// Cache for processed pin requests to prevent infinite retries
-// Map of requestId -> { processedAt: timestamp, status: 'completed'|'failed' }
-const processedPinRequests = new Map();
-const PIN_REQUEST_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour - don't reprocess within this time
-
 const isProtectedRelay = relayConfig.protected;
 loggers.server.info({ isProtectedRelay }, "Relay protection enabled");
 
@@ -548,36 +543,6 @@ async function initializeServer() {
       statsTracker.patchSocket(peer.wire, addr, "zen");
     });
     
-    // ZEN Pin Request Listener
-    if (replicationConfig.autoReplication) {
-      loggers.server.info("🔄 ZEN Auto-replication enabled - listening for pin requests");
-      zen.get(GUN_PATHS.PIN_REQUESTS).map().on(async (data: any, requestId: any) => {
-        if (!data || typeof data !== "object" || !data.cid) return;
-        if (data.status !== "pending") return;
-        if (data.timestamp && Date.now() - data.timestamp > 3600000) return;
-        
-        const cached = processedPinRequests.get(requestId);
-        if (cached && Date.now() - cached.processedAt < PIN_REQUEST_CACHE_TTL_MS) return;
-        
-        loggers.server.info({ cid: data.cid, requestId }, "🔁 Received PIN request via ZEN");
-        processedPinRequests.set(requestId, { processedAt: Date.now(), status: "processing" });
-        
-        try {
-          const response = await fetch(`${ipfsConfig.apiUrl}/api/v0/pin/add?arg=${data.cid}`, {
-            method: "POST",
-            headers: ipfsConfig.apiToken ? { Authorization: `Bearer ${ipfsConfig.apiToken}` } : {},
-          });
-          
-          if (response.ok) {
-            loggers.server.info({ cid: data.cid }, "✅ Successfully pinned via ZEN auto-replication");
-            zen.get(GUN_PATHS.PIN_REQUESTS).get(requestId).get("status").put("completed");
-          }
-        } catch (err) {
-          loggers.server.error({ err, cid: data.cid }, "❌ ZEN auto-replication pin failed");
-        }
-      });
-    }
-
     loggers.server.info("✅ ZEN Instance initialized alongside Gun");
   }
 
@@ -622,8 +587,8 @@ async function initializeServer() {
   // The data is still saved correctly - this is just GunDB's internal verification
   // These warnings don't affect functionality and can be safely ignored
 
-  // Initialize Relay User for x402 subscriptions
-  // This user owns the subscription data in GunDB
+  // Initialize Relay User
+  // This user owns the relay metadata in GunDB
   // REQUIRED: Must use direct SEA keypair (prevents "Signature did not match" errors)
 
   let relayKeyPair = null;
@@ -805,187 +770,6 @@ See docs/RELAY_KEYS.md for more information.
     // Not a valid URL, use as-is
   }
 
-  // Initialize Network Pin Request Listener (auto-replication)
-  const autoReplication = replicationConfig.autoReplication;
-
-  if (autoReplication) {
-    loggers.server.info("🔄 Auto-replication enabled - listening for pin requests");
-
-    // Cleanup old processed requests periodically
-    setInterval(
-      () => {
-        const now = Date.now();
-        for (const [reqId, info] of processedPinRequests.entries()) {
-          if (now - info.processedAt > PIN_REQUEST_CACHE_TTL_MS) {
-            processedPinRequests.delete(reqId);
-          }
-        }
-      },
-      10 * 60 * 1000
-    ); // Cleanup every 10 minutes
-
-    gun
-      .get(GUN_PATHS.PIN_REQUESTS)
-      .map()
-      .on(async (data: any, requestId: any) => {
-        if (!data || typeof data !== "object" || !data.cid) return;
-        if (data.status !== "pending") return;
-
-        // Don't process old requests (older than 1 hour)
-        if (data.timestamp && Date.now() - data.timestamp > 3600000) return;
-
-        // Check if we already processed this request recently
-        const cached = processedPinRequests.get(requestId);
-        if (cached && Date.now() - cached.processedAt < PIN_REQUEST_CACHE_TTL_MS) {
-          // Skip - already processed
-          return;
-        }
-
-        // Don't process own requests
-        const relayPub = app.get("relayUserPub");
-        if (data.requester === relayPub) return;
-
-        // Mark as being processed to prevent duplicate processing
-        processedPinRequests.set(requestId, {
-          processedAt: Date.now(),
-          status: "processing",
-        });
-
-        if (loggingConfig.debug) {
-          loggers.server.debug(
-            { cid: data.cid, requester: data.requester?.substring(0, 20) },
-            `📥 Received pin request`
-          );
-        }
-
-        try {
-          // Check if we already have this pinned
-          const http = await import("http");
-          const alreadyPinned = await new Promise((resolve) => {
-            const timeout = setTimeout(() => resolve(false), 5000);
-            const options: any = {
-              hostname: IPFS_API_HOST,
-              port: IPFS_API_PORT,
-              path: `/api/v0/pin/ls?arg=${data.cid}&type=all`,
-              method: "POST",
-              headers: { "Content-Length": "0" },
-            };
-            if (IPFS_API_TOKEN) {
-              options.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-            }
-            const req = http.request(options, (res) => {
-              let body = "";
-              res.on("data", (chunk) => (body += chunk));
-              res.on("end", () => {
-                clearTimeout(timeout);
-                try {
-                  const result = JSON.parse(body);
-                  resolve(result.Keys && Object.keys(result.Keys).length > 0);
-                } catch {
-                  resolve(false);
-                }
-              });
-            });
-            req.on("error", () => {
-              clearTimeout(timeout);
-              resolve(false);
-            });
-            req.end();
-          });
-
-          if (alreadyPinned) {
-            if (loggingConfig.debug) {
-              loggers.server.debug({ cid: data.cid }, `✅ CID already pinned locally`);
-            }
-            processedPinRequests.set(requestId, {
-              processedAt: Date.now(),
-              status: "completed",
-            });
-            return;
-          }
-
-          // Pin the content
-          if (loggingConfig.debug) {
-            loggers.server.debug({ cid: data.cid }, `📌 Pinning`);
-          }
-          const pinResult: any = await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error("Pin timeout")), 60000);
-            const options: any = {
-              hostname: IPFS_API_HOST,
-              port: IPFS_API_PORT,
-              path: `/api/v0/pin/add?arg=${data.cid}`,
-              method: "POST",
-              headers: { "Content-Length": "0" },
-            };
-            if (IPFS_API_TOKEN) {
-              options.headers["Authorization"] = `Bearer ${IPFS_API_TOKEN}`;
-            }
-            const req = http.request(options, (res) => {
-              let body = "";
-              res.on("data", (chunk) => (body += chunk));
-              res.on("end", () => {
-                clearTimeout(timeout);
-                try {
-                  resolve(JSON.parse(body));
-                } catch {
-                  resolve({ raw: body });
-                }
-              });
-            });
-            req.on("error", (e) => {
-              clearTimeout(timeout);
-              reject(e);
-            });
-            req.end();
-          });
-
-          if (pinResult.Pins || pinResult.raw?.includes("Pins")) {
-            if (loggingConfig.debug) {
-              loggers.server.debug({ cid: data.cid }, `✅ Successfully pinned`);
-            }
-            processedPinRequests.set(requestId, {
-              processedAt: Date.now(),
-              status: "completed",
-            });
-
-            // Publish response
-            const crypto = await import("crypto");
-            const responseId = crypto.randomBytes(8).toString("hex");
-            gun.get(GUN_PATHS.PIN_RESPONSES).get(responseId).put({
-              id: responseId,
-              requestId,
-              responder: relayPub,
-              status: "completed",
-              timestamp: Date.now(),
-            });
-          } else {
-            if (loggingConfig.debug) {
-              loggers.server.debug({ cid: data.cid, pinResult }, `⚠️ Pin result unclear`);
-            }
-            processedPinRequests.set(requestId, {
-              processedAt: Date.now(),
-              status: "failed",
-            });
-
-          }
-        } catch (error: any) {
-          if (loggingConfig.debug) {
-            loggers.server.error(
-              { cid: data.cid, err: error.message },
-              `Failed to pin ${data.cid}`
-            );
-          }
-          processedPinRequests.set(requestId, {
-            processedAt: Date.now(),
-            status: "failed",
-          });
-
-        }
-      });
-  } else {
-    loggers.server.info("🔄 Auto-replication disabled");
-  }
-
   // Initialize Generic Services (Linda functionality)
   // DISABLED: Services removed as client migrated to pure GunDB
   /*
@@ -1165,11 +949,7 @@ See docs/RELAY_KEYS.md for more information.
       pulse.ipfs = { connected: false, error: e.message };
     }
 
-    // Legacy pulse (for backward compatibility)
-    db?.get("pulse").put(pulse);
-
     // CRITICAL: Save pulse to GunDB relays namespace for network discovery
-    // This is what /api/v1/network/stats reads from
     try {
       // Save pulse with timestamp for filtering
       const relayData = {
@@ -1282,8 +1062,6 @@ See docs/RELAY_KEYS.md for more information.
   // Handle shutdown signals
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
-
-  loggers.server.info({ host, port }, `🚀 Shogun Relay Server running`);
 
   loggers.server.info({ host, port }, `🚀 Shogun Relay Server running`);
 

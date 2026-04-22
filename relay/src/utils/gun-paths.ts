@@ -25,16 +25,8 @@ export const GUN_PATHS = {
   MB_USAGE: "shogun/mbUsage",
   TEST: "shogun/test",
 
-  // Reputation and Features (unified under shogun/network)
-  REPUTATION: "shogun/network/reputation",
-  PIN_REQUESTS: "shogun/network/pin-requests",
-  PIN_RESPONSES: "shogun/network/pin-responses",
-
   // System
   SYSTEM_HASH: "shogun/systemhash",
-
-  // Indexes (unified under shogun/index)
-  OBSERVATIONS_BY_HOST: "shogun/index/observations-by-host",
 
   // Anna's Archive (torrent preservation network) - unified under shogun/
   // ANNAS_ARCHIVE removed
@@ -42,9 +34,6 @@ export const GUN_PATHS = {
   // Wormhole
   SHOGUN_WORMHOLE: "shogun/wormhole",
   WORMHOLE_TRANSFERS: "transfers", // Relative to SHOGUN_WORMHOLE
-
-  // X402 (Payment/Subscription Protocol) - kept for legacy potential compatibility
-  X402: "shogun/x402",
 } as const;
 
 export type GunPath = (typeof GUN_PATHS)[keyof typeof GUN_PATHS];

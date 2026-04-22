@@ -20,7 +20,7 @@ const upload = multer({
 });
 
 /**
- * IPFS File Upload endpoint with dual authentication and x402 subscription check
+ * IPFS File Upload endpoint with dual authentication
  */
 router.post(
   "/upload",

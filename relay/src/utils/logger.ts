@@ -60,20 +60,12 @@ export const logger = baseLogger;
 export const loggers = {
   server: createLogger("server"),
   relayUser: createLogger("relay-user"),
-  storagDeals: createLogger("storage-deals"),
-  dealSync: createLogger("deal-sync"),
-  frozenData: createLogger("frozen-data"),
-  reputation: createLogger("reputation"),
-  x402: createLogger("x402-merchant"),
   ipfs: createLogger("ipfs-client"),
-  registry: createLogger("registry-client"),
-  erasure: createLogger("erasure-coding"),
   sqlite: createLogger("sqlite-store"),
   bullet: createLogger("bullet-catcher"),
   services: createLogger("services"),
   uploads: createLogger("uploads"),
   visualGraph: createLogger("visual-graph"),
-  bridge: createLogger("bridge-client"),
 };
 
 export default logger;

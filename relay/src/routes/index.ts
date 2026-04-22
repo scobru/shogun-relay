@@ -1215,26 +1215,6 @@ export default (app: express.Application) => {
           `${baseRoute}/services/:service/restart`,
           // Visual Graph
           `${baseRoute}/visualGraph`,
-          // Network Federation & Storage Proofs
-          `${baseRoute}/network/relays`,
-          `${baseRoute}/network/relay/:host`,
-          `${baseRoute}/network/stats`,
-          `${baseRoute}/network/proof/:cid`,
-          `${baseRoute}/network/verify-proof`,
-          `${baseRoute}/network/pin-request`,
-          `${baseRoute}/network/pin-requests`,
-          `${baseRoute}/network/pin-response`,
-          // Reputation System
-          `${baseRoute}/network/reputation`,
-          `${baseRoute}/network/reputation/:host`,
-          `${baseRoute}/network/reputation/record-proof`,
-          `${baseRoute}/network/best-relays`,
-          // Verified (Frozen/Immutable) Data
-          `${baseRoute}/network/verified/relays`,
-          `${baseRoute}/network/verified/relay/:host`,
-          `${baseRoute}/network/verified/observation`,
-          `${baseRoute}/network/verified/observations/:host`,
-          `${baseRoute}/network/verified/entry/:namespace/:hash`,
         ],
       },
     });

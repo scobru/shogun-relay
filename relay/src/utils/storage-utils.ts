@@ -30,9 +30,8 @@ interface GunAck {
 }
 
 /**
- * Update MB usage for a user (legacy system)
- * This is the legacy tracking system for general uploads.
- * For x402 subscriptions, use X402Merchant.updateStorageUsage() instead.
+ * Update MB usage for a user
+ * This is the tracking system for general uploads.
  *
  * @param gun - GunDB instance
  * @param userAddress - User address
