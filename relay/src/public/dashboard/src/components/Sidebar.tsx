@@ -202,7 +202,7 @@ function Sidebar() {
           <img src={logoSvg} alt="Delay" className="w-10 h-10 shogun-logo" />
           <div>
             <span className="font-bold text-lg">Delay</span>
-            <p className="text-xs text-base-content/60">Relay Dashboard v1.3.0</p>
+            <p className="text-xs text-base-content/60">Relay Dashboard v1.3.1</p>
           </div>
         </div>
 
