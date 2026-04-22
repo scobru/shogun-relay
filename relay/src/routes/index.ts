@@ -395,7 +395,10 @@ export default (app: express.Application) => {
       (req.headers["authorization"] && (req.headers["authorization"] as string).split(" ")[1]) ||
       req.headers["token"];
 
-    if (token === authConfig.adminPassword) {
+    const tokenHash = hashToken((token as string) || "");
+    const adminHash = hashToken(authConfig.adminPassword || "");
+
+    if (token && secureCompare(tokenHash, adminHash)) {
       res.redirect("/api/v1/ipfs/webui/?auth_token=" + encodeURIComponent(token as string));
       return;
     }
@@ -641,7 +644,10 @@ export default (app: express.Application) => {
       const customToken = req.headers["token"];
       const token = bearerToken || customToken;
 
-      if (token === authConfig.adminPassword) {
+      const tokenHash = hashToken((token as string) || "");
+      const adminHash = hashToken(authConfig.adminPassword || "");
+
+      if (token && secureCompare(tokenHash, adminHash)) {
         next();
       } else {
         res.status(401).json({ success: false, error: "Unauthorized" });

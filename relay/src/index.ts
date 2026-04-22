@@ -171,7 +171,10 @@ async function initializeServer() {
 
     // Se ha headers, verifica il token
     if (msg && msg.headers && msg.headers.token) {
-      const hasValidAuth = msg.headers.token === authConfig.adminPassword;
+      const tokenHash = hashToken(msg.headers.token);
+      const adminHash = hashToken(authConfig.adminPassword || "");
+      const hasValidAuth = secureCompare(tokenHash, adminHash);
+
       if (hasValidAuth) {
         loggers.server.info(`🔍 PUT allowed - valid token: ${msg.headers}`);
         return true;
@@ -372,10 +375,13 @@ async function initializeServer() {
       const authHeader = req.headers["authorization"];
       const bearerToken = authHeader && authHeader.split(" ")[1];
       const customToken = req.headers["token"];
-      const formToken = req.query["_auth_token"]; // Token inviato tramite form
+      const formToken = req.query["_auth_token"] as string | undefined; // Token inviato tramite form
       const token = bearerToken || customToken || formToken;
 
-      if (token === authConfig.adminPassword) {
+      const tokenHash = hashToken(token || "");
+      const adminHash = hashToken(authConfig.adminPassword || "");
+
+      if (token && secureCompare(tokenHash, adminHash)) {
         next();
       } else {
         loggers.server.warn(`❌ Accesso negato a ${path} - Token mancante o non valido`);
