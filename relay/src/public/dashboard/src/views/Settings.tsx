@@ -13,12 +13,7 @@ interface StorageStats {
   };
 }
 
-interface RelayKeys {
-  pub: string;
-  priv: string;
-  epub: string;
-  epriv: string;
-}
+
 
 interface ConfigItem {
   key: string;
@@ -35,11 +30,7 @@ function Settings() {
   const { theme, setTheme } = useTheme();
   const [newPassword, setNewPassword] = useState("");
 
-  // Relay Keys State
-  const [relayKeys, setRelayKeys] = useState<RelayKeys | null>(null);
-  const [loadingKeys, setLoadingKeys] = useState(false);
-  const [showKeys, setShowKeys] = useState(false);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
 
   // Storage Stats State
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
@@ -56,18 +47,7 @@ function Settings() {
     text: string;
   } | null>(null);
 
-  const fetchRelayKeys = useCallback(async () => {
-    setLoadingKeys(true);
-    try {
-      const res = await fetch("/api/v1/admin/relay-keys", { headers: getAuthHeaders() });
-      const data = await res.json();
-      if (data.success) setRelayKeys(data.keys);
-    } catch (e) {
-      console.error("Failed to fetch relay keys:", e);
-    } finally {
-      setLoadingKeys(false);
-    }
-  }, [getAuthHeaders]);
+
 
   const fetchStorageStats = useCallback(async () => {
     setLoadingStorage(true);
@@ -97,11 +77,10 @@ function Settings() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchRelayKeys();
       fetchStorageStats();
       fetchConfig();
     }
-  }, [isAuthenticated, fetchRelayKeys, fetchStorageStats, fetchConfig]);
+  }, [isAuthenticated, fetchStorageStats, fetchConfig]);
 
   const copyToClipboard = async (text: string, keyName: string) => {
     await navigator.clipboard.writeText(text);
@@ -109,10 +88,7 @@ function Settings() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const maskKey = (key: string) => {
-    if (showKeys) return key;
-    return key.substring(0, 8) + "••••••••••••••••" + key.substring(key.length - 8);
-  };
+
 
   const handleLogin = () => {
     if (newPassword.trim()) {
@@ -391,67 +367,7 @@ function Settings() {
         </div>
       )}
 
-      {/* Relay Keys (Only when authenticated) */}
-      {isAuthenticated && (
-        <div className="card bg-base-100 shadow">
-          <div className="card-body">
-            <div className="flex items-center justify-between">
-              <h3 className="card-title">🔑 Relay Keys</h3>
-              <div className="flex items-center gap-2">
-                <label className="label cursor-pointer gap-2">
-                  <span className="label-text text-sm">Show Keys</span>
-                  <input
-                    type="checkbox"
-                    className="toggle toggle-sm"
-                    checked={showKeys}
-                    onChange={(e) => setShowKeys(e.target.checked)}
-                  />
-                </label>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={fetchRelayKeys}
-                  disabled={loadingKeys}
-                >
-                  {loadingKeys ? (
-                    <span className="loading loading-spinner loading-xs"></span>
-                  ) : (
-                    "🔄"
-                  )}
-                </button>
-              </div>
-            </div>
 
-            {loadingKeys ? (
-              <div className="flex justify-center p-4">
-                <span className="loading loading-spinner"></span>
-              </div>
-            ) : relayKeys ? (
-              <div className="flex flex-col gap-3 mt-2">
-                {(["pub", "priv", "epub", "epriv"] as const).map((keyType) => (
-                  <div key={keyType} className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-base-content/60 uppercase">
-                        {keyType}
-                      </span>
-                      <button
-                        className="btn btn-ghost btn-xs"
-                        onClick={() => copyToClipboard(relayKeys[keyType], keyType)}
-                      >
-                        {copiedKey === keyType ? "✅ Copied!" : "📋 Copy"}
-                      </button>
-                    </div>
-                    <code className="bg-base-200 px-3 py-2 rounded text-xs break-all font-mono">
-                      {maskKey(relayKeys[keyType])}
-                    </code>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-base-content/50 text-sm">Failed to load keys</p>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Storage Overview (Only when authenticated) */}
       {isAuthenticated && (

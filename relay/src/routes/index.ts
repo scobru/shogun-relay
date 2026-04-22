@@ -60,9 +60,8 @@ const tokenAuthMiddleware = (req: Request, res: Response, next: NextFunction) =>
   }
 };
 
-// Importa i moduli delle routes
-import uploadsRouter from "./uploads";
 import ipfsRouter from "./ipfs";
+import apiKeysRouter from "./api-keys";
 import systemRouter from "./system";
 import debugRouter from "./debug";
 import visualGraphRouter from "./visualGraph";
@@ -550,8 +549,8 @@ export default (app: express.Application) => {
 
   // Route di autenticazione
 
-  // Route per gli upload degli utenti
-  app.use(`${baseRoute}/user-uploads`, uploadsRouter);
+  // API Keys (stateless admin keys)
+  app.use(`${baseRoute}/api-keys`, tokenAuthMiddleware, apiKeysRouter);
 
   // Route per IPFS (conditional)
   if (ipfsConfig.enabled) {
@@ -1112,10 +1111,9 @@ export default (app: express.Application) => {
           `${baseRoute}/system/health`,
           `${baseRoute}/system/stats`,
           `${baseRoute}/system/alldata`,
-          // User Uploads
-          `${baseRoute}/user-uploads/system-hashes`,
-          `${baseRoute}/user-uploads/:identifier`,
-          `${baseRoute}/user-uploads/:identifier/:hash`,
+          // API Keys
+          `${baseRoute}/api-keys`,
+          `${baseRoute}/api-keys/generate`,
           // IPFS (aligned with Kubo API)
           `${baseRoute}/ipfs/upload`,
           `${baseRoute}/ipfs/status`,
@@ -1128,8 +1126,6 @@ export default (app: express.Application) => {
           `${baseRoute}/ipfs/repo/gc`,
           `${baseRoute}/ipfs/repo/stat`,
           `${baseRoute}/ipfs/version`,
-          `${baseRoute}/ipfs/version`,
-          `${baseRoute}/ipfs/user-uploads/:userAddress`,
           // Users
 
           // Gateway proxy
@@ -1138,8 +1134,6 @@ export default (app: express.Application) => {
           // Notes
           `${baseRoute}/notes`,
           `${baseRoute}/notes/regular`,
-          // Debug
-          `${baseRoute}/debug/mb-usage/:userAddress`,
           // Services
           `${baseRoute}/services/status`,
           `${baseRoute}/services/:service/restart`,

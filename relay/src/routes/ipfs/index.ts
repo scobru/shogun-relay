@@ -6,8 +6,6 @@ import uploadDirectoryRouter from "./upload-directory";
 import decryptRouter from "./decrypt";
 import pinRouter from "./pin";
 import repoRouter from "./repo";
-import userUploadsRouter from "./user-uploads";
-
 const router: Router = Router();
 
 // Mount all IPFS sub-routers
@@ -18,6 +16,5 @@ router.use("/", uploadDirectoryRouter);
 router.use("/", decryptRouter);
 router.use("/", pinRouter);
 router.use("/", repoRouter);
-router.use("/", userUploadsRouter);
 
 export default router;

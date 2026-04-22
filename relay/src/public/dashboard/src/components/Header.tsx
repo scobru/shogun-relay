@@ -5,7 +5,6 @@ import { useAuth } from "../context/AuthContext";
 const pageTitles: Record<string, { title: string; description: string }> = {
   "/": { title: "Status", description: "Overview and system health" },
   "/stats": { title: "Live Stats", description: "Real-time metrics and monitoring" },
-  "/services": { title: "Services", description: "Monitor and control system services" },
   "/files": { title: "Files", description: "IPFS pin management and uploads" },
   "/explore": { title: "Explore", description: "Graph explorer and visualization" },
   "/network": { title: "Network", description: "Network statistics and peers" },

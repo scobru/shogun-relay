@@ -1,155 +1,184 @@
-import { useEffect, useState, useCallback } from 'react'
-import { useAuth } from '../context/AuthContext'
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 
 interface ApiKey {
-  keyId: string; name: string; createdAt: number; lastUsedAt?: number; expiresAt?: number
+  keyId: string;
+  name: string;
+  keyPrefix: string;
+  createdAt: number;
+  lastUsed?: number;
 }
 
-function ApiKeys() {
-  const { isAuthenticated, getAuthHeaders } = useAuth()
-  const [keys, setKeys] = useState<ApiKey[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newExpires, setNewExpires] = useState('')
-  const [createdToken, setCreatedToken] = useState('')
-  const [copied, setCopied] = useState(false)
-  const [status, setStatus] = useState('')
+const ApiKeys: React.FC = () => {
+  const { token } = useAuth();
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
 
-  const loadKeys = useCallback(async () => {
+  const fetchKeys = async () => {
     try {
-      const res = await fetch('/api/v1/api-keys', { headers: getAuthHeaders() })
-      const data = await res.json()
-      if (data.success && data.keys) setKeys(data.keys)
-    } catch (error) { console.error('Failed to load API keys:', error) }
-    finally { setLoading(false) }
-  }, [getAuthHeaders])
+      setLoading(true);
+      const response = await fetch("/api/v1/api-keys", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setKeys(data.keys);
+      } else {
+        setError(data.error || "Failed to fetch API keys");
+      }
+    } catch (err) {
+      setError("Network error fetching API keys");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  useEffect(() => { if (isAuthenticated) loadKeys(); else setLoading(false) }, [isAuthenticated, loadKeys])
+  useEffect(() => {
+    fetchKeys();
+  }, [token]);
 
-  const createKey = async () => {
-    if (!newName.trim()) { setStatus('Name is required'); return }
+  const handleGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newKeyName) return;
+
     try {
-      const body: { name: string; expiresInDays?: number } = { name: newName.trim() }
-      if (newExpires) body.expiresInDays = parseInt(newExpires, 10)
-      const res = await fetch('/api/v1/api-keys', {
-        method: 'POST', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-      })
-      const data = await res.json()
-      if (data.success && data.token) { setCreatedToken(data.token); setNewName(''); setNewExpires(''); setShowCreate(false); loadKeys() }
-      else setStatus(data.error || 'Failed to create key')
-    } catch (error) { console.error('Failed to create key:', error); setStatus('Failed to create key') }
-  }
+      setGenerating(true);
+      const response = await fetch("/api/v1/api-keys/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: newKeyName }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setGeneratedToken(data.token);
+        setNewKeyName("");
+        fetchKeys();
+      } else {
+        alert(data.error || "Failed to generate API key");
+      }
+    } catch (err) {
+      alert("Network error generating API key");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
-  const revokeKey = async (keyId: string) => {
-    if (!confirm('Revoke this API key?')) return
-    try { const res = await fetch(`/api/v1/api-keys/${keyId}`, { method: 'DELETE', headers: getAuthHeaders() }); const data = await res.json(); if (data.success) loadKeys() }
-    catch (error) { console.error('Failed to revoke key:', error) }
-  }
+  const handleRevoke = async (keyId: string) => {
+    if (!confirm("Are you sure you want to revoke this API key?")) return;
 
-  const formatDate = (ts: number) => new Date(ts).toLocaleDateString()
-  const isExpired = (key: ApiKey) => key.expiresAt && Date.now() > key.expiresAt
-
-  if (!isAuthenticated) {
-    return <div className="alert alert-warning"><span className="text-2xl">🔒</span><div><h3 className="font-bold">Authentication Required</h3><p>Enter admin password in Settings to manage API keys.</p></div></div>
-  }
+    try {
+      const response = await fetch(`/api/v1/api-keys/${keyId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        fetchKeys();
+      } else {
+        alert(data.error || "Failed to revoke API key");
+      }
+    } catch (err) {
+      alert("Network error revoking API key");
+    }
+  };
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl">
-      {/* Header */}
-      <div className="card bg-base-100 shadow">
-        <div className="card-body flex-row items-center justify-between">
-          <div>
-            <h2 className="card-title">🔑 API Keys</h2>
-            <p className="text-base-content/60">Manage API keys for programmatic access</p>
-          </div>
-          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>+ Create Key</button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <div className="card bg-base-100 shadow-xl border border-base-300">
+        <div className="card-body">
+          <h2 className="card-title text-2xl font-bold mb-4">API Keys</h2>
+          <p className="text-base-content/70 mb-6">
+            Generate stateless API keys for automated access to the relay (Uploads, IPFS, etc.). 
+            These keys provide admin-level access to the endpoints they support.
+          </p>
 
-      {/* Create Modal */}
-      {showCreate && (
-        <dialog className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">Create API Key</h3>
-            <div className="form-control mt-4">
-              <label className="label"><span className="label-text">Key Name</span></label>
-              <input type="text" className="input input-bordered" placeholder="e.g., My App Key" value={newName} onChange={e => setNewName(e.target.value)} />
-            </div>
-            <div className="form-control mt-4">
-              <label className="label"><span className="label-text">Expires In Days (optional)</span></label>
-              <input type="number" className="input input-bordered" placeholder="e.g., 30" value={newExpires} onChange={e => setNewExpires(e.target.value)} min="1" />
-            </div>
-            {status && <div className="alert alert-error mt-4"><span>{status}</span></div>}
-            <div className="modal-action">
-              <button className="btn" onClick={() => setShowCreate(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={createKey}>Create</button>
-            </div>
-          </div>
-          <form method="dialog" className="modal-backdrop"><button onClick={() => setShowCreate(false)}>close</button></form>
-        </dialog>
-      )}
-
-      {/* Token Display */}
-      {createdToken && (
-        <div className="alert alert-success">
-          <div className="flex-1">
-            <h4 className="font-bold">🎉 Key Created!</h4>
-            <p className="text-sm">Save this token - you won't see it again:</p>
-            <code className="bg-base-300 p-2 rounded block mt-2 text-xs break-all">{createdToken}</code>
-          </div>
-          <div className="flex gap-2">
-            <button
-              className={`btn btn-sm ${copied ? 'btn-success text-white' : ''}`}
-              onClick={() => {
-                navigator.clipboard.writeText(createdToken)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 2000)
-              }}
+          <form onSubmit={handleGenerate} className="flex gap-4 mb-8">
+            <input
+              type="text"
+              placeholder="Key Name (e.g. My Script)"
+              className="input input-bordered flex-1"
+              value={newKeyName}
+              onChange={(e) => setNewKeyName(e.target.value)}
+              disabled={generating}
+            />
+            <button 
+              type="submit" 
+              className={`btn btn-primary ${generating ? "loading" : ""}`}
+              disabled={generating || !newKeyName}
             >
-              {copied ? '✅ Copied!' : '📋 Copy'}
+              Generate New Key
             </button>
-            <button className="btn btn-sm btn-primary" onClick={() => setCreatedToken('')}>Done</button>
-          </div>
-        </div>
-      )}
+          </form>
 
-      {/* Keys List */}
-      {loading ? (
-        <div className="flex justify-center p-8"><span className="loading loading-spinner loading-lg"></span></div>
-      ) : keys.length === 0 ? (
-        <div className="card bg-base-100 shadow">
-          <div className="card-body items-center text-center">
-            <span className="text-4xl">🔐</span>
-            <h3 className="card-title">No API Keys</h3>
-            <p className="text-base-content/60">Create your first API key to get started</p>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {keys.map(key => (
-            <div key={key.keyId} className={`card bg-base-100 shadow ${isExpired(key) ? 'opacity-50' : ''}`}>
-              <div className="card-body">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <strong>{key.name}</strong>
-                    {isExpired(key) && <span className="badge badge-error">Expired</span>}
-                  </div>
-                  <button className="btn btn-error btn-sm btn-outline" onClick={() => revokeKey(key.keyId)}>Revoke</button>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-sm text-base-content/60">
-                  <span>ID: <code>{key.keyId}</code></span>
-                  <span>Created: {formatDate(key.createdAt)}</span>
-                  <span>Last Used: {key.lastUsedAt ? formatDate(key.lastUsedAt) : 'Never'}</span>
-                  <span>Expires: {key.expiresAt ? formatDate(key.expiresAt) : 'Never'}</span>
+          {generatedToken && (
+            <div className="alert alert-success shadow-lg mb-8">
+              <div>
+                <h3 className="font-bold">New API Key Generated!</h3>
+                <p className="text-sm">Copy this token now. It will not be shown again.</p>
+                <div className="mt-2 p-2 bg-base-300 rounded font-mono break-all select-all">
+                  {generatedToken}
                 </div>
               </div>
+              <div className="flex-none">
+                <button className="btn btn-sm btn-ghost" onClick={() => setGeneratedToken(null)}>Close</button>
+              </div>
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+          )}
 
-export default ApiKeys
+          <div className="overflow-x-auto">
+            <table className="table w-full">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Prefix</th>
+                  <th>Created</th>
+                  <th>Last Used</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={5} className="text-center">Loading...</td></tr>
+                ) : keys.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center opacity-50 italic">No API keys found.</td></tr>
+                ) : (
+                  keys.map((key) => (
+                    <tr key={key.keyId}>
+                      <td className="font-medium">{key.name}</td>
+                      <td className="font-mono text-xs">{key.keyPrefix}</td>
+                      <td className="text-sm">{new Date(key.createdAt).toLocaleString()}</td>
+                      <td className="text-sm">
+                        {key.lastUsed ? new Date(key.lastUsed).toLocaleString() : "Never"}
+                      </td>
+                      <td>
+                        <button 
+                          className="btn btn-error btn-xs"
+                          onClick={() => handleRevoke(key.keyId)}
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ApiKeys;
