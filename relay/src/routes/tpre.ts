@@ -26,7 +26,7 @@ router.post("/reencrypt", async (req, res) => {
   try {
     // 1. Look up this relay's kfrag for this (group, member) pair
     // Using waitForZenData to handle P2P sync latency
-    const kfragNode = gun.get("signal_rooms").get(groupId).get("relay_kfrags").get(memberPub);
+    const kfragNode = gun.get("linda_rooms").get(groupId).get("relay_kfrags").get(memberPub);
     const kfragString: string | null = await waitForZenData(kfragNode);
     
     if (!kfragString || typeof kfragString !== 'string') {
