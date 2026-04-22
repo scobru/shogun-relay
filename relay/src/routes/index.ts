@@ -871,20 +871,23 @@ export default (app: express.Application) => {
           const walkDir = async (dir: string): Promise<void> => {
             try {
               const items = await fs.promises.readdir(dir, { withFileTypes: true });
-              for (const item of items) {
-                const fullPath = path.join(dir, item.name);
-                if (item.isDirectory()) {
-                  await walkDir(fullPath);
-                } else if (item.isFile()) {
-                  try {
-                    const stats = await fs.promises.stat(fullPath);
-                    totalSize += stats.size;
-                    fileCount++;
-                  } catch (e) {
-                    // Ignore unreadable files
+              // Process directory entries concurrently for better performance
+              await Promise.all(
+                items.map(async (item) => {
+                  const fullPath = path.join(dir, item.name);
+                  if (item.isDirectory()) {
+                    await walkDir(fullPath);
+                  } else if (item.isFile()) {
+                    try {
+                      const stats = await fs.promises.stat(fullPath);
+                      totalSize += stats.size;
+                      fileCount++;
+                    } catch (e) {
+                      // Ignore unreadable files
+                    }
                   }
-                }
-              }
+                })
+              );
             } catch (e) {
               // Ignore unreadable directories
             }
