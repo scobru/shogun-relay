@@ -45,7 +45,7 @@
     "express-basic-auth": "^1.2.1",
     "express-rate-limit": "^8.0.1",
     "form-data": "^4.0.3",
-    "gun": "https://github.com/scobru/gun",
+    "gun": "https://github.com/amark/gun",
     "http-proxy-middleware": "^3.0.5",
     "ip": "^2.0.1",
     "is-fn": "^3.0.0",
@@ -63,7 +63,7 @@
     "short-uuid": "^6.0.3",
     "tsx": "^4.19.2",
     "vis-network": "^10.0.2",
-    "zen": "https://github.com/scobru/zen"
+    "zen": "https://github.com/akaoio/zen"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
