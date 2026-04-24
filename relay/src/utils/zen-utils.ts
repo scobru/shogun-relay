@@ -11,7 +11,7 @@ import { IGunChain } from "gun/types/gun";
  */
 export async function waitForZenData(
   node: IGunChain<any, any, any, any>,
-  timeoutMs: number = 30000
+  timeoutMs: number = 8000
 ): Promise<any> {
   return new Promise((resolve) => {
     let resolved = false;
