@@ -36,7 +36,7 @@ import {
 
 import { startWormholeCleanup } from "./utils/wormhole-cleanup";
 import { tokenAuthMiddleware } from "./middleware/token-auth";
-import { secureCompare, hashToken, createProductionErrorHandler } from "./utils/security";
+import { secureCompare, hashToken, createProductionErrorHandler, isOriginAllowed } from "./utils/security";
 
 import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
 
@@ -188,17 +188,11 @@ async function initializeServer() {
 
   // ===== SECURITY: CORS Configuration =====
   const corsOptions = {
-    origin: authConfig.corsOrigins.includes("*")
-      ? true // Allow all origins if '*' is configured
-      : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
-        if (
-          authConfig.corsOrigins.some(
-            (allowed: string) => allowed === origin || origin.endsWith(allowed.replace("*.", "."))
-          )
-        ) {
+        if (isOriginAllowed(origin, authConfig.corsOrigins)) {
           callback(null, true);
         } else {
           loggers.server.warn({ origin }, "CORS blocked request from origin");
