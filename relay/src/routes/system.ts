@@ -71,9 +71,9 @@ import { performAliasMaintenance } from "../utils/alias-maintenance";
 
 const router: Router = express.Router();
 
-// Middleware per ottenere l'istanza Gun dal relay
+// Middleware per ottenere l'istanza Gun/ZEN dal relay
 const getGunInstance = (req: Request): any => {
-  return req.app.get("gunInstance");
+  return req.app.get("zenInstance") || req.app.get("gunInstance");
 };
 
 // Middleware per ottenere l'istanza ZEN dal relay

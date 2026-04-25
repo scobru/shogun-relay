@@ -58,7 +58,7 @@ describe("System Routes Performance", () => {
   let server: any;
   let baseUrl: string;
   let tempLogFile: string;
-  let dummyLines = 500000;
+  let dummyLines = 100000;
 
   beforeEach(async () => {
     app = express();

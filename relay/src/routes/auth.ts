@@ -5,7 +5,7 @@ const router: express.Router = express.Router();
 
 // Helper to get gun instance safely
 const getGun = (req: Request) => {
-  return req.app.get("gunInstance");
+  return req.app.get("zenInstance") || req.app.get("gunInstance");
 };
 
 /**

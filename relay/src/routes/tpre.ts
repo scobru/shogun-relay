@@ -18,9 +18,9 @@ router.post("/reencrypt", async (req, res) => {
 
   loggers.server.info(`[TPRE] 📥 Request for Group: ${groupId?.substring(0, 8)} | Member: ${memberPub?.substring(0, 12)}...`);
 
-  const gun = req.app.get("gunInstance");
+  const gun = req.app.get("zenInstance") || req.app.get("gunInstance");
   if (!gun) {
-    return res.status(500).json({ error: "Gun instance not available" });
+    return res.status(500).json({ error: "No database instance available" });
   }
 
   try {

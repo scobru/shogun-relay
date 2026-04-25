@@ -11,9 +11,9 @@ interface CustomRequest extends Request {
 
 const router: Router = express.Router();
 
-// Middleware per ottenere l'istanza Gun dal relay
+// Middleware per ottenere l'istanza Gun/ZEN dal relay
 const getGunInstance = (req: Request): any => {
-  return req.app.get("gunInstance");
+  return req.app.get("zenInstance") || req.app.get("gunInstance");
 };
 
 const GUN_META_KEYS = ["_", "#", ">", "<"];
