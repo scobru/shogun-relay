@@ -45,7 +45,6 @@ function ConsoleLogs() {
         setError(data.error);
       }
     } catch (e: any) {
-      console.error("Failed to fetch logs", e);
       setError(e.message || "Failed to fetch logs");
     } finally {
       if (loading) setLoading(false);
