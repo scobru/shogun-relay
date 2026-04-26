@@ -486,7 +486,17 @@ export default (app: express.Application) => {
   // Route per servire i file JavaScript dalla directory lib
   app.get("/lib/:filename", async (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
-    const filePath = path.resolve(publicPath, "lib", req.params.filename);
+    const targetDir = path.resolve(publicPath, "lib");
+    const filePath = path.resolve(targetDir, req.params.filename);
+
+    if (!filePath.startsWith(targetDir + path.sep)) {
+      loggers.server.warn({ filename: req.params.filename }, `⚠️ Path traversal attempt blocked`);
+      return res.status(403).json({
+        success: false,
+        error: "Access denied",
+      });
+    }
+
     const exists = await fs.promises
       .access(filePath)
       .then(() => true)
@@ -518,7 +528,17 @@ export default (app: express.Application) => {
   // Route per servire i file CSS dalla directory styles
   app.get("/styles/:filename", async (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
-    const filePath = path.resolve(publicPath, "styles", req.params.filename);
+    const targetDir = path.resolve(publicPath, "styles");
+    const filePath = path.resolve(targetDir, req.params.filename);
+
+    if (!filePath.startsWith(targetDir + path.sep)) {
+      loggers.server.warn({ filename: req.params.filename }, `⚠️ Path traversal attempt blocked`);
+      return res.status(403).json({
+        success: false,
+        error: "Access denied",
+      });
+    }
+
     const exists = await fs.promises
       .access(filePath)
       .then(() => true)
