@@ -490,6 +490,20 @@ export default (app: express.Application) => {
   app.get("/lib/:filename", async (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const filePath = path.resolve(publicPath, "lib", req.params.filename);
+
+    // Prevent path traversal attacks
+    const targetDir = path.resolve(publicPath, "lib");
+    if (!filePath.startsWith(targetDir + path.sep)) {
+      loggers.server.warn(
+        { filename: req.params.filename, filePath },
+        "🚨 Path traversal attempt blocked in /lib"
+      );
+      return res.status(403).json({
+        success: false,
+        error: "Forbidden",
+      });
+    }
+
     const exists = await fs.promises
       .access(filePath)
       .then(() => true)
@@ -522,6 +536,20 @@ export default (app: express.Application) => {
   app.get("/styles/:filename", async (req, res) => {
     const publicPath = path.resolve(__dirname, "../public");
     const filePath = path.resolve(publicPath, "styles", req.params.filename);
+
+    // Prevent path traversal attacks
+    const targetDir = path.resolve(publicPath, "styles");
+    if (!filePath.startsWith(targetDir + path.sep)) {
+      loggers.server.warn(
+        { filename: req.params.filename, filePath },
+        "🚨 Path traversal attempt blocked in /styles"
+      );
+      return res.status(403).json({
+        success: false,
+        error: "Forbidden",
+      });
+    }
+
     const exists = await fs.promises
       .access(filePath)
       .then(() => true)
