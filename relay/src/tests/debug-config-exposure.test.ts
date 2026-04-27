@@ -77,8 +77,5 @@ describe("Debug Config Exposure Vulnerability", () => {
 
     // New field should be present
     expect(response.body.adminPasswordStatus).toBe("CONFIGURED");
-
-    console.log("Fix verified: No sensitive data exposed even with authentication");
-    console.log("Data:", JSON.stringify(response.body, null, 2));
   });
 });
