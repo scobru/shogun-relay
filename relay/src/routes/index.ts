@@ -1046,7 +1046,7 @@ export default (app: express.Application) => {
           }
         }
 
-        const success = updateEnvFile(updates);
+        const success = await updateEnvFile(updates);
 
         if (!success) {
           return res.status(500).json({
@@ -1088,7 +1088,7 @@ export default (app: express.Application) => {
       try {
         const { readEnvFile, parseEnvFile } = await import("../utils/runtime-config");
 
-        const content = readEnvFile();
+        const content = await readEnvFile();
         if (content === null) {
           return res.status(404).json({
             success: false,

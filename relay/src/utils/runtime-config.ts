@@ -150,14 +150,14 @@ export function requiresRestart(key: string): boolean {
 /**
  * Read the .env file contents
  */
-export function readEnvFile(): string | null {
+export async function readEnvFile(): Promise<string | null> {
   try {
     const envPath = path.join(process.cwd(), ".env");
-    if (!fs.existsSync(envPath)) {
+    return await fs.promises.readFile(envPath, "utf-8");
+  } catch (error: any) {
+    if (error.code === "ENOENT") {
       return null;
     }
-    return fs.readFileSync(envPath, "utf-8");
-  } catch (error) {
     loggers.server.error({ err: error }, "Failed to read .env file");
     return null;
   }
@@ -199,13 +199,17 @@ export function parseEnvFile(content: string): Record<string, string> {
  * Update a value in the .env file
  * @returns true if successful
  */
-export function updateEnvFile(updates: Record<string, string>): boolean {
+export async function updateEnvFile(updates: Record<string, string>): Promise<boolean> {
   try {
     const envPath = path.join(process.cwd(), ".env");
     let content = "";
 
-    if (fs.existsSync(envPath)) {
-      content = fs.readFileSync(envPath, "utf-8");
+    try {
+      content = await fs.promises.readFile(envPath, "utf-8");
+    } catch (error: any) {
+      if (error.code !== "ENOENT") {
+        throw error;
+      }
     }
 
     const lines = content.split("\n");
@@ -238,7 +242,7 @@ export function updateEnvFile(updates: Record<string, string>): boolean {
       }
     }
 
-    fs.writeFileSync(envPath, newLines.join("\n"));
+    await fs.promises.writeFile(envPath, newLines.join("\n"));
     loggers.server.info({ keys: Object.keys(updates) }, "📝 .env file updated");
 
     return true;
