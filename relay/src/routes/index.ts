@@ -89,6 +89,9 @@ export default (app: express.Application) => {
   // Configurazione generale delle route
   const baseRoute = "/api/v1";
 
+  // Applicazione del rate limiting generale a tutte le route API
+  app.use(baseRoute, generalLimiter);
+
   // OpenAPI Specification endpoint - Must be registered BEFORE other API routes
   app.get("/api/openapi.json", (req, res) => {
     try {

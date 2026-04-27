@@ -36,6 +36,7 @@ export const config = {
       `
 *** WELCOME TO DELAY ***
 `,
+    trustProxy: process.env.TRUST_PROXY || "1",
   },
 
   // Relay Identity

@@ -238,7 +238,14 @@ async function initializeServer() {
   app.use(express.urlencoded({ extended: true })); // Aggiungi supporto per i dati del form
 
   // Fix per rate limiting con proxy
-  app.set("trust proxy", 1);
+  const trustProxy = serverConfig.trustProxy;
+  if (trustProxy === "true") {
+    app.set("trust proxy", true);
+  } else if (trustProxy === "false") {
+    app.set("trust proxy", false);
+  } else {
+    app.set("trust proxy", isNaN(Number(trustProxy)) ? trustProxy : Number(trustProxy));
+  }
 
   // Stats Tracker Initialize
   const statsTracker = new StatsTracker();
