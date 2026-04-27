@@ -8,6 +8,7 @@ import { ipfsUpload } from "../../utils/ipfs-client";
 import type { CustomRequest, IpfsRequestOptions } from "./types";
 import { IPFS_API_TOKEN, verifyWalletSignature } from "./utils";
 import { GUN_PATHS } from "../../utils/gun-paths";
+import { secureCompare, hashToken } from "../../utils/security";
 
 const router: Router = Router();
 
@@ -39,7 +40,10 @@ router.post(
 
     if (adminTokenStr && typeof adminTokenStr === "string") {
       // Check admin password
-      if (adminTokenStr === authConfig.adminPassword) {
+      const tokenHash = hashToken(adminTokenStr);
+      const adminHash = hashToken(authConfig.adminPassword || "");
+
+      if (authConfig.adminPassword && secureCompare(tokenHash, adminHash)) {
         isAdmin = true;
       } else if (adminTokenStr.startsWith("shogun-api-")) {
         // Check API key

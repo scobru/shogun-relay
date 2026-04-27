@@ -6,6 +6,7 @@ import { authConfig, ipfsConfig } from "../../config";
 import { ipfsUpload } from "../../utils/ipfs-client";
 import type { CustomRequest } from "./types";
 import { GUN_PATHS } from "../../utils/gun-paths";
+import { secureCompare, hashToken } from "../../utils/security";
 
 const router: Router = Router();
 
@@ -23,8 +24,11 @@ router.post(
     const authHeader = req.headers["authorization"];
     const bearerToken = authHeader && authHeader.split(" ")[1];
     const customToken = req.headers["token"];
-    const adminToken = bearerToken || customToken;
-    const isAdmin = adminToken === authConfig.adminPassword;
+    const adminToken = (bearerToken || customToken) as string;
+
+    const tokenHash = hashToken(adminToken || "");
+    const adminHash = hashToken(authConfig.adminPassword || "");
+    const isAdmin = authConfig.adminPassword && secureCompare(tokenHash, adminHash);
 
     const userAddressRaw = req.headers["x-user-address"];
     const userAddress = Array.isArray(userAddressRaw) ? userAddressRaw[0] : userAddressRaw;

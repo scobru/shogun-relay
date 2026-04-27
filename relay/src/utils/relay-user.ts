@@ -13,6 +13,7 @@ import { loggers } from "./logger";
 const log = loggers.relayUser;
 import { authConfig } from "../config/env-config";
 import { GUN_PATHS, getGunNode } from "./gun-paths";
+import { secureCompare, hashToken } from "./security";
 
 // Module state
 let relayUser: GunUser | undefined = undefined;
@@ -281,7 +282,10 @@ export const adminAuthMiddleware = (req: any, res: any, next: any) => {
     return res.status(401).json({ success: false, error: "Unauthorized - Token required" });
   }
 
-  if (token === authConfig.adminPassword) {
+  const tokenHash = hashToken(token as string);
+  const adminHash = hashToken(authConfig.adminPassword || "");
+
+  if (authConfig.adminPassword && secureCompare(tokenHash, adminHash)) {
     next();
   } else {
     return res.status(401).json({ success: false, error: "Unauthorized - Invalid token" });
