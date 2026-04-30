@@ -33,6 +33,7 @@
   "author": "Shogun Team",
   "license": "MIT",
   "dependencies": {
+    "@akaoio/zen": "github:akaoio/zen",
     "@aws-sdk/client-s3": "^3.993.0",
     "@nucypher/umbral-pre": "^0.10.0",
     "@smithy/node-http-handler": "^4.4.10",

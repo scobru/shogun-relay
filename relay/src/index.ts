@@ -42,6 +42,13 @@ import { GUN_PATHS, getGunNode } from "./utils/gun-paths";
 
 import { gunAliasGuard } from "./middleware/gun-alias-guard";
 import { performAliasMaintenance } from "./utils/alias-maintenance";
+import {
+  discoverNetworkIdentity,
+  getHardwarePeerId,
+  setupPeerExchange,
+  latchDomain,
+  kprs
+} from "./utils/zen-network";
 
 // Route Imports
 
@@ -184,6 +191,17 @@ async function initializeServer() {
       req.url = queryPart ? `${normalizedPath}?${queryPart}` : normalizedPath;
     }
     next();
+  });
+
+  // Latch domain from first incoming request Host header if still unknown
+  app.use((req, res, next) => {
+    latchDomain(req, app.get("zenInstance"));
+    next();
+  });
+
+  // --- ZEN Peers Endpoint ---
+  app.get("/peers", (req, res) => {
+    res.status(200).json(Array.from(kprs));
   });
 
   // ===== SECURITY: CORS Configuration =====
@@ -538,6 +556,28 @@ async function initializeServer() {
     }
 
     loggers.server.info({ path: zenConfig.path, dataDir: zenDataDir }, "🚀 Initializing ZEN Instance...");
+
+    // Discover network identity and Hardware ID
+    const networkIdentity = await discoverNetworkIdentity(port as number);
+    loggers.server.info(`🌐 Network Identity Discovered: ${JSON.stringify(networkIdentity)}`);
+
+    const hwidRaw = getHardwarePeerId();
+    let ppid = null;
+    if (hwidRaw) {
+      try {
+        const seed = await ZEN.hash(hwidRaw, null, null, { encode: "base62" });
+        const ppair = await ZEN.pair(null, { seed });
+        ppid = ppair.pub;
+        loggers.server.info(`🔑 ZEN Peer ID (stable): ${ppid.slice(0, 9)}...`);
+      } catch (e: any) {
+        loggers.server.warn(`⚠️ ZEN pid derivation failed: ${e.message}`);
+      }
+    }
+
+    if (ppid) {
+      zenOptions.pid = ppid;
+    }
+
     const zen = new ZEN(zenOptions);
     zen._graph; // Force relay initialization as per examples
     app.set("zenInstance", zen);
@@ -549,6 +589,10 @@ async function initializeServer() {
       const addr = peer.url || peer.id || "unknown";
       statsTracker.patchSocket(peer.wire, addr, "zen");
     });
+
+    const activeDomain = networkIdentity.domain || networkIdentity.ip;
+    const serverUrl = activeDomain ? `wss://${activeDomain}:${port}${zenConfig.path}` : null;
+    setupPeerExchange(zen, serverUrl);
 
     loggers.server.info("✅ ZEN Instance initialized alongside Gun");
   }
