@@ -680,14 +680,12 @@ router.get("/services/:name/logs", adminAuthMiddleware, async (req, res) => {
     // This assumes standard log locations or PM2 log naming convention
     let logFile = "";
 
-    // Normalize service name
+    // Normalize and validate service name
     const normalizedName = (serviceName as string).toLowerCase().replace(/%20/g, " ").trim();
 
-    if (
-      normalizedName.includes("..") ||
-      normalizedName.includes("/") ||
-      normalizedName.includes("\\")
-    ) {
+    // Strict validation to prevent path traversal and other injection attacks
+    const nameRegex = /^[a-zA-Z0-9\s\-_]+$/;
+    if (!nameRegex.test(normalizedName)) {
       return res.status(400).json({
         success: false,
         error: "Invalid service name",
