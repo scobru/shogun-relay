@@ -622,7 +622,8 @@ router.get("/peers", adminAuthMiddleware, (req, res) => {
     const gun = getGunInstance(req);
 
     // Get peers information
-    const peers = gun._.opt.peers || {};
+    // Use optional chaining to prevent crashes if the instance is not fully initialized
+    const peers = gun?._?.opt?.peers || {};
 
     res.json({
       success: true,
@@ -651,8 +652,16 @@ router.post("/peers/add", adminAuthMiddleware, (req, res) => {
       });
     }
 
-    // Add peer to Gun
-    gun.opt({ peers: [peer] });
+    // Add peer to Gun if instance and opt method are available
+    if (gun && typeof gun.opt === "function") {
+      gun.opt({ peers: [peer] });
+    } else {
+      loggers.server.warn({ peer }, "⚠️ Cannot add peer: Gun instance or .opt() not available");
+      return res.status(503).json({
+        success: false,
+        error: "Gun instance not ready",
+      });
+    }
 
     res.json({
       success: true,
