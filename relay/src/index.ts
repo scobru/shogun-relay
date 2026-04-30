@@ -7,7 +7,7 @@ import setSelfAdjustingInterval from "self-adjusting-interval";
 import { fileURLToPath } from "url";
 import Gun from "gun";
 import "gun/sea";
-import "gun/lib/stats";
+// import "gun/lib/stats"; // Disabled: causes EACCES errors by trying to write to /root/.local/state/zen/
 
 // import "gun/axe"; // Disabled: causes infinite event-loop blocks / 504 Gateway Timeouts on writes in cyclic nets
 import "./utils/bullet-catcher";
@@ -482,6 +482,7 @@ async function initializeServer() {
     chunk: 1000,
     pack: 1000,
     jsonify: true,
+    stats: false, // Prevent writing to /root/.local/state/zen/
   };
 
   // Logic to ensure storage consistency
@@ -549,6 +550,7 @@ async function initializeServer() {
       axe: false,
       peers: peers, // Share the same peers
       store: zenStore,
+      stats: false, // Prevent writing to /root/.local/state/zen/
     };
 
     if (!zenStore) {
