@@ -13,6 +13,7 @@ import "gun/sea";
 import "./utils/bullet-catcher";
 // @ts-ignore
 import ZEN from "zen";
+import "zen/lib/multicast.js";
 
 import multer from "multer";
 import SQLiteStore from "./utils/sqlite-store";
@@ -398,7 +399,7 @@ async function initializeServer() {
     }
   });
 
-  app.use((Gun as any).serve);
+  app.use((ZEN as any).serve);
 
   // IPFS File Upload Endpoint
   const upload = multer({ storage: multer.memoryStorage() });
@@ -547,7 +548,7 @@ async function initializeServer() {
       radisk: true,
       isValid: hasValidToken,
       localStorage: false,
-      axe: false,
+      axe: true,
       peers: peers, // Share the same peers
       store: zenStore,
       stats: false, // Prevent writing to /root/.local/state/zen/
