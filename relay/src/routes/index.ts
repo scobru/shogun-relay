@@ -68,6 +68,7 @@ import visualGraphRouter from "./visualGraph";
 // torrentRouter removed
 import authRouter from "./auth";
 import tpreRouter from "./tpre";
+import networkRouter from "./network";
 
 import { ipfsRequest } from "../utils/ipfs-client";
 import { generateOpenAPISpec } from "../utils/openapi-generator";
@@ -586,6 +587,7 @@ export default async (app: express.Application) => {
 
   // Route di sistema e debug (always enabled - core functionality)
   app.use(`${baseRoute}/system`, systemRouter);
+  app.use(`${baseRoute}/network`, networkRouter);
   app.use(`${baseRoute}/debug`, debugRouter);
 
   // Route per il grafico visivo (always enabled)
