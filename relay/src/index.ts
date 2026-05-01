@@ -399,10 +399,19 @@ async function initializeServer() {
     }
   });
 
-  app.use((ZEN as any).serve);
-
   // IPFS File Upload Endpoint
   const upload = multer({ storage: multer.memoryStorage() });
+
+  // --- Modular Routes ---
+  // Registration is moved here to ensure it happens BEFORE server starts listening
+  // and BEFORE any fallback middlewares.
+  try {
+    const { default: registerRoutes } = await import("./routes/index");
+    await registerRoutes(app);
+    loggers.server.info("✅ Route modulari configurate con successo");
+  } catch (error) {
+    loggers.server.error({ err: error }, "❌ Errore nel caricamento delle route modulari");
+  }
 
   /**
    * Start the Express server
@@ -704,15 +713,6 @@ async function initializeServer() {
 
   // Esponi l'istanza Gun globalmente per le route
   (global as any).gunInstance = gun;
-
-  // --- Modular Routes ---
-  try {
-    const { default: registerRoutes } = await import("./routes/index");
-    registerRoutes(app);
-    loggers.server.info("✅ Route modulari configurate con successo");
-  } catch (error) {
-    loggers.server.error({ err: error }, "❌ Errore nel caricamento delle route modulari");
-  }
 
   // ===== SECURITY: Production Error Handler =====
   // This must be added AFTER all routes to catch any unhandled errors

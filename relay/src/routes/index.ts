@@ -85,7 +85,7 @@ const generalLimiter = rateLimit({
   } as any, // Type assertion to match rate-limit types
 });
 
-export default (app: express.Application) => {
+export default async (app: express.Application) => {
   // Configurazione generale delle route
   const baseRoute = "/api/v1";
 
@@ -1163,6 +1163,14 @@ export default (app: express.Application) => {
       },
     });
   });
+
+  // Fallback to ZEN.serve for library assets and internal routes
+  // This is placed after specific API routes but before the final catch-all
+  // @ts-ignore
+  const { default: ZEN } = await import("zen");
+  if (ZEN && (ZEN as any).serve) {
+    app.use((ZEN as any).serve);
+  }
 
   // Fallback to index.html per tutte le altre route
   app.get("/*", async (req, res) => {
