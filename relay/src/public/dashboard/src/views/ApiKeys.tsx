@@ -10,7 +10,7 @@ interface ApiKey {
 }
 
 const ApiKeys: React.FC = () => {
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, password } = useAuth();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +39,7 @@ const ApiKeys: React.FC = () => {
 
   useEffect(() => {
     fetchKeys();
-  }, [token]);
+  }, [password]);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
