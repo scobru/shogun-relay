@@ -10,7 +10,7 @@ interface ApiKey {
 }
 
 const ApiKeys: React.FC = () => {
-  const { token } = useAuth();
+  const { getAuthHeaders } = useAuth();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,9 +22,7 @@ const ApiKeys: React.FC = () => {
     try {
       setLoading(true);
       const response = await fetch("/api/v1/api-keys", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
@@ -53,7 +51,7 @@ const ApiKeys: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({ name: newKeyName }),
       });
@@ -78,9 +76,7 @@ const ApiKeys: React.FC = () => {
     try {
       const response = await fetch(`/api/v1/api-keys/${keyId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
       const data = await response.json();
       if (data.success) {
